@@ -1,0 +1,13 @@
+# local editor configuration
+.claude/
+
+# third-party model files, used only as a validation answer key
+*.fth
+*.aro
+
+# the single-file build (npm run build)
+dist/
+
+# operating system
+Thumbs.db
+.DS_Store

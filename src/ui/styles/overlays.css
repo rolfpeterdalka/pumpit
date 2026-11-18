@@ -1,0 +1,55 @@
+/* Overlays: right-click card, modal dialog, toast and the bubble of the notes. */
+.ctxmenu { position: fixed; z-index: 40; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 0; display: flex; flex-direction: column; width: min(330px, calc(100vw - 16px)); overflow: hidden; }
+.info-head { display: flex; flex-direction: column; gap: 1px; padding: 10px 14px 8px; border-bottom: 1px solid var(--line); background: var(--sunk); }
+.info-head b { font-size: 15px; color: var(--accent); }
+.info-head span { font-size: 12.5px; color: var(--ink-2); }
+.info-rows { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin: 0; padding: 10px 14px; font-size: 13px; }
+.info-rows dt { color: var(--ink-2); }
+.info-rows dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.info-rows dd.strong { font-weight: 600; color: var(--ink); }
+.info-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 10px 10px; border-top: 1px solid var(--line); }
+.ctxmenu .info-actions button { border: 1px solid var(--line); background: var(--panel); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.ctxmenu .info-actions button:hover { background: var(--accent-soft); border-color: var(--accent); }
+.modal-back { position: fixed; inset: 0; background: rgba(10, 16, 20, .45); z-index: 50; display: grid; place-items: center; padding: 16px; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); width: min(560px, 100%); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.modal h3 { margin: 0; font: 600 18px var(--f-display); }
+.modal textarea { width: 100%; min-height: 220px; font-family: var(--f-mono); font-size: 12px; }
+.modal input[type="text"] { width: 100%; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* report of an imported model (File → Open with a .fth file) */
+.import-report { max-height: min(62vh, 560px); overflow: auto; font-size: 13px; }
+.import-report p { margin: 0 0 8px; }
+.import-report p.ok { color: var(--ok); font-weight: 600; }
+.import-report p.warn { padding: 8px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.import-report p.muted { color: var(--ink-2); }
+.import-report h4 { margin: 14px 0 4px; font: 600 13.5px var(--f-display); color: var(--ink); }
+.import-report h4.level-missing { color: var(--crit); }
+.import-report ul { margin: 0; padding-left: 20px; }
+.import-report li { margin: 3px 0; color: var(--ink-2); }
+.import-scenarios label { display: flex; gap: 10px; align-items: flex-start; padding: 7px 6px; border-radius: 8px; cursor: pointer; }
+.import-scenarios label:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.import-scenarios input { margin-top: 3px; }
+.import-scenarios b { font-weight: 600; color: var(--ink); }
+.import-scenarios .tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.import-scenarios small { display: block; margin-top: 2px; color: var(--ink-2); white-space: pre-line; }
+.import-scenarios label.empty { cursor: default; opacity: .6; }
+.import-scenarios label.empty:hover { background: none; }
+.import-scenarios .tag.empty { color: var(--ink-2); border-color: var(--line); }
+/* keyboard shortcuts box (Edit menu) */
+.shortcuts { max-height: min(62vh, 560px); overflow: auto; font-size: 12.5px; }
+.shortcuts h4 { margin: 14px 0 4px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.shortcuts table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.shortcuts th { width: 36%; font: 500 12px var(--f-mono); color: var(--ink); text-align: left; vertical-align: top; padding: 4px 14px 4px 0; }
+.shortcuts td { color: var(--ink-2); padding: 4px 0; border-bottom: 1px solid var(--line); }
+.shortcuts th { border-bottom: 1px solid var(--line); }
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--panel);
+  padding: 8px 16px; border-radius: 8px; box-shadow: var(--shadow); font-size: 13px; max-width: calc(100% - 32px);
+}
+/* the bubble of a field's note (tips.js), over everything else; clicks go through it */
+.tip {
+  position: fixed; z-index: 80; pointer-events: none; width: max-content; max-width: min(320px, calc(100vw - 16px)); padding: 8px 11px;
+  background: var(--panel); color: var(--ink-2); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  font-size: 12.5px; line-height: 1.45; text-transform: none; letter-spacing: normal; font-weight: 400;
+}
+.tip b { color: var(--ink); font-weight: 600; }

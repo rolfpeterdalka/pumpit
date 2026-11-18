@@ -1,0 +1,237 @@
+// Data model: factories for models, pipes and junctions, path access and topology helpers
+// (specification sections 2, 3 and 6). Scenarios and validation extend PumpIt.model in their own files.
+(function (root) {
+  const PumpIt = root.PumpIt;
+  const types = PumpIt.junctionTypes;
+  const { t } = PumpIt.i18n;
+  const q = (value, unit) => ({ value, unit });
+  const clone = (o) => (o === undefined ? undefined : JSON.parse(JSON.stringify(o)));
+
+  function newJunction(type, id, x, y) {
+    const j = { id, name: '', type, x, y, elevation: q(0, 'm') };
+    const def = types.get(type);
+    if (!def) throw new Error(t('core.model.unknownJunctionType', { type }));
+    Object.assign(j, def.defaults());
+    return j;
+  }
+
+  // Models saved before some junction types were removed: convert to the closest equivalent. The check valve came back
+  // with the time simulation (§7.4 of its specification): one saved before gets the fields it lacks.
+  function migrate(m) {
+    const notes = [];
+    for (const j of m.junctions) {
+      const was = j.type;
+      if (was === 'check') {
+        if (j.closed === undefined && j.special === 'closed') j.closed = true;
+        for (const [k, v] of Object.entries(types.get('check').defaults())) if (j[k] === undefined) j[k] = v;
+      }
+      else if (was === 'bend' || was === 'areachange') {
+        Object.assign(j, { type: 'generic', genModel: 'K', K: was === 'bend' && j.bendModel === 'K' ? j.K : (was === 'bend' ? 0.3 : 0) });
+        if (!j.curve) j.curve = newJunction('generic', 0, 0, 0).curve;
+      } else if (was === 'deadend') Object.assign(j, { type: 'flow', Q: q(0, 'm³/h'), dir: 'out' });
+      if (was !== j.type) notes.push(`J${j.id}: ${was} → ${types.table()[j.type].label}`);
+      delete j.designFactor;
+    }
+    for (const p of m.pipes) delete p.factors;
+    return notes;
+  }
+
+  function newPipe(id, up, down) {
+    return {
+      id, name: '', up, down,
+      length: q(10, 'm'),
+      material: { kind: 'steel', nps: '4', sch: '40' },
+      geometry: {
+        kind: 'circular', d: q(102.26, 'mm'), dOuter: q(100, 'mm'), dInner: q(50, 'mm'),
+        width: q(100, 'mm'), height: q(50, 'mm'), area: q(50, 'cm²'), perim: q(30, 'cm'),
+      },
+      friction: { model: 'roughness', eps: q(0.046, 'mm'), rel: 0.0001, f: 0.02, C: 120 },
+      fittings: [],
+      idReduction: 0,
+      nParallel: 1,
+      closed: false,
+    };
+  }
+
+  // Data of a pipe the user draws (R-13 of the 3D views): length, material, section and friction copied from the
+  // reference pipe, never taken from the drawing. Without a reference (or with an invalid length) the length is
+  // 100 m, and the rest comes from newPipe.
+  function pipeDefaults(prev) {
+    const base = newPipe(0, 0, 0);
+    const pick = (k) => clone(prev && prev[k] ? prev[k] : base[k]);
+    const L = prev && prev.length ? Number(prev.length.value) : NaN;
+    return { length: L > 0 ? pick('length') : q(100, 'm'), material: pick('material'), geometry: pick('geometry'), friction: pick('friction') };
+  }
+
+  // the gas of the compressible mode (R-10): a library gas by its id, or 'custom' with its own MW, k and μ; Z is always
+  // given. For a library gas the stored MW, k and μ are not used (they seed a custom gas)
+  function newGasFluid() {
+    return { kind: 'gas', gas: 'air', name: '', MW: 28.9647, k: 1.4, Z: 1, mu: q(0.01813, 'cP'), T: q(20, '°C') };
+  }
+
+  // control of the time simulation (docs/time-simulation.md): off by default, so a model calculates as before. Clock,
+  // step and the parameters of the central method of the tank levels and of the implicit method of the gas vessels (its
+  // relative tolerance, relaxation and iterations); dataEnd: what a table without repetition gives past its last point;
+  // tariff: the price of the energy by the hour of the day, for the cost of the pumps (off by default); exactEvents: an
+  // event on a level fires at the time the level crosses its value, between two steps (forward method)
+  const TIME_METHODS = ['forward', 'central', 'implicit'];
+  const DATA_END = ['hold', 'extrapolate'];
+  const newTariff = () => ({ use: false, currency: '', t: [0], v: [0], tUnit: 'h' });
+  function newTimeControl() {
+    return {
+      on: false, start: q(0, 'h'), stop: q(24, 'h'), step: q(10, 'min'), saveEvery: 1, method: 'forward',
+      relTol: 1e-5, absTol: q(0.03048, 'mm'), relax: 1, maxIter: 10000, dataEnd: 'hold', tariff: newTariff(), exactEvents: false,
+    };
+  }
+
+  // the time control of a loaded model: missing or invalid fields back to their defaults (a model saved before the time
+  // simulation gets it switched off, and calculates as before)
+  function normalizeTime(m) {
+    const d = newTimeControl(), tc = m.solution && m.solution.time;
+    const o = tc && typeof tc === 'object' && !Array.isArray(tc) ? tc : {};
+    const out = Object.assign({}, d, o);
+    out.on = o.on === true;
+    out.exactEvents = o.exactEvents === true;
+    for (const k of ['start', 'stop', 'step', 'absTol']) if (!isQty(out[k])) out[k] = d[k];
+    for (const k of ['saveEvery', 'relTol', 'relax', 'maxIter']) if (typeof out[k] !== 'number') out[k] = d[k];
+    if (!TIME_METHODS.includes(out.method)) out.method = d.method;
+    if (!DATA_END.includes(out.dataEnd)) out.dataEnd = d.dataEnd;
+    const tf = out.tariff;
+    if (!(tf && typeof tf === 'object' && Array.isArray(tf.t) && Array.isArray(tf.v))) out.tariff = newTariff();
+    else { out.tariff = Object.assign(newTariff(), tf); out.tariff.use = tf.use === true; if (typeof out.tariff.currency !== 'string') out.tariff.currency = ''; }
+    m.solution.time = out;
+    // the named events of the model (combined events): a list
+    if (!Array.isArray(m.events)) m.events = [];
+    return m;
+  }
+
+  // a new model; its default texts (title, fluid name, base scenario) are in the current language
+  function newModel() {
+    return {
+      version: 1,
+      title: t('core.model.untitled'),
+      system: {
+        fluid: { kind: 'water', T: q(20, '°C'), name: t('core.model.fluidName'), rho: q(998.2, 'kg/m³'), mu: q(1.002, 'cP'), pv: q(0.02386, 'kgf/cm²(a)') },
+        patm: q(1.03323, 'kgf/cm²(a)'),
+        gravity: 1,
+        reLam: 2300,
+        reTurb: 4000,
+        laminarK: 'craneFt',
+        // compressible mode (R-01..R-04, R-41): the regime, the thermal model, the gas (kept beside the liquid of
+        // `fluid`, so a change of regime loses nothing: decision G-05) and the design limits of the warnings
+        regime: 'incompressible',
+        gasMode: 'isothermal',
+        fluidGas: newGasFluid(),
+        machLimit: 0.7,
+        gasVelLimit: q(30, 'm/s'),
+      },
+      solution: { tolRel: 1e-4, maxIter: 500, relax: 1, adaptive: true, checkMass: true, time: newTimeControl() },
+      pipes: [],
+      junctions: [],
+      events: [],
+      scenarios: { list: [{ id: 'base', name: t('core.model.baseScenario'), parent: null, overrides: {}, notes: '' }], current: 'base' },
+      nextId: { p: 1, j: 1 },
+    };
+  }
+
+  // ---------- path access ----------
+
+  function getPath(o, path) {
+    if (!path) return o;
+    let cur = o;
+    for (const k of path.split('.')) { if (cur == null) return undefined; cur = cur[k]; }
+    return cur;
+  }
+  function setPath(o, path, v) {
+    const ks = path.split('.');
+    let cur = o;
+    for (let i = 0; i < ks.length - 1; i++) {
+      if (cur[ks[i]] == null || typeof cur[ks[i]] !== 'object') cur[ks[i]] = {};
+      cur = cur[ks[i]];
+    }
+    cur[ks[ks.length - 1]] = v;
+  }
+  function deepEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  // objKey: 'sys' | 'sol' | 'p:ID' | 'j:ID'
+  function getObj(m, key) {
+    if (key === 'sys') return m.system;
+    if (key === 'sol') return m.solution;
+    const [k, id] = key.split(':');
+    const n = Number(id);
+    return k === 'p' ? m.pipes.find((p) => p.id === n) : m.junctions.find((j) => j.id === n);
+  }
+
+  // ---------- topology ----------
+
+  function pipesAt(m, jid) { return m.pipes.filter((p) => p.up === jid || p.down === jid); }
+
+  // regime of a model (compressible mode, R-02): 'compressible' (gas) or 'incompressible' (liquid, the default and the
+  // regime of every model saved before the field existed)
+  const REGIMES = ['incompressible', 'compressible'];
+  const GAS_MODES = ['isothermal', 'adiabatic'];
+  // laminar correction of the K values: against the Crane fT (the default), against the pipe's own turbulent f, or none
+  const LAMINAR_K = ['craneFt', 'pipeFt', 'none'];
+  const isCompressible = (m) => !!(m && m.system && m.system.regime === 'compressible');
+  // old values that saved models may hold: the Portuguese values of the specification (before 19 October 2026) and the
+  // former names of the laminar corrections of K (until 19 October 2026)
+  const OLD_VALUES = {
+    incompressivel: 'incompressible', compressivel: 'compressible', isotermico: 'isothermal', adiabatico: 'adiabatic',
+    improvedAtkf: 'craneFt', atkf: 'pipeFt',
+  };
+  const RENAMED = ['regime', 'gasMode', 'laminarK'];
+  const renamed = (v) => (typeof v === 'string' && Object.prototype.hasOwnProperty.call(OLD_VALUES, v) ? OLD_VALUES[v] : v);
+
+  // regime fields of a loaded model (§8.5), and its laminar correction of K: old values renamed (in the system and in
+  // the scenarios), unknown values back to the defaults, missing gas fields filled in. A gas written as the active
+  // fluid (system.fluid.kind 'gas', the layout of §8.1) becomes the gas of the model, with its numbers in SI, and the
+  // liquid goes back to the default one.
+  const isQty = (v) => v && typeof v === 'object' && 'value' in v && 'unit' in v;
+  function normalizeRegime(m) {
+    const s = m.system;
+    for (const k of RENAMED) if (k in s) s[k] = renamed(s[k]);
+    for (const scn of (m.scenarios && m.scenarios.list) || []) {
+      const ov = scn && scn.overrides;
+      if (!ov) continue;
+      for (const k of RENAMED) if ('sys|' + k in ov) ov['sys|' + k] = renamed(ov['sys|' + k]);
+    }
+    if (s.fluid && s.fluid.kind === 'gas') {
+      const f = s.fluid;
+      s.fluidGas = Object.assign(newGasFluid(), {
+        gas: 'custom', name: typeof f.name === 'string' ? f.name : '', MW: f.MW, k: f.k, Z: f.Z ?? 1,
+        mu: isQty(f.mu) ? f.mu : q(f.mu, 'Pa·s'), T: isQty(f.T) ? f.T : q(f.T, 'K'),
+      });
+      s.fluid = newModel().system.fluid;
+      if (s.regime === undefined) s.regime = 'compressible';
+    }
+    if (!REGIMES.includes(s.regime)) s.regime = 'incompressible';
+    if (!GAS_MODES.includes(s.gasMode)) s.gasMode = 'isothermal';
+    if (!LAMINAR_K.includes(s.laminarK)) s.laminarK = 'craneFt';
+    const g = s.fluidGas && typeof s.fluidGas === 'object' && !Array.isArray(s.fluidGas) ? s.fluidGas : {};
+    s.fluidGas = Object.assign(newGasFluid(), g, { kind: 'gas' });
+    if (!isQty(s.fluidGas.T)) s.fluidGas.T = newGasFluid().T;
+    if (!isQty(s.fluidGas.mu)) s.fluidGas.mu = newGasFluid().mu;
+    if (!(typeof s.machLimit === 'number')) s.machLimit = 0.7;
+    if (!isQty(s.gasVelLimit)) s.gasVelLimit = q(30, 'm/s');
+    return m;
+  }
+
+  // inlet and outlet pipes of a two-port junction, by reference direction
+  function ports(m, j) {
+    const ps = pipesAt(m, j.id);
+    const inP = ps.filter((p) => p.down === j.id);
+    const outP = ps.filter((p) => p.up === j.id);
+    if (inP.length === 1 && outP.length === 1) return { in: inP[0], out: outP[0], consistent: true };
+    if (ps.length === 2) return { in: ps[0], out: ps[1], consistent: false };
+    return null;
+  }
+
+  PumpIt.model = Object.assign(PumpIt.model || {}, {
+    q, clone, newJunction, newPipe, pipeDefaults, newModel, newGasFluid, migrate,
+    getPath, setPath, getObj, deepEqual,
+    pipesAt, ports, REGIMES, GAS_MODES, LAMINAR_K, isCompressible, normalizeRegime,
+    TIME_METHODS, DATA_END, newTimeControl, normalizeTime,
+  });
+  // { type: definition } in display order, built from the junction type registry
+  Object.defineProperty(PumpIt.model, 'JT', { get: () => types.table(), enumerable: true, configurable: true });
+})(typeof window !== 'undefined' ? window : globalThis);

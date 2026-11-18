@@ -1,0 +1,17 @@
+/* The water hammer: its stamp and time cursor at the top, its section across the system window, its tables. */
+
+/* the stamp beside the regime (the button that stops a run and the time cursor take those of the time simulation) */
+.stamp.surge { border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); color: var(--ink); }
+.stamp.surge.running { background: color-mix(in srgb, var(--crit) 12%, var(--panel)); }
+
+/* its section in the system window, below the two columns and across them */
+.sys-col.sys-wide { margin-top: 14px; }
+.surge-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; align-items: start; }
+@media (max-width: 760px) {
+  .surge-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* the sectioning of the run: a row takes to its pipe */
+.surge-table { max-height: 320px; margin: 6px 0 8px; }
+.surge-table tbody tr { cursor: pointer; }
+.surge-table td.bad, #su-env td.bad { color: var(--crit); font-weight: 600; }
