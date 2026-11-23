@@ -158,7 +158,8 @@
   // header of a column, in the catalogs results.columns (liquid) and results.gasColumns (gas)
   const label = (regime, table, k) => t((regime === 'gas' ? 'results.gasColumns.' : 'results.columns.') + table + '.' + k);
   const value = (e, row, ctx) => (e.v ? e.v(row, ctx) : row[e.k]);
-  const ctxOf = (res) => ({ rho: res.fluid.rho, patm: res.patm, g: res.g, fluid: res.fluid });
+  // rhoN: the normal density of a gas (a liquid has none: its normal volume flow takes its density)
+  const ctxOf = (res) => ({ rho: res.fluid.rho, rhoN: res.fluid.rhoN, patm: res.patm, g: res.g, fluid: res.fluid });
 
   // the rows of a table: the result of each object with the fields its outputs read. hooks: what the interface knows,
   //   dn(p, r), series(p)   the nominal size and series of a pipe (or its inner diameter)
@@ -183,9 +184,11 @@
       return Object.assign({ id: j.id, name: j.name, key: 'j:' + j.id, typeLabel: M.JT[j.type].label, Qt: r.m / res.fluid.rho }, r,
         { two: !('net' in r), mnet: net, Qnet: net / res.fluid.rho, chokedTxt: choked(r) });
     });
+    // without an efficiency curve the shaft power is not known (the core gives it as the power given to the liquid,
+    // which has its own column)
     if (table === 'pumps') return Object.entries(res.pumps).map(([id, r]) => Object.assign(
       { id: +id, name: name('j:' + id), key: 'j:' + id, etaPct: r.etaAssumed ? NaN : r.eta * 100, stateTxt: t('junctions.pump.form.' + r.state) },
-      sides(res.junctions[id]), r));
+      sides(res.junctions[id]), r, r.etaAssumed ? { Pshaft: NaN } : {}));
     // a control valve shows its kind next to the type ("Control valve PRV")
     if (table === 'valves') return Object.entries(res.valves).map(([id, r]) => Object.assign(
       { id: +id, name: name('j:' + id), key: 'j:' + id, typeLabel: M.JT[r.type].label + (r.ctype ? ' ' + r.ctype : '') },

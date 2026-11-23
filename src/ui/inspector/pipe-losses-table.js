@@ -28,7 +28,10 @@
     for (const p of pipes) {
       const cur = (j.pipeK && j.pipeK[p.id]) || {};
       const path = 'pipeK.' + p.id;
-      const write = (patch) => app.setVal(key, path, Object.assign({ kOut: 0, kIn: 0 }, cur, patch));
+      // field by field, so that a scenario keeps inheriting the fields it does not change; a pipe without losses yet
+      // gets the whole entry
+      const write = (patch) => (j.pipeK && j.pipeK[p.id] ? app.setVals(key, Object.entries(patch).map(([f, v]) => [path + '.' + f, v]))
+        : app.setVal(key, path, Object.assign({ kOut: 0, kIn: 0 }, patch)));
       const tr = el('tr');
       const td0 = el('td', {}, `<span class="num">P${p.id}</span>`);
       const mk = (field, aria) => {
@@ -68,7 +71,8 @@
         const pk = j.pipeK && j.pipeK[p.id];
         if (!pk || !fin(pk[field])) continue;
         const z = zOf(pk);
-        pairs.push(['pipeK.' + p.id, Object.assign({ kOut: 0, kIn: 0 }, pk, to === 'depth' ? { depth: { value: inUnit(zL - z, u), unit: u } } : { elev: { value: inUnit(z, u), unit: u } })]);
+        // only the field of the new reference: the losses and the old reference stay as they are (or inherited)
+        pairs.push(to === 'depth' ? ['pipeK.' + p.id + '.depth', { value: inUnit(zL - z, u), unit: u }] : ['pipeK.' + p.id + '.elev', { value: inUnit(z, u), unit: u }]);
       }
       return pairs;
     }

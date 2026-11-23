@@ -5,10 +5,10 @@
   const F = PumpIt.ui.format;
   const { t } = PumpIt.i18n;
 
-  // loss model of a valve: K, Cv, Kv or, unless opts.opening is false, an opening with its characteristic
-  function lossModelFields(s, key, j, f, opts = {}) {
-    const models = [['K', t('junctions.lossModel.K')], ['Cv', t('junctions.lossModel.Cv')], ['Kv', t('junctions.lossModel.Kv')]];
-    if (opts.opening !== false) models.push(['opening', t('junctions.lossModel.opening')]);
+  // loss model of a valve: those its type accepts (K, Cv, Kv, an opening with its characteristic), the list that a change
+  // of type also follows
+  function lossModelFields(s, key, j, f) {
+    const models = PumpIt.junctionTypes.get(j.type).lossModels.map((m) => [m, t('junctions.lossModel.' + m)]);
     s.appendChild(f.sel(key, 'lossModel', t('junctions.lossModel.label'), models));
     if (j.lossModel === 'K') s.appendChild(f.num(key, 'K', 'K'));
     if (j.lossModel === 'Cv') s.appendChild(f.num(key, 'Cv', 'Cv', { info: t('junctions.lossModel.CvHint') }));

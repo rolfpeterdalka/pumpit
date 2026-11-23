@@ -24,7 +24,7 @@
 
     form(s, { key, j, f }) {
       f.note(s, PumpIt.ui.format.esc(tx('form.hint')));
-      JT.shared.lossModelFields(s, key, j, f, { opening: false });
+      JT.shared.lossModelFields(s, key, j, f);
       s.appendChild(f.qty(key, 'vClose', tx('form.vClose'), 'velocity', { info: tx('form.vCloseHint') }));
       s.appendChild(f.qty(key, 'dPopen', tx('form.dPopen'), 'dp', { info: tx('form.dPopenHint') }));
       s.appendChild(f.chk(key, 'closed', tx('form.closed')));

@@ -872,6 +872,68 @@ console.log('\nThe chart over time draws every number of the table over time');
     && Math.abs(gp[0].series[0].pts[0][1] - g.Min) < 1e-15 && Math.abs(g.Min - 0.093498) < 1e-6
     && Math.abs(gp[0].series[1].pts[0][1] - g.Mout) < 1e-15 && Math.abs(g.Mout - 0.12260) < 1e-5
     && Math.abs(gp[0].series[2].pts[0][1] - g.Re) < 1e-6 && Math.abs(g.Re - 1220573) < 1, `${g.Min} ${g.Mout} ${g.Re}`);
+
+  // The value a table of a gas gave (review of 6c4f0fa, item 1): 400 Nm³/h at J5 of the air plant, recorded in kg/s,
+  // read back at the normal density in Nm³/h and at the density of J5 at that step in m³/h, in the table and the chart.
+  UI.columnSetup = UI.columnSetup || { columns: () => [] };
+  UI.junctionTypes = UI.junctionTypes || { get: () => null };
+  UI.timeFormat.num = () => '';
+  app.savePrefs = () => {};
+  const units = {};
+  app.outUnit = (k, cat) => (units[k] && P10.units.has(cat, units[k]) ? units[k] : P10.units.list(cat)[0]);
+  const plant = (v, P5) => {
+    m = P10.examples.get('airPlant').build();
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: M.q(0, 'h'), stop: M.q(1, 'h'), step: M.q(10, 'min') });
+    const j5 = m.junctions.find((j) => j.id === 5);
+    j5.time = { use: true, what: 'Q', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 0.5, 1], v, tUnit: 'h', vUnit: 'Nm³/h' }], repeat: false, interp: 'step' };
+    // the set pressure of the reducing valve J3 over time, so that the density at J5 changes
+    if (P5) m.junctions.find((j) => j.id === 3).time = { use: true, what: 'set', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 1], v: P5, tUnit: 'h', vUnit: 'bar(g)' }], repeat: false, interp: 'linear' };
+    run = P10.time.run(M.effective(m, 'base'));
+  };
+  // the column of the table values at every row, in a unit
+  const column = (u) => {
+    units['tin.Q'] = u; app.prefs.timeObj = 'junctions:5';
+    const box = new Node('div'); UI.timeResults.render('series', box);
+    return [...box.html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((r) => [...r[1].matchAll(/<td class="num[^"]*">([^<]*)<\/td>/g)].pop()[1]);
+  };
+  const num = (s) => Number(s.replace(/\s/g, '').replace('.', '').replace(',', '.').replace('−', '-'));
+  plant([400, 400, 400]);
+  const rho5 = run.series.junctions[5].rho, kg = run.series.inputs[5].v;
+  const nm = column('Nm³/h'), loc = column('m³/h'), ks = column('kg/s');
+  ok('Q3 the table over time of J5 in Nm³/h: 400 at every step', nm.length === run.times.length && nm.every((x) => Math.abs(num(x) - 400) < 1e-3), nm.join(' | '));
+  ok('Q3 in kg/s: 0,14358 as recorded', Math.abs(num(ks[0]) - 0.14358) < 1e-5 && Math.abs(kg[0] - 0.143584562) < 1e-8, ks[0]);
+  ok('Q3 in m³/h: at the density of J5, 63,83 at the first step', Math.abs(num(loc[0]) - 63.83) < 5e-3 && Math.abs(num(loc[0]) - kg[0] / rho5[0] * 3600) < 1e-3, `${loc[0]} rho ${rho5[0]}`);
+  units['tchart.flow'] = 'Nm³/h';
+  const cn = draw('junctions:5', ['junctions:5|@input']);
+  ok('Q3 the chart in Nm³/h draws 400 at every step', cn[0].series[0].pts.every((p) => Math.abs(p[1] - 400) < 1e-6), cn[0].series[0].pts.map((p) => p[1].toFixed(2)).join(' '));
+  units['tchart.flow'] = 'm³/h';
+  const cl = draw('junctions:5', ['junctions:5|@input']);
+  ok('Q3 the chart in m³/h follows the density of J5', cl[0].series[0].pts.every((p, i) => Math.abs(p[1] - kg[i] / rho5[i] * 3600) < 1e-9));
+  // a vessel pressure over time: the density of J5 changes, and each row and point converts with its own
+  plant([400, 400, 400], [6, 3]);
+  const r5 = run.series.junctions[5].rho, k5 = run.series.inputs[5].v, last = run.times.length - 1;
+  const loc2 = column('m³/h');
+  units['tchart.flow'] = 'm³/h';
+  const cv = draw('junctions:5', ['junctions:5|@input']);
+  ok('Q4 with a varying pressure the density of J5 changes over the run', Math.abs(r5[last] / r5[0] - 1) > 0.05, `${r5[0]} → ${r5[last]}`);
+  ok('Q4 m³/h at two steps: each at the density of J5 at its step, in the table and the chart',
+    [0, last].every((i) => Math.abs(num(loc2[i]) - k5[i] / r5[i] * 3600) < 1e-3 * k5[i] / r5[i] * 3600 && Math.abs(cv[0].series[0].pts[i][1] - k5[i] / r5[i] * 3600) < 1e-9),
+    `${loc2[0]} ${loc2[last]}`);
+  ok('Q4 Nm³/h stays 400', column('Nm³/h').every((x) => Math.abs(num(x) - 400) < 1e-3));
+  // no density of J5 at a step: the volume flow there is not available, the mass and normal flows are
+  const saved = run.series.junctions[5].rho;
+  run.series.junctions[5].rho = saved.map((x, i) => (i === 1 ? NaN : x));
+  const gap = column('m³/h');
+  ok('Q4 without the density of J5 at a step, its m³/h is —', gap[1] === '—' && gap[0] !== '—' && column('Nm³/h')[1] !== '—', gap.slice(0, 3).join(' | '));
+  run.series.junctions[5].rho = saved;
+  // the event log of a gas: a table started at 30 min jumps from the steady 400 to 200, told in Nm³/h
+  plant([400, 400, 400]);
+  m.junctions.find((j) => j.id === 5).time = { use: true, what: 'Q', basis: 'absolute', start: 'single', when: [{ q: 'time', op: '>=', value: M.q(30, 'min') }], tables: [{ t: [0, 1], v: [200, 200], tUnit: 'h', vUnit: 'Nm³/h' }], repeat: false, interp: 'linear' };
+  run = P10.time.run(M.effective(m, 'base'));
+  units['tev.flow'] = 'Nm³/h';
+  const evBox = new Node('div'); UI.timeResults.render('events', evBox);
+  const jump = (evBox.html.match(/<td class="txt">([^<]*400[^<]*)<\/td><\/tr>/) || [])[1] || '';
+  ok('Q5 the event log tells a jump of the flow of a gas in Nm³/h: 400 → 200', /400\s*Nm³\/h/.test(jump) && /200\s*Nm³\/h/.test(jump), jump || evBox.html.slice(0, 300));
 }
 
 // ------------------------------------------------------------ a draft belongs to its scenario
@@ -910,6 +972,280 @@ console.log('\nA draft of a cell stays in the scenario it was typed in');
   ok('R3 and the file keeps the number', JSON.parse(JSON.stringify(m)).junctions[1].curve.y[1] === 46.5 && commits.length === 0);
   NC11.clearDrafts();
   ok('R4 another model drops every draft', shows(cell()) === '46,5');
+}
+
+// ------------------------------------------------------------ a field inside a block a scenario overrides
+// Review of 6c4f0fa, items 5 and 7, on the example of pumping between tanks and its 90 % speed scenario: the table of
+// the losses at the pipes writes the field typed (pipeK.1.kIn), so that the K leaving stays inherited; the friction a
+// new material gives is written field by field, and a roughness back from the parent is the parent's; a file that
+// holds a whole block is split on opening, with the same effective model.
+console.log('\nA field inside a block of a scenario follows the parent');
+{
+  const c12 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P12 = c12.PumpIt, UI = P12.ui, M = P12.model;
+  UI.dialogs = { toast() {}, modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection() {} };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c12, { filename: f });
+  run('src/ui/app/state.js');
+  const app = P12.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/inspector/pipe-losses-table.js');
+  UI.junctionTypes = { get: (type) => ({ connectionElevation: type === 'reservoir' }) };
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null });
+  const reopen = (text) => app.loadModel(JSON.parse(text), { fit: false });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  P12.i18n.setLanguage('pt-BR');
+  const fresh = () => { app.model = P12.examples.get('pump').build(); app.model.scenarios.current = 's1'; app.undoStack = []; app.redoStack = []; };
+  const flow = (m = app.model, sid = 's1') => P12.solver.run(M.effective(m, sid)).pipes[1].Q * 3600;
+  const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+  const own = (prefix, sid = 's1') => Object.keys(app.model.scenarios.list.find((s) => s.id === sid).overrides).filter((k) => k.startsWith(prefix)).sort().join(',');
+  // a cell of the table of J1 typed as the user does
+  const type = (sid, field, v) => {
+    app.model.scenarios.current = sid;
+    const s = UI.pipeLossesTable.build('j:1', M.getObj(app.eff(), 'j:1'));
+    const find = (n) => { if (n.id === `pk-1-1-${field}`) return n; for (const c of n.children || []) { const r = find(c); if (r) return r; } return null; };
+    const inp = find(s);
+    inp.value = String(v).replace('.', ','); inp.fire('change');
+  };
+  const pk = (sid) => M.getObj(M.effective(app.model, sid), 'j:1').pipeK[1];
+
+  fresh();
+  type('s1', 'kIn', 9);
+  ok('I5 K arriving 9 in the child: only that field of the child changes', own('j:1|') === 'j:1|pipeK.1.kIn', own('j:1|'));
+  type('base', 'kOut', 100);
+  ok('I5 K leaving 100 in the base reaches the child: 100 and 9, 71.88 m³/h', pk('s1').kOut === 100 && pk('s1').kIn === 9 && near(flow(), 71.88, 1e-4), `${JSON.stringify(pk('s1'))} ${flow().toFixed(3)}`);
+  const saved = JSON.stringify(app.model);
+  reopen(saved);
+  ok('I5 saved and opened again: 100 and 9, 71.88 m³/h', pk('s1').kOut === 100 && pk('s1').kIn === 9 && near(flow(app.model, 's1'), 71.88, 1e-4), flow(app.model, 's1').toFixed(3));
+  type('base', 'kOut', 2);
+  ok('I5 a later change in the base still reaches the child', pk('s1').kOut === 2 && pk('s1').kIn === 9);
+  // the elevation of the connection of P1 to the reservoir J1, typed in the child, is one field of its own
+  type('s1', 'elev', 1);
+  ok('I5 the elevation of the connection is a field of its own', own('j:1|') === 'j:1|pipeK.1.elev,j:1|pipeK.1.kIn' && pk('s1').kOut === 2, own('j:1|'));
+
+  // a file of before: the whole entry in the child, split on opening without any value changing
+  fresh();
+  M.setField(app.model, 's1', 'j:1', 'pipeK.1', { kOut: 0.5, kIn: 9 });
+  ok('I6 a file of before holds the whole entry', own('j:1|') === 'j:1|pipeK.1');
+  reopen(JSON.stringify(app.model));
+  ok('I6 opened: only K arriving stays in the child, the flow as before', own('j:1|') === 'j:1|pipeK.1.kIn' && pk('s1').kIn === 9 && pk('s1').kOut === 0.5, own('j:1|'));
+  app.model.scenarios.current = 's1';
+  M.setField(app.model, 'base', 'j:1', 'pipeK.1.kOut', 100);
+  ok('I6 then the base reaches the K leaving of the child: 71.88 m³/h', near(flow(), 71.88, 1e-4), flow().toFixed(3));
+  // a whole block that cannot be split (the parent has a field the override lacks) keeps every value
+  fresh();
+  M.setField(app.model, 'base', 'j:1', 'pipeK.1', { kOut: 0.5, kIn: 1, elev: { value: 1, unit: 'm' } });
+  M.setField(app.model, 's1', 'j:1', 'pipeK.1', { kOut: 0.5, kIn: 9 });
+  const before = JSON.stringify(M.effective(app.model, 's1'));
+  M.setField(app.model, 's1', 'j:1', 'pipeK.1.kOut', 3);
+  const e1 = M.getObj(M.effective(app.model, 's1'), 'j:1').pipeK[1];
+  ok('I6 a block that cannot be split keeps its values and takes the field typed', e1.kOut === 3 && e1.kIn === 9 && e1.elev === undefined, JSON.stringify(e1));
+  M.clearOverride(app.model, 's1', 'j:1', 'pipeK.1.kOut');
+  ok('I6 and its field restored takes the parent value', M.getObj(M.effective(app.model, 's1'), 'j:1').pipeK[1].kOut === 0.5 && JSON.stringify(M.effective(app.model, 's1')) === before);
+
+  // item 7: stainless steel in the child, the roughness back from the parent by the button and by typing it
+  const eps = (sid = 's1') => M.getObj(M.effective(app.model, sid), 'p:1').friction.eps.value;
+  fresh();
+  app.setVal('p:1', 'material.kind', 'stainless');
+  ok('I7 stainless steel in the child: 0.015 mm, field by field', eps() === 0.015 && !own('p:1|').split(',').includes('p:1|friction'), own('p:1|'));
+  app.clearOv('p:1', 'friction.eps');
+  ok('I7 the button brings back 0.046 mm and the field is not marked; the material stays stainless', eps() === 0.046 && !app.isOv('p:1', 'friction.eps') && M.getObj(app.eff(), 'p:1').material.kind === 'stainless');
+  M.setField(app.model, 'base', 'p:1', 'friction.eps', { value: 0.05, unit: 'mm' });
+  ok('I7 a later roughness of the base reaches the child', eps() === 0.05);
+  app.undo();
+  ok('I7 undo of the restore: 0.015 mm again', eps() === 0.015 && app.isOv('p:1', 'friction.eps'));
+  fresh();
+  app.setVal('p:1', 'material.kind', 'stainless');
+  app.setVal('p:1', 'friction.eps', { value: 0.046, unit: 'mm' });
+  ok('I7 typing 0.046 mm also follows the parent again', eps() === 0.046 && !app.isOv('p:1', 'friction.eps'));
+  // a file of before, with the friction written whole by the change of material
+  fresh();
+  M.setField(app.model, 's1', 'p:1', 'material.kind', 'stainless');
+  M.setField(app.model, 's1', 'p:1', 'friction', { model: 'roughness', eps: { value: 0.015, unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
+  reopen(JSON.stringify(app.model));
+  ok('I7 a file of before: the friction becomes its roughness alone, 0.015 mm', own('p:1|') === 'p:1|friction.eps,p:1|material.kind' && eps() === 0.015, own('p:1|'));
+  app.model.scenarios.current = 's1';
+  app.clearOv('p:1', 'friction.eps');
+  ok('I7 and its restore brings back 0.046 mm', eps() === 0.046 && !app.isOv('p:1', 'friction.eps'));
+  // the time data of a junction written whole by the child: "Use" can be ticked again
+  fresh();
+  const j2 = app.model.junctions.find((j) => j.id === 2);
+  j2.time = { use: true, what: 'speed', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 1], v: [100, 100], tUnit: 'h', vUnit: '' }], repeat: false, interp: 'linear' };
+  app.setVal('j:2', 'time.use', false);
+  app.setVal('j:2', 'time', Object.assign(M.clone(M.getObj(app.eff(), 'j:2').time), { tables: [{ t: [0, 1], v: [90, 90], tUnit: 'h', vUnit: '' }] }));
+  app.setVal('j:2', 'time.use', true);
+  const tm = M.getObj(app.eff(), 'j:2').time;
+  ok('I7 time data written whole by the child: "Use" ticked again holds, the table of the child stays', tm.use === true && tm.tables[0].v[0] === 90 && !app.isOv('j:2', 'time.use'), own('j:2|'));
+}
+
+// ------------------------------------------------------------ the type of a junction and the mode of a scenario
+// Review of 6c4f0fa, items 6 and 8, on the example of pumping between tanks and its 90 % speed scenario: a new type
+// keeps, in the base and in the child, the loss the new type accepts; the mode a child chose holds whatever its parent
+// chooses later, and comes back from the parent as one choice.
+console.log('\nA new type and a mode of calculation follow the scenarios');
+{
+  const c13 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P13 = c13.PumpIt, UI = P13.ui, M = P13.model;
+  UI.dialogs = { toast() {}, modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection() {} };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c13, { filename: f });
+  run('src/ui/app/state.js');
+  const app = P13.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/time/system.js');
+  run('src/ui/surge/system.js');
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  app.validation = () => ({ items: [] });
+  const reopen = (text) => app.loadModel(JSON.parse(text), { fit: false });
+  P13.i18n.setLanguage('pt-BR');
+  const fresh = () => { app.model = P13.examples.get('pump').build(); app.model.scenarios.current = 's1'; app.undoStack = []; app.redoStack = []; };
+  const flow = (sid = 's1') => P13.solver.run(M.effective(app.model, sid)).pipes[1].Q * 3600;
+  const near = (a, b, tol = 1e-4) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+  const j3 = (sid) => M.getObj(M.effective(app.model, sid), 'j:3');
+
+  // item 6: K = 25 in the child, a check valve in the base
+  fresh();
+  app.setVal('j:3', 'K', 25);
+  ok('I8 K = 25 in the child: 78.82 m³/h', near(flow(), 78.82), flow().toFixed(3));
+  app.model.scenarios.current = 'base';
+  app.changeType(3, 'check');
+  ok('I8 a check valve everywhere, 0.14 in the base and 25 in the child', j3('base').type === 'check' && j3('s1').type === 'check' && j3('base').K === 0.14 && j3('s1').K === 25, `${j3('base').K} ${j3('s1').K}`);
+  ok('I8 the child flows 78.82 m³/h', near(flow(), 78.82), flow().toFixed(3));
+  const saved = JSON.stringify(app.model);
+  ok('I8 the saved file keeps the K of the child', JSON.parse(saved).scenarios.list.find((s) => s.id === 's1').overrides['j:3|K'] === 25);
+  reopen(saved);
+  ok('I8 reopened: 25 in the child, 78.82 m³/h', j3('s1').K === 25 && near(flow(), 78.82), flow().toFixed(3));
+  fresh();
+  app.setVal('j:3', 'K', 25);
+  app.model.scenarios.current = 'base';
+  app.changeType(3, 'check');
+  app.undo();
+  ok('I8 undo: a valve again, K 25 in the child', j3('s1').type === 'valve' && j3('s1').K === 25 && j3('base').K === 0.14);
+  app.redo();
+  ok('I8 redo: a check valve, K 25 in the child', j3('s1').type === 'check' && j3('s1').K === 25 && near(flow(), 78.82));
+  // a loss model the new type does not accept goes back to its default, in the base and in the child; a Cv stays
+  fresh();
+  app.setVals('j:3', [['lossModel', 'opening'], ['open', 50]]);
+  app.model.scenarios.current = 'base';
+  app.setVals('j:3', [['lossModel', 'Cv'], ['Cv', 300]]);
+  app.changeType(3, 'check');
+  const own3 = Object.keys(app.model.scenarios.list.find((s) => s.id === 's1').overrides).filter((k) => k.startsWith('j:3|')).sort().join(',');
+  ok('I8 by opening in the child: the check valve takes the Cv of the base, the opening goes', j3('s1').lossModel === 'Cv' && j3('s1').Cv === 300 && j3('s1').open === undefined && own3 === '', own3);
+  app.changeType(3, 'reliefValve');
+  ok('I8 a relief valve keeps the Cv', j3('base').lossModel === 'Cv' && j3('base').Cv === 300 && j3('base').K === undefined);
+  app.changeType(3, 'branch');
+  ok('I8 a branch has no loss model', j3('base').lossModel === undefined && j3('base').Cv === undefined);
+  // the K of a sharp-edged orifice (unused, 10) does not reach a valve, nor the K of a valve an orifice
+  fresh();
+  app.model.scenarios.current = 'base';
+  app.changeType(3, 'orifice');
+  ok('I8 an orifice keeps its own K, 10', j3('base').K === 10, String(j3('base').K));
+  app.changeType(3, 'valve');
+  ok('I8 the orifice back to a valve: the default K of a valve, 0.2', j3('base').lossModel === 'K' && j3('base').K === 0.2, String(j3('base').K));
+
+  // item 8: the boxes of the system window, ticked as the user does
+  const box = (sid, what) => {
+    app.model.scenarios.current = sid;
+    const s = what === 'time' ? UI.timeSystem.section() : UI.surgeSystem.section();
+    const find = (n) => { if (n.id === UI.forms.idOf('sol', what + '.on')) return n; for (const c of n.children || []) { const r = find(c); if (r) return r; } return null; };
+    return find(s);
+  };
+  const tick = (sid, what, on) => { const b = box(sid, what); b.checked = on; b.fire('change'); };
+  const mode = (sid) => { const e = M.effective(app.model, sid); return `${e.solution.time.on ? 'time' : ''}${P13.surge.inputs.isOn(e) ? 'surge' : ''}` || 'steady'; };
+  const both = (sid) => mode(sid) === 'timesurge';
+  const second = () => { const s = M.addScenario(app.model, 'base', 'second'); return s.id; };
+  fresh();
+  const s2 = second();
+  tick('s1', 'time', true);
+  ok('I9 the child turns the time simulation on', mode('s1') === 'time' && mode('base') === 'steady');
+  tick('base', 'surge', true);
+  ok('I9 the base turns the water hammer on: the child keeps the time simulation', mode('s1') === 'time' && !both('s1') && mode('base') === 'surge', mode('s1'));
+  ok('I9 a second child inherits the water hammer of the base', mode(s2) === 'surge');
+  reopen(JSON.stringify(app.model));
+  ok('I9 reopened: time in the child, water hammer in the base and in the second child', mode('s1') === 'time' && mode('base') === 'surge' && mode(s2) === 'surge');
+  app.model.scenarios.current = 's1';
+  ok('I9 both switches marked as the choice of the child', app.isOv('sol', 'time.on') && app.isOv('sol', 'surge.on'));
+  app.clearOv('sol', 'time.on');
+  ok('I9 restored: the child does the water hammer of the base, both switches unmarked', mode('s1') === 'surge' && !app.isOv('sol', 'time.on') && !app.isOv('sol', 'surge.on'));
+  app.undo();
+  ok('I9 undo of the restore: the time simulation again', mode('s1') === 'time');
+  // the other order: the child chooses the water hammer, the base the time simulation
+  fresh();
+  const s3 = second();
+  tick('s1', 'surge', true);
+  tick('base', 'time', true);
+  ok('I9 the other order: water hammer in the child, time in the base and in the second child', mode('s1') === 'surge' && mode('base') === 'time' && mode(s3) === 'time' && !both('s1'), mode('s1'));
+  // the base turns the water hammer on over its time simulation: the base switches in one edit, the child keeps its own
+  tick('base', 'surge', true);
+  ok('I9 the base switches to the water hammer, its time simulation off', mode('base') === 'surge' && mode('s1') === 'surge' && mode(s3) === 'surge');
+  ok('I9 a file of before with both on in one scenario still tells it', (() => { const m = M.clone(app.model); m.scenarios.list.find((s) => s.id === 's1').overrides['sol|time.on'] = true; return P13.surge.inputs.checkControl(M.effective(m, 's1')).includes('control.time'); })());
+}
+
+// ------------------------------------------------------------ the basis of a table of the water hammer
+// Review of 6c4f0fa, item 9: the level of J1 of the example of pumping between tanks, 3 and 2.7 m, goes to 100 and 90 %
+// and back with its numbers; a speed table of a pump at 90 % takes that 90 % as its 100 %; without a steady value the
+// data stay, with the message.
+console.log('\nThe basis of a table of the water hammer converts its values');
+{
+  const c14 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js', 'src/ui/time/point-table.js']);
+  const P14 = c14.PumpIt, UI = P14.ui, M = P14.model;
+  const sections = [];
+  let toasts = [];
+  UI.dialogs = { toast() {}, modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection: (kind, fn) => sections.push(fn) };
+  UI.junctionTypes = { get: () => ({}) };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c14, { filename: f });
+  run('src/ui/app/state.js');
+  const app = P14.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/time/data-section.js');
+  run('src/ui/surge/junction-section.js');
+  const surgeSection = sections[sections.length - 1];
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null, surgeOn: () => true, toast: (m) => toasts.push(m) });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  app.effObj = (k) => M.getObj(app.eff(), k);
+  P14.i18n.setLanguage('pt-BR');
+  const find = (n, id) => { if (n.id === id) return n; for (const c of n.children || []) { const r = find(c, id); if (r) return r; } return null; };
+  const choose = (jid, v) => { const host = new Node('div'); surgeSection(host, jid); const s = find(host, `sd-${jid}-basis`); s.value = v; s.fire('change'); };
+  const data = (jid) => M.getObj(app.model, 'j:' + jid).surge;
+  app.model = P14.examples.get('pump').build(); app.model.scenarios.current = 'base'; app.undoStack = []; app.redoStack = [];
+  app.model.solution.surge = Object.assign(P14.surge.inputs.newControl(), { on: true, duration: { value: 1, unit: 's' } });
+  M.getObj(app.model, 'j:1').surge = { use: true, what: 'level', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 1], v: [3, 2.7], tUnit: 's', vUnit: 'm' }], repeat: false, interp: 'linear' };
+  const shown = (jid) => data(jid).tables.map((tb) => tb.v.join(' ') + ' ' + tb.vUnit).join(' | ');
+  choose(1, 'relative');
+  ok('S1 3 and 2.7 m become 100 and 90 %', data(1).basis === 'relative' && shown(1) === '100 90 %', shown(1));
+  const undoes = app.undoStack.length;
+  choose(1, 'absolute');
+  ok('S1 and back to 3 and 2.7 m, one undo step each', data(1).basis === 'absolute' && shown(1) === '3 2.7 m' && app.undoStack.length === undoes + 1, shown(1));
+  // a pump at 90 %: its speed table of 90 and 72 % is 100 and 80 % of it
+  const j2 = M.getObj(app.model, 'j:2');
+  j2.speed = 90;
+  j2.surge = { use: true, what: 'speed', basis: 'absolute', start: 'combined', when: [], tables: [{ t: [0, 1], v: [90, 72], tUnit: 's', vUnit: '%' }, { t: [0, 1], v: [72, 45], tUnit: 's', vUnit: '%' }], repeat: false, interp: 'linear' };
+  const qs = P14.surge.inputs.quantities(j2).map((q) => q.what);
+  if (qs.includes('speed')) {
+    choose(2, 'relative');
+    ok('S1 a speed of reference 90 %: every table follows, 100 and 80 %, 80 and 50 %', shown(2) === '100 80 % | 80 50 %', shown(2));
+    choose(2, 'absolute');
+    ok('S1 and back to 90 and 72 %, 72 and 45 %', shown(2) === '90 72 % | 72 45 %', shown(2));
+  } else ok('S1 a pump has a speed table in the water hammer', false, qs.join(','));
+  // without a steady value (no level), the data stay and the message tells why
+  M.getObj(app.model, 'j:1').liquidElev = { value: 0, unit: 'm' };
+  toasts = [];
+  const before = JSON.stringify(data(1));
+  choose(1, 'relative');
+  ok('S1 a steady level of zero: the tables and the basis stay, with the message', JSON.stringify(data(1)) === before && toasts.length === 1 && /não podem acompanhar/.test(toasts[0]), toasts.join());
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

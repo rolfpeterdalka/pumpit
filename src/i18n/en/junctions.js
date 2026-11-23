@@ -107,6 +107,7 @@ PumpIt.i18n.add('en', {
     pump: {
       label: 'Pump',
       check: {
+        effRange: 'efficiency points above 0 and up to 100% (0 only at zero flow)',
         ratio: 'pressure ratio',
         ratioGasOnly: 'a fixed pressure ratio only in the compressible (gas) mode',
         etaGas: 'efficiency between 0 and 100%',
@@ -119,6 +120,9 @@ PumpIt.i18n.add('en', {
       },
       error: { curve: 'Pump J{id}: {message}' },
       warn: {
+        effRange: 'Pump J{id}: the fitted efficiency curve gives {eta}% at the operating point, outside 0 to 100%. The points typed are within the range: review the fit (linear interpolation follows the points). The shaft power is not available.',
+        effRangeGas: 'Compressor J{id}: the efficiency curve gives {eta}% at the operating point, outside 0 to 100%. The power to the gas is not available, and the discharge temperature takes the efficiency limited to 1 to 100%.',
+        effNoSpeed: 'Pump J{id}: without the speed of its control the efficiency and the shaft power are not available.',
         curveRises: 'Pump J{id}: the fitted curve rises over part of the flow range; check the fit.',
         noZeroHead: 'Pump J{id}: the fitted curve does not cross the zero-head axis.',
         fixedNegative: 'Fixed-flow pump J{id} adding negative pressure ({dp} kgf/cm²).',

@@ -69,7 +69,8 @@
     for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && fit[f] !== mat[f]) M.setField(app.model, sid, key, 'material.' + f, fit[f]);
     M.setField(app.model, sid, key, 'geometry.kind', 'circular');
     M.setField(app.model, sid, key, 'geometry.d', { value: +D.pipeDims(fit).id.toFixed(2), unit: 'mm' });
-    if (newKind && !restore) M.setField(app.model, sid, key, 'friction', defaultFriction(mat.kind));
+    // the friction of the material field by field: a field equal to the parent's stays inherited
+    if (newKind && !restore) for (const [f, v] of Object.entries(defaultFriction(mat.kind))) M.setField(app.model, sid, key, 'friction.' + f, v);
   }
   const defaultFriction = (kind) => ({ model: 'roughness', eps: { value: D.pipeEps(kind), unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
   // several fields of one object in a single step (one undo snapshot, one recalculation): [[path, value], ...]
@@ -216,22 +217,26 @@
     app.changed();
   };
 
-  // changing the type keeps the compatible data
+  // Changing the type keeps the compatible data, by the same rule in the base and in every scenario
+  // (PumpIt.junctionTypes.shared.keepsOnRetype): the name, the elevation, the losses at the pipes, a loss model the new
+  // type accepts and the coefficients the new type has. What only the old type had goes, in the base and in the
+  // overrides of the scenarios.
   app.changeType = (id, type) => {
     const old = app.model.junctions.find((j) => j.id === id);
     if (!old || old.type === type) return;
     app.pushUndo();
+    const keeps = PumpIt.junctionTypes.shared.keepsOnRetype;
+    const def = PumpIt.junctionTypes.get(type), from = PumpIt.junctionTypes.get(old.type);
     const nj = M.newJunction(type, id, old.x, old.y);
-    for (const k of ['name', 'elevation']) nj[k] = old[k];
+    const defaults = def.defaults();
+    for (const k of Object.keys(old)) if (k !== 'type' && k !== 'id' && keeps(def, defaults, k, old[k], from)) nj[k] = old[k];
     for (const k of M.LAYOUT_KEYS.junction) if (old[k] !== undefined) nj[k] = old[k]; // the drawing stays
-    if (old.pipeK && nj.pipeK) nj.pipeK = old.pipeK;
-    if (old.lossModel && nj.lossModel) for (const k of ['lossModel', 'K', 'Cv', 'Kv']) nj[k] = old[k];
     Object.keys(old).forEach((k) => delete old[k]);
     Object.assign(old, nj);
     for (const s of app.model.scenarios.list) {
       for (const k of Object.keys(s.overrides)) {
         const [ok, path] = k.split('|');
-        if (ok === 'j:' + id && !/^(name|elevation)$/.test(path)) delete s.overrides[k];
+        if (ok === 'j:' + id && !keeps(def, defaults, path, s.overrides[k], from)) delete s.overrides[k];
       }
     }
     app.changed();

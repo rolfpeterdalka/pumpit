@@ -97,10 +97,13 @@
       if (d.start === 'single') conditions(1);
       if (d.start === 'combined') combined();
     } else {
-      s.appendChild(field(tx('basis'), select('basis', SI().BASES.map((b) => [b, t('time.data.bases.' + b)]), d.basis, (v) => write((x) => {
-        x.basis = v;
-        for (const tb of x.tables || []) tb.vUnit = unitFor(qt.cat, v);
-      })), { info: t('time.data.basisHint') }));
+      // absolute or relative values: the numbers of every table follow in one edit, by the steady value the water hammer
+      // reads (the same conversion as the time data); without it the tables and the basis stay, and a message tells why
+      s.appendChild(field(tx('basis'), select('basis', SI().BASES.map((b) => [b, t('time.data.bases.' + b)]), d.basis, (v) => {
+        const tables = UI.timeData.rebase(j, qt, d.tables || [], v);
+        if (!tables) { app.toast(t('time.data.basisNoSteady')); app.renderAll(); return; }
+        write((x) => { x.tables = tables; x.basis = v; });
+      }), { info: t('time.data.basisHint') }));
       s.appendChild(field(tx('start'), select('start', E().STARTS.map((x) => [x, t('time.data.starts.' + x)]), d.start, (v) => write((x) => {
         x.start = v;
         x.when = x.when || [];

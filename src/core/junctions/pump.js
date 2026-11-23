@@ -101,10 +101,18 @@
       r.speed = s * 100;
     }
     const Qs = Number.isFinite(s) ? Q / (el.N * s) : NaN; // equivalent flow per pump on the 100% curve
-    r.eta = el.effCurve && Number.isFinite(Qs) ? H.evalCurve(el.effCurve, Qs) : 1;
+    // the efficiency of the curve at the operating point (none without the speed its control looks for); without a
+    // curve, 100 % (etaAssumed: the shaft power is the power given to the liquid)
+    r.eta = !el.effCurve ? 1 : Number.isFinite(Qs) ? H.evalCurve(el.effCurve, Qs) : NaN;
     bestEfficiency(r, el, s, Q);
     r.Pideal = Q * dP;
-    r.Pshaft = r.eta > 0 ? r.Pideal / r.eta : NaN;
+    // a fitted curve may leave 0 to 100 % between valid points: no shaft power then. etaInvalid: the efficiency is not
+    // usable where the pump gives power (or not known, without the speed of its control), with a warning
+    const valid = r.eta > 0 && r.eta <= 1 + 1e-12;
+    r.Pshaft = valid ? r.Pideal / r.eta : NaN;
+    r.etaInvalid = !!el.effCurve && (!Number.isFinite(r.eta) || (!valid && r.Pideal > 0));
+    if (el.effCurve && !Number.isFinite(Qs)) warn('warning', t('junctions.pump.warn.effNoSpeed', { id: j.id }), 'j:' + j.id);
+    else if (r.etaInvalid) warn('warning', t('junctions.pump.warn.effRange', { id: j.id, eta: (r.eta * 100).toFixed(2) }), 'j:' + j.id);
     if (el.npshrCurve && Number.isFinite(Qs)) r.NPSHR = s * s * H.evalCurve(el.npshrCurve, Qs);
     if (m < 0) warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
     if (el.curve && Number.isFinite(Qs) && Qs > el.curve.xmax * 1.0001) warn('warning', t('junctions.pump.warn.beyondCurve', { id: j.id }), 'j:' + j.id);
@@ -112,6 +120,9 @@
     if (!el.effCurve) r.etaAssumed = true;
     return r;
   }
+
+  // the points of an efficiency curve, in %: above 0 and up to 100, or 0 at zero flow
+  const effPointsOk = (c) => c.y.every((y, i) => Number.isFinite(y) && y <= 100 && (y > 0 || (y === 0 && c.x[i] === 0)));
 
   // best efficiency point (an output, docs/result-outputs.md): the flow at the peak of the efficiency curve, taken to the
   // speed s and to the N machines of the operating point by the affinity laws, and the flow Q as a percentage of it. No
@@ -144,6 +155,8 @@
       // a fixed pressure ratio is a compressor of the compressible mode
       if (j.mode === 'ratio') { if (!gas) need('ratioGasOnly'); else if (!(j.ratio > 0)) need('ratio'); }
       if (gas && j.etaGas !== undefined && !(j.etaGas > 0 && j.etaGas <= 100)) need('etaGas');
+      // the points of the efficiency curve (read by a compressor in every mode, by a pump of a liquid on its curve)
+      if ((gas || j.mode !== 'fixedFlow') && j.eff && Array.isArray(j.eff.y) && j.eff.y.length && !effPointsOk(j.eff)) need('effRange');
       if (['curve', 'controlFlow', 'controlDischarge', 'controlSuction'].includes(j.mode) && !curveOk(j.curve)) need('curve');
       if (j.mode === 'fixedFlow' && !(fin(j.fixedFlow) && j.fixedFlow.value >= 0)) need('fixedFlow');
       if (j.mode === 'controlFlow' && !pos(j.setQ)) need('setQ');
@@ -240,11 +253,25 @@
       const c = j.eff;
       lk.effCurve = H.makeCurve(c.x.map((v) => U.toSI(v, c.xUnit, 'volFlow')), c.y.map((v) => v / 100), c.fit);
     }
-    // polytropic efficiency at a volume flow Q of the suction
-    lk.etaAt = (Q) => {
-      const e = lk.effCurve ? H.evalCurve(lk.effCurve, Q / (N * s)) : (j.etaGas > 0 ? j.etaGas : 75) / 100;
-      return e > 0.01 ? Math.min(e, 1) : 0.01;
+    // polytropic efficiency at a volume flow Q of the suction and the speed sp (the typed one, or the one of a control),
+    // as the curve gives it; etaUse is the value the temperature takes, within 1 to 100 % (etaGas without a value)
+    const etaGas = (j.etaGas > 0 ? j.etaGas : 75) / 100;
+    lk.etaAt = (Q, sp = s) => (lk.effCurve ? (sp > 0 ? H.evalCurve(lk.effCurve, Q / (N * sp)) : NaN) : etaGas);
+    lk.etaUse = (e) => (Number.isFinite(e) ? (e > 0.01 ? Math.min(e, 1) : 0.01) : etaGas);
+    // the isentropic head of a pressure ratio r from the stagnation temperature T0 at the suction
+    lk.headOf = (r, T0) => cx.ZR * T0 * k / (k - 1) * (Math.pow(Math.max(r, 1e-9), (k - 1) / k) - 1) / g;
+    // a control: the speed whose curve gives the head H at the suction flow Q, s²·H1(Q/(N·s)) = H. status 'high' (not
+    // even at 300 %: no speed), 'low' (below 1 %: 1 %) or 'ok'
+    lk.controlSpeed = (Q, Hs) => {
+      const f = (sp) => sp * sp * H.evalCurve(lk.curve, Q / (N * sp)) - Hs;
+      let lo = 0.01, hi = 3;
+      if (f(hi) < 0) return { s: NaN, status: 'high' };
+      if (f(lo) > 0) return { s: lo, status: 'low' };
+      for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
+      return { s: (lo + hi) / 2, status: 'ok' };
     };
+    // the speed the machine runs at for a suction flow Q and a pressure ratio r: that of its control, or the typed one
+    lk.speedAt = (Q, r, T0) => (lk.controlled && lk.curve ? lk.controlSpeed(Q, lk.headOf(r, T0)).s : s);
     const suction = (m, na, sol) => { const P0 = p0(na, Pin, lk.a, sol), T0 = T0of(na); return { P0, T0, Q: m * cx.ZR * T0 / P0 }; };
     lk.suction = suction; lk.p0 = p0; lk.T0of = T0of;
     const flowRow = (qt) => {
@@ -277,7 +304,9 @@
       if (cx.iso || !(m > 0)) return 1;
       const na = S.gasNode(lk.pk, res, l.a), nb = S.gasNode(lk.pk, res, l.b);
       const r = p0(nb, Pout, l.b, res) / p0(na, Pin, l.a, res);
-      return r > 1 ? Math.pow(r, (k - 1) / (k * lk.etaAt(suction(m, na, res).Q))) : 1;
+      if (!(r > 1)) return 1;
+      const su = suction(m, na, res);
+      return Math.pow(r, (k - 1) / (k * lk.etaUse(lk.etaAt(su.Q, lk.speedAt(su.Q, r, su.T0)))));
     };
   }
   const Fw = () => PumpIt.gas.flow;
@@ -293,20 +322,26 @@
     const na = S.gasNode(el.pk, rc.res, el.a);
     const su = el.suction(m, na, rc.res);
     r.Q = su.Q; r.T0in = su.T0;
-    r.dHs = cx.ZR * su.T0 * k / (k - 1) * (Math.pow(Math.max(r.ratio, 1e-9), (k - 1) / k) - 1) / rc.env.g; // isentropic head
-    r.eta = el.etaAt(su.Q);
-    r.T0out = r.ratio > 1 ? su.T0 * Math.pow(r.ratio, (k - 1) / (k * r.eta)) : su.T0;
-    r.Pgas = m * cx.cp * (r.T0out - su.T0);
+    r.dHs = el.headOf(r.ratio, su.T0); // isentropic head
+    // the speed: of the control, the one whose curve gives the head the network asks for; the efficiency is read at it
+    let sp = el.s;
     if (el.controlled && el.curve) {
-      // the speed whose curve gives the head the network asks for: s²·H1(Q/(N·s)) = H
-      const f = (sp) => sp * sp * H.evalCurve(el.curve, su.Q / (el.N * sp)) - r.dHs;
-      let lo = 0.01, hi = 3, sp = NaN;
-      if (f(hi) < 0) rc.warn('warning', t('junctions.pump.warn.speedTooHigh', { id: j.id }), 'j:' + j.id);
-      else if (f(lo) > 0) { sp = lo; rc.warn('warning', t('junctions.pump.warn.speedTooLow', { id: j.id }), 'j:' + j.id); }
-      else { for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; } sp = (lo + hi) / 2; }
+      const c = el.controlSpeed(su.Q, r.dHs);
+      sp = c.s;
+      if (c.status === 'high') rc.warn('warning', t('junctions.pump.warn.speedTooHigh', { id: j.id }), 'j:' + j.id);
+      if (c.status === 'low') rc.warn('warning', t('junctions.pump.warn.speedTooLow', { id: j.id }), 'j:' + j.id);
       r.speed = sp * 100;
     } else if (j.mode === 'fixedFlow' || j.mode === 'ratio') r.speed = NaN;
-    bestEfficiency(r, el, el.controlled && el.curve ? r.speed / 100 : el.s, su.Q);
+    r.eta = el.etaAt(su.Q, sp);
+    // an efficiency outside 0 to 100 % (a fitted curve), or none (no speed): no power to the gas; the discharge
+    // temperature takes the efficiency the network used
+    const valid = r.eta > 0 && r.eta <= 1 + 1e-12;
+    r.etaInvalid = !Number.isFinite(r.eta) || (!valid && m > 0);
+    r.T0out = r.ratio > 1 ? su.T0 * Math.pow(r.ratio, (k - 1) / (k * el.etaUse(r.eta))) : su.T0;
+    r.Pgas = valid ? m * cx.cp * (r.T0out - su.T0) : NaN;
+    if (el.effCurve && !Number.isFinite(r.eta)) rc.warn('warning', t('junctions.pump.warn.effNoSpeed', { id: j.id }), 'j:' + j.id);
+    else if (r.etaInvalid) rc.warn('warning', t('junctions.pump.warn.effRangeGas', { id: j.id, eta: (r.eta * 100).toFixed(2) }), 'j:' + j.id);
+    bestEfficiency(r, el, sp, su.Q);
     if (m < 0) rc.warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
     if (el.curve && j.mode === 'curve' && su.Q / (el.N * el.s) > el.curve.xmax * 1.0001) rc.warn('warning', t('junctions.pump.warn.beyondCurve', { id: j.id }), 'j:' + j.id);
     if (r.ratio < 1 && m > 0) rc.warn('warning', t('core.gas.compressorBelowOne', { id: j.id, r: r.ratio.toFixed(3) }), 'j:' + j.id);

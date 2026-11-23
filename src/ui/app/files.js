@@ -26,6 +26,8 @@
     if (PumpIt.surge) PumpIt.surge.inputs.normalize(m);
     M.normalizeLayout(m);
     M.normalizeEnds(m);
+    // overrides of a whole block of friction or of losses at the pipes: one per field that differs from the parent
+    M.splitBlocksOnLoad(m);
     return m;
   }
 

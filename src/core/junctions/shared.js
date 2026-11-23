@@ -162,8 +162,25 @@
     apply: (jc, v) => { jc.gasT = q(v, 'K'); },
   };
 
+  // The fields of each loss model of a valve. A type lists the models it accepts (def.lossModels); changing the type of
+  // a junction keeps, in the base and in each scenario, its name, its elevation, its losses at the pipes, a loss model
+  // the new type accepts and the coefficients the new type has; the rest of the old type goes (keepsOnRetype).
+  const LOSS_FIELDS = { K: ['K'], Cv: ['Cv'], Kv: ['Kv'], opening: ['CvMax', 'char', 'R', 'open'], CdA: ['CdA'] };
+  const LOSS_FIELD_SET = new Set(Object.values(LOSS_FIELDS).flat());
+  // The coefficients pass only between two valve types (both list lossModels): another type with a field of the same
+  // name (the K of an orifice, unused while it is sharp-edged) gives nothing to a valve, nor takes from one.
+  // path: the field (or a path inside it) of the old junction; value: its value there; def and defaults: the new type;
+  // from: the definition of the old type
+  function keepsOnRetype(def, defaults, path, value, from) {
+    const f = path.split('.')[0];
+    if (f === 'name' || f === 'elevation') return true;
+    if (f === 'pipeK') return 'pipeK' in defaults;
+    if (f === 'lossModel') return path === f && (def.lossModels || []).includes(value);
+    return LOSS_FIELD_SET.has(f) && f in defaults && !!def.lossModels && !!(from && from.lossModels);
+  }
+
   PumpIt.junctionTypes.shared = {
-    valveTime, gasTemperature, K_SPACE, CHARS, cvAtOpening, openingOfCv, openingCv, shutByOpening, checkCharacteristic,
+    LOSS_FIELDS, keepsOnRetype, valveTime, gasTemperature, K_SPACE, CHARS, cvAtOpening, openingOfCv, openingCv, shutByOpening, checkCharacteristic,
     valveLoss, checkValveLoss, equivalentCv, inlineValveResult, dischargeResults,
     gasValveK, gasEquivalentCv, gasDischargeResults, gasNode, gasMachAt, gasBasisP,
   };

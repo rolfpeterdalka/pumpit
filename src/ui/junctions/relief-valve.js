@@ -29,7 +29,7 @@
       s.appendChild(f.qty(key, 'Pset', ds('Pset'), 'pressure'));
       if (j.mode !== 'instant') s.appendChild(f.qty(key, 'Pfull', ds('Pfull'), 'pressure'));
       s.appendChild(f.qty(key, 'Pclose', ds('Pclose'), 'pressure', { info: ds('PcloseHint') }));
-      s.appendChild(f.sel(key, 'lossModel', ds('capacity'), [['Cv', ds('capacities.Cv')], ['Kv', ds('capacities.Kv')], ['CdA', ds('capacities.CdA')]]));
+      s.appendChild(f.sel(key, 'lossModel', ds('capacity'), PumpIt.junctionTypes.get(j.type).lossModels.map((m) => [m, ds('capacities.' + m)])));
       if (j.lossModel === 'Kv') s.appendChild(f.num(key, 'Kv', 'Kv', { info: t('junctions.lossModel.KvHint') }));
       else if (j.lossModel === 'CdA') s.appendChild(f.qty(key, 'CdA', 'Cd·A', 'area'));
       else s.appendChild(f.num(key, 'Cv', 'Cv', { info: t('junctions.lossModel.CvHint') }));

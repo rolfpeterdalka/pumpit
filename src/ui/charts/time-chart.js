@@ -90,9 +90,13 @@
       const plain = cat === 'none' || cat === 'pct';
       const u = plain ? '' : app.outUnit('tchart.' + cat, cat);
       const unitText = cat === 'pct' ? '%' : u ? F.unit(u) : '';
-      const conv = (v) => (plain ? v : F.conv(v, cat, u, ctx));
+      // the value a table gave converts at each step with the densities of its junction then (no density: no point)
+      const conv = (v, n, q, id) => {
+        if (plain) return v;
+        try { return F.conv(v, cat, u, q.k === '@input' ? UI.timeResults.inputCtx(run, id, n, ctx) : ctx); } catch (e) { return NaN; }
+      };
       const series = list.map(({ s, i, kind, id, q }) => {
-        const ys = values(run, kind, id, q).map(conv);
+        const ys = values(run, kind, id, q).map((v, n) => conv(v, n, q, id));
         return { name: seriesName(run, s), color: COLORS[i % COLORS.length], pts: xs.map((x, n) => [x, ys[n]]), at: [xs[ic], ys[ic]] };
       });
       const unitSel = plain ? '' : `<select class="unit-sel" data-t="tchart" data-c="${cat}" data-cat="${cat}" aria-label="${F.esc(tx('unit'))}">${U.list(cat).map((x) => F.option(x, F.unit(x), x === u)).join('')}</select>`;

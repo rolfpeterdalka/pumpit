@@ -72,12 +72,12 @@
         if (!isolated && l.mode === 'dP') { const Mv = Fw.machOf(cx, Math.abs(m) / A, na.P, Fw.tempOf(cx, na)); ea = full(na.P, Fw.tempOf(cx, na), Mv, Math.abs(m) / A); eb = full(nb.P, Fw.tempOf(cx, nb), Mv, Math.abs(m) / A); }
       }
       const sg = m >= 0 ? 1 : -1;
-      const inlet = m >= 0 ? ea : eb, outlet = m >= 0 ? eb : ea;
       Object.assign(r, {
         Pin: ea.P, Pout: eb.P, P0in: ea.P0, P0out: eb.P0, Tin: ea.T, Tout: eb.T, T0in: ea.T0, T0out: eb.T0,
         Min: ea.M, Mout: eb.M, rhoIn: ea.rho, rhoOut: eb.rho, Vin: sg * ea.V, Vout: sg * eb.V,
         V: sg * Math.max(Math.abs(ea.V) || 0, Math.abs(eb.V) || 0),
-        Q: inlet.rho > 0 ? m / inlet.rho : NaN, Qout: outlet.rho > 0 ? m / outlet.rho : NaN,
+        // the volume flows at the ends of the reference direction, as rhoIn, rhoOut, Vin and Vout: Q·ρ = ṁ at each end
+        Q: ea.rho > 0 ? m / ea.rho : NaN, Qout: eb.rho > 0 ? m / eb.rho : NaN,
         Re, f, regime: t('core.solver.regime.' + (Re < env.reLam ? 'laminar' : Re > env.reTurb ? 'turbulent' : 'transition')),
         profile: prof ? prof.map(([x, Px, Tx, Mx]) => [s0.dir > 0 ? x : P.L - x, Px, Tx, Mx]).sort((u, w) => u[0] - w[0]) : null,
       });

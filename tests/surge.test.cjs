@@ -1040,5 +1040,22 @@ console.log('\nModule and checklist');
   check('with the water hammer off its data are not checked', vo.ok);
 }
 
+// ---------- review of 6c4f0fa, item 9: a level table of the reservoir J1 of the example of pumping between tanks, 3 and
+// 2.7 m in 1 s, is the same run given in % of the steady level, 100 and 90 %
+console.log('\nA level table in metres or in % of the steady level');
+{
+  const levelRun = (tb, basis) => {
+    const m = PumpIt.examples.get('pump').build();
+    m.solution.surge = Object.assign(SG.inputs.newControl(), { on: true, duration: { value: 1, unit: 's' } });
+    m.junctions.find((j) => j.id === 1).surge = { use: true, what: 'level', basis, start: 'time', when: [], tables: [tb], repeat: false, interp: 'linear' };
+    return simulate(m);
+  };
+  const a = levelRun({ t: [0, 1], v: [3, 2.7], tUnit: 's', vUnit: 'm' }, 'absolute');
+  const b = levelRun({ t: [0, 1], v: [100, 90], tUnit: 's', vUnit: '%' }, 'relative');
+  const n = a.times.length, Pa = seriesOf(a, 1, 0, 'P'), Pb = seriesOf(b, 1, 0, 'P');
+  check('171 samples and 127 070.44 Pa at the end, at the first station of P1', n === 171 && b.times.length === 171 && Math.abs(Pa[n - 1] - 127070.44) < 0.005, `${n} ${Pa[n - 1]}`);
+  check('the two representations give the same series', Pa.every((x, i) => Math.abs(x - Pb[i]) <= 1e-9 * Math.abs(x)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

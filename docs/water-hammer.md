@@ -83,7 +83,7 @@ The decisions of Annex A are followed as written. They are repeated here with th
 
 **W-18 Artificial transient.** 0.5 % of the absolute pressure, and of the flows above the limit; the run stops by default.
 
-**W-19 Exclusive** with the time simulation (turning one on turns the other off); refused in the compressible mode.
+**W-19 Exclusive** with the time simulation (turning one on turns the other off); refused in the compressible mode. In a child scenario the two switches are one choice: a scenario that turns one on turns the other off at its own level (`effective` in `src/core/model/scenarios.js`), so its choice holds whatever its parent chooses later; restoring either switch brings both back from the parent, and the marker of an inherited value shows on both. A scenario that sets both on, which only an old file can hold, keeps the item of the checklist. The basis of a table (absolute or % of the steady value) converts the numbers of every table of the junction in one edit, as the time data do; without a steady value the data stay and a message says why.
 
 **W-20 Relief valve.** Its pressures are those of its node, stagnation; Cv grows in a straight line from the closing pressure to the full opening pressure, and the closing pressure is at most the set pressure (checklist), the set pressure itself when left empty (`reliefValve` in `devices.js`).
 

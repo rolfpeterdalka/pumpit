@@ -309,5 +309,32 @@ for (const ex of PumpIt.examples.EXAMPLES) {
   }
 }
 
+// Review of 6c4f0fa, item 4: an efficiency curve fitted above 100 % between valid points gives no shaft power and a
+// warning; linear interpolation follows the points; points outside 0 to 100 % stay pending in the checklist, and a
+// control without a speed leaves the efficiency unknown
+console.log('\nThe efficiency of a pump stays within 0 to 100 %');
+{
+  const ex = () => PumpIt.examples.get('pump').build();
+  const withEff = (y, fit) => { const m = ex(); m.junctions.find((j) => j.id === 2).eff = { x: [0, 40, 80, 120], y, xUnit: 'm³/h', fit }; return m; };
+  const r2 = solveOk(withEff([0, 85, 98, 99], '2'));
+  const p2 = r2.pumps[2], w2 = r2.warnings.filter((w) => w.obj === 'j:2');
+  check('order 2: 101.93 % at 111.36 m³/h, no shaft power, one warning that names the fit', Math.abs(p2.eta * 100 - 101.930) < 1e-3 && Math.abs(p2.Q * 3600 - 111.36) < 5e-3
+    && Number.isNaN(p2.Pshaft) && p2.etaInvalid && w2.length === 1 && w2[0].level === 'warning' && w2[0].text.includes('101.93%') && w2[0].text.includes('fit'), JSON.stringify(w2.map((w) => w.text)));
+  const rx = solveOk(withEff([0, 85, 98, 99], 'xy'));
+  check('linear interpolation: 98.784 % and 11.150 kW, no warning', Math.abs(rx.pumps[2].eta * 100 - 98.784) < 1e-3 && Math.abs(rx.pumps[2].Pshaft / 1000 - 11.150) < 5e-4
+    && !rx.pumps[2].etaInvalid && !rx.warnings.some((w) => w.obj === 'j:2'));
+  const pending = (m) => { const v = M.validate(M.effective(m, 'base')); return !v.ok && (v.undef.get('j:2') || []).includes(PumpIt.i18n.t('junctions.pump.check.effRange')); };
+  check('points of 120 % stay pending in the checklist', pending(withEff([120, 120, 120, 120], '2')));
+  check('0 % only at zero flow; a negative point or 0 % at a flow stay pending', !pending(withEff([0, 85, 98, 99], '2')) && pending(withEff([5, 0, 98, 99], '2')) && pending(withEff([-1, 85, 98, 99], '2')));
+  const fixed = withEff([120, 120, 120, 120], '2'); fixed.junctions.find((j) => j.id === 2).mode = 'fixedFlow';
+  check('a liquid pump at a fixed flow does not read the curve: not pending', !pending(fixed));
+  // a flow control that cannot reach its flow, even at 300 %: no speed, so no efficiency and no shaft power
+  const far = ex(); Object.assign(far.junctions.find((j) => j.id === 2), { mode: 'controlFlow', setQ: q(2000, 'm³/h') });
+  const rf = S.run(M.effective(far, 'base'));
+  const pf = rf.pumps && rf.pumps[2];
+  check('a control without a speed: efficiency and shaft power not available, with a warning', !!pf && Number.isNaN(pf.speed) && Number.isNaN(pf.eta) && Number.isNaN(pf.Pshaft) && pf.etaInvalid
+    && rf.warnings.some((w) => w.obj === 'j:2' && w.text.includes('without the speed')), pf ? `${pf.speed} ${pf.eta}` : JSON.stringify(rf.errors));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

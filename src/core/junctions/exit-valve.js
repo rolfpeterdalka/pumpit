@@ -9,6 +9,7 @@
   PumpIt.junctionTypes.register({
     type: 'exitvalve', order: 90, group: 'valves',
     pipes: [1, 1], multi: true, ref: true,
+    lossModels: ['K', 'Cv', 'Kv', 'opening'],
 
     defaults: () => ({ Pout: q(0, 'kgf/cm²(g)'), lossModel: 'K', K: 0, Cv: 100, Kv: 86, CvMax: 100, char: 'linear', R: 50, open: 100 }),
 

@@ -25,6 +25,15 @@
   // a value in the unit chosen for its column key (prefs.colUnits)
   const unitOf = (k, cat) => app.outUnit(k, cat);
   const val = (v, cat, k, ctx) => (Number.isFinite(v) ? F.fmt(F.conv(v, cat, unitOf(k, cat), ctx), 5) : '—');
+  // The conversion of the value a table gave at a recorded step. A gas reads a volume flow at the density of its junction
+  // at that step (none recorded: no volume flow) and a normal volume flow at its normal density; a liquid has one density.
+  function inputCtx(run, id, i, ctx) {
+    if (!run.gas) return ctx;
+    const s = run.series.junctions[id], rho = s && s.rho ? s.rho[i] : NaN;
+    return Object.assign({}, ctx, { rho: rho > 0 ? rho : NaN });
+  }
+  // a table value in the unit of its column ('—' when the conversion lacks a density)
+  const inputVal = (v, cat, k, ctx) => { try { return val(v, cat, k, ctx); } catch (e) { return '—'; } };
   const head = (label, k, cat) => `${F.esc(label)}${cat ? C.unitSelect(k.split('.')[0], { k: k.split('.').slice(1).join('.'), c: cat }, label) : ''}`;
   // the name of an object of the model
   function objName(key) {
@@ -85,7 +94,7 @@
     if (kind === 'pumps' || kind === 'valves') {
       const jr = pick(run.series.junctions[id]);
       for (const k of ['P0in', 'P0out', 'Pin', 'Pout']) if (!(k in row) && k in jr) row[k] = jr[k];
-      if (kind === 'pumps') row.etaPct = r.etaAssumed ? NaN : r.eta * 100;
+      if (kind === 'pumps') { row.etaPct = r.etaAssumed ? NaN : r.eta * 100; if (r.etaAssumed) row.Pshaft = NaN; }
     }
     return row;
   }
@@ -115,7 +124,10 @@
       for (let i = 0; i < n; i++) {
         const row = rowAt(run, pick.kind, pick.id, i);
         let cells = cols.map((c) => { const x = C.cellValue(c, row, ctx, pick.kind); return `<td class="num${x === '—' ? ' na' : ''}">${F.esc(x)}</td>`; }).join('');
-        if (inp) cells += `<td class="num">${inp.cat ? val(run.series.inputs[pick.id].v[i], inp.cat, 'tin.' + inp.what, ctx) : F.fmt(run.series.inputs[pick.id].v[i], 5)}</td>`;
+        if (inp) {
+          const x = inp.cat ? inputVal(run.series.inputs[pick.id].v[i], inp.cat, 'tin.' + inp.what, inputCtx(run, pick.id, i, ctx)) : F.fmt(run.series.inputs[pick.id].v[i], 5);
+          cells += `<td class="num${x === '—' ? ' na' : ''}">${x}</td>`;
+        }
         rows.push(cells);
       }
     }
@@ -147,7 +159,8 @@
     const ctx = ctxOf();
     if (cat === 'none') return short(v);
     if (cat === 'percent') return short(v) + ' %';
-    const u = unitOf('tev.' + cat, cat === 'flow' ? 'volFlow' : cat);
+    // a flow of a gas in normal volume (its density changes along the network), of a liquid in volume
+    const u = unitOf('tev.' + cat, cat !== 'flow' ? cat : C.isGas(app.currentResults()) ? 'normFlow' : 'volFlow');
     const c = cat === 'flow' ? 'flow' : cat;
     return `${short(F.conv(v, c, u, ctx))} ${F.unit(u)}`;
   }
@@ -186,8 +199,13 @@
       Object.entries(X.pipes).map(([id, o]) => ({ key: 'p:' + id, cells: [at(o.Pmax, 'pressure', 'tex.P', ctx) + ends(o.Pmax), when(o.Pmax), at(o.Pmin, 'pressure', 'tex.P', ctx) + ends(o.Pmin), when(o.Pmin), at(o.Qmax, 'volFlow', 'tex.Q', ctx), when(o.Qmax), at(o.Qmin, 'volFlow', 'tex.Q', ctx), when(o.Qmin), at(o.Vmax, 'velocity', 'tex.V', ctx), when(o.Vmax)] })), tx('pipesHint'));
     html += table(tx('kinds.junctions'), [[tx('P0max'), 'tex.P0', 'pressure'], [tx('at'), '', null], [tx('P0min'), 'tex.P0', 'pressure'], [tx('at'), '', null]],
       Object.entries(X.junctions).map(([id, o]) => ({ key: 'j:' + id, cells: [at(o.Pmax, 'pressure', 'tex.P0', ctx), when(o.Pmax), at(o.Pmin, 'pressure', 'tex.P0', ctx), when(o.Pmin)] })));
-    html += table(tx('kinds.pumps'), [[tx('Qmax'), 'tex.Q', 'volFlow'], [tx('at'), '', null], [tx('Qmin'), 'tex.Q', 'volFlow'], [tx('at'), '', null], [tx('Hmax'), 'tex.H', 'head'], [tx('at'), '', null], [tx('Hmin'), 'tex.H', 'head'], [tx('at'), '', null], [tx('Wmax'), 'tex.W', 'power'], [tx('at'), '', null], [tx('Wmin'), 'tex.W', 'power'], [tx('at'), '', null]],
-      Object.entries(X.pumps).map(([id, o]) => ({ key: 'j:' + id, cells: [at(o.Qmax, 'volFlow', 'tex.Q', ctx), when(o.Qmax), at(o.Qmin, 'volFlow', 'tex.Q', ctx), when(o.Qmin), at(o.Hmax, 'head', 'tex.H', ctx), when(o.Hmax), at(o.Hmin, 'head', 'tex.H', ctx), when(o.Hmin), at(o.Pmax, 'power', 'tex.W', ctx), when(o.Pmax), at(o.Pmin, 'power', 'tex.W', ctx), when(o.Pmin)] })));
+    // a compressor: its isentropic head and the power it gives the gas
+    const g = run.gas ? 'Gas' : '';
+    // a pump without an efficiency curve (*): the power given to the liquid, as in the totals
+    const pw = (o, x) => at(x, 'power', 'tex.W', ctx) + (o.noEff && x && Number.isFinite(x.v) ? ' *' : '');
+    html += table(tx('kinds.pumps'), [[tx('Qmax'), 'tex.Q', 'volFlow'], [tx('at'), '', null], [tx('Qmin'), 'tex.Q', 'volFlow'], [tx('at'), '', null], [tx('Hmax' + g), 'tex.H', 'head'], [tx('at'), '', null], [tx('Hmin' + g), 'tex.H', 'head'], [tx('at'), '', null], [tx('Wmax' + g), 'tex.W', 'power'], [tx('at'), '', null], [tx('Wmin' + g), 'tex.W', 'power'], [tx('at'), '', null]],
+      Object.entries(X.pumps).map(([id, o]) => ({ key: 'j:' + id, cells: [at(o.Qmax, 'volFlow', 'tex.Q', ctx), when(o.Qmax), at(o.Qmin, 'volFlow', 'tex.Q', ctx), when(o.Qmin), at(o.Hmax, 'head', 'tex.H', ctx), when(o.Hmax), at(o.Hmin, 'head', 'tex.H', ctx), when(o.Hmin), pw(o, o.Pmax), when(o.Pmax), pw(o, o.Pmin), when(o.Pmin)] })),
+      Object.values(X.pumps).some((o) => o.noEff) ? tx('noEffPower') : '');
     return html || `<div class="card"><div class="empty">${F.esc(tx('noObjects'))}</div></div>`;
   }
   function totalsTab(run) {
@@ -200,14 +218,21 @@
     // a gas counts its mass where a liquid counts its volume
     const gas = !!run.gas;
     const amount = gas ? [tx('pumpedMass'), 'tto.M', 'mass'] : [tx('pumped'), 'tto.V', 'volume'];
-    let html = table(tx('kinds.pumps'), [[tx('energy'), 'tto.E', 'energy'], [tx('energyIdeal'), 'tto.E', 'energy'], amount, [tx('ton'), 'tto.t', 'time'], [tx('starts'), '', null]].concat(costHead),
-      Object.entries(T.pumps).map(([id, o]) => ({ key: 'j:' + id, cells: [v(o.E, 'energy', 'tto.E') + (o.noEff ? ' *' : ''), v(o.Eideal, 'energy', 'tto.E'), gas ? v(o.M, 'mass', 'tto.M') : v(o.V, 'volume', 'tto.V'), v(o.ton, 'time', 'tto.t'), String(o.starts)].concat(C ? [money(o.cost)] : []) })),
+    // a compressor gives its energy to the gas, which is the whole of its energy; a pump without an efficiency curve (*)
+    // counts the energy given to the liquid, and so does its cost
+    const star = (o) => (o.noEff ? ' *' : '');
+    const energyCols = gas ? [[tx('energyGas'), 'tto.E', 'energy']] : [[tx('energy'), 'tto.E', 'energy'], [tx('energyIdeal'), 'tto.E', 'energy']];
+    let html = table(tx('kinds.pumps'), energyCols.concat([amount, [tx('ton'), 'tto.t', 'time'], [tx('starts'), '', null]], costHead),
+      Object.entries(T.pumps).map(([id, o]) => ({ key: 'j:' + id, cells: (gas ? [v(o.E, 'energy', 'tto.E')] : [v(o.E, 'energy', 'tto.E') + star(o), v(o.Eideal, 'energy', 'tto.E')]).concat([gas ? v(o.M, 'mass', 'tto.M') : v(o.V, 'volume', 'tto.V'), v(o.ton, 'time', 'tto.t'), String(o.starts)], C ? [money(o.cost) + (Number.isFinite(o.cost) ? star(o) : '')] : []) })),
       Object.values(T.pumps).some((o) => o.noEff) ? tx('noEff') : '');
     if (C) {
       const cur = C.currency ? ' ' + F.esc(C.currency) : '';
-      const kv = [[tx('costTotal'), money(C.total) + cur]];
-      if (Number.isFinite(C.annual)) kv.push([tx('annual'), money(C.annual) + cur]);
-      html += `<div class="card"><div class="card-head"><h3>${F.esc(tx('costTitle'))}</h3>${Number.isFinite(C.annual) ? `<span class="muted small">${F.esc(tx('annualHint'))}</span>` : ''}</div><div class="kv">${kv.map(([k, x]) => `<div><span class="eyebrow">${F.esc(k)}</span><b>${x}</b></div>`).join('')}</div></div>`;
+      const mark = C.noEff && Number.isFinite(C.total) ? ' *' : '';
+      // the time the run integrated, which the estimate of a year needs as a whole number of days
+      const kv = [[tx('costTotal'), money(C.total) + cur + mark], [tx('costSpan'), F.esc(tx('days', { n: F.fmt(C.days, 4) }))]];
+      if (Number.isFinite(C.annual)) kv.push([tx('annual'), money(C.annual) + cur + mark]);
+      const note = Number.isFinite(C.annual) ? tx('annualHint') : tx('annualNone');
+      html += `<div class="card"><div class="card-head"><h3>${F.esc(tx('costTitle'))}</h3><span class="muted small">${F.esc(note)}</span></div><div class="kv">${kv.map(([k, x]) => `<div><span class="eyebrow">${F.esc(k)}</span><b>${x}</b></div>`).join('')}</div>${mark ? `<div class="muted small">${F.esc(tx('noEff'))}</div>` : ''}</div>`;
     }
     html += table(tx('kinds.tanks'), [[tx('V0'), 'tto.V', 'volume'], [tx('Vf'), 'tto.V', 'volume'], [tx('dV'), 'tto.V', 'volume'], [tx('Vin'), 'tto.V', 'volume'], [tx('Vout'), 'tto.V', 'volume'], [tx('over'), 'tto.V', 'volume'], [tx('def'), 'tto.V', 'volume'], [tx('closure'), 'tto.V', 'volume']],
       Object.entries(T.tanks).filter(([, o]) => !o.vessel).map(([id, o]) => ({ key: 'j:' + id, cells: [v(o.V0, 'volume', 'tto.V'), v(o.Vf, 'volume', 'tto.V'), v(o.dV, 'volume', 'tto.V'), v(o.Vin, 'volume', 'tto.V'), v(o.Vout, 'volume', 'tto.V'), v(o.over, 'volume', 'tto.V'), v(o.def, 'volume', 'tto.V'), v(o.closure, 'volume', 'tto.V')] })), tx('tanksHint'));
@@ -297,5 +322,5 @@
     return out;
   }
 
-  UI.timeResults = { TABS, render, bind, summaryCard, warningsCard, objects, rowAt, sheets, TANK_COLS, tankCols, tankLabel };
+  UI.timeResults = { TABS, render, bind, summaryCard, warningsCard, objects, rowAt, inputCtx, sheets, TANK_COLS, tankCols, tankLabel };
 })(window);

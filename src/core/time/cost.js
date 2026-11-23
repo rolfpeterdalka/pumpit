@@ -37,14 +37,19 @@
   // the cost of the energy of an interval w (s) at the power p (W) and the time t
   const of = (T, w, p, t) => (w * p * priceAt(T, t)) / KWH;
 
-  // the totals of the cost: of every pump, of the network and, when the run lasts a whole number of days, a year of it
+  // the totals of the cost: of every pump, of the network and, when the run integrated a whole number of days, a year of
+  // it. The days are those of the intervals the run integrated (totals.span, s), not those it was planned for: a run
+  // stopped before its end counts only what it calculated.
   function finish(totals, P) {
     if (!P.tariff) return;
     let total = 0;
-    for (const id in totals.pumps) total += totals.pumps[id].cost || 0;
-    const days = (P.tf - P.t0) / DAY;
+    // a pump whose energy is not known leaves the total unknown
+    for (const id in totals.pumps) total += totals.pumps[id].cost;
+    const days = (totals.span || 0) / DAY;
     const whole = days >= 1 && Math.abs(days - Math.round(days)) < 1e-9;
-    totals.cost = { currency: P.tariff.currency, total, days, annual: whole ? (total * 365) / Math.round(days) : NaN };
+    // (noEff: a pump without an efficiency curve, whose cost is that of the energy given to the liquid)
+    const noEff = Object.values(totals.pumps).some((o) => o.noEff);
+    totals.cost = { currency: P.tariff.currency, total, days, noEff, annual: whole ? (total * 365) / Math.round(days) : NaN };
   }
 
   PumpIt.time = Object.assign(PumpIt.time || {}, { cost: { DAY, KWH, check, prepare, priceAt, of, finish } });

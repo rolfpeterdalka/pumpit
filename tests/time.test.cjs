@@ -1176,5 +1176,79 @@ console.log('\nThe model of a recorded step (the pump chart at the time cursor)'
   check('and at 0 h the curve of 100 % passes through the first point', rel(interp(c0.pump, p0.Q), p0.dH) < 0.01 && !near(interp(c0.pump, pt.Q), interp(crv.pump, pt.Q), 0.5));
 }
 
+// Review of 6c4f0fa, item 4 over time: a pump whose fitted efficiency passes 100 % has no shaft power, so its energy, its
+// cost and the total cost are not known (no silent fallback to the power given to the liquid)
+console.log('\nAn efficiency outside 0 to 100 % leaves the energy unknown');
+{
+  const m = PumpIt.examples.get('pump').build();
+  Object.assign(m.solution.time, { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(10, 'min') });
+  m.solution.time.tariff = { use: true, currency: '', t: [0], v: [1], tUnit: 'h' };
+  m.junctions.find((j) => j.id === 2).eff = { x: [0, 40, 80, 120], y: [0, 85, 98, 99], xUnit: 'm³/h', fit: '2' };
+  const r = TM.run(M.effective(m, 'base'));
+  const o = r.totals.pumps[2];
+  check('energy and cost of J2 not available, nor the total cost; no estimate marker', r.ok && Number.isNaN(o.E) && Number.isNaN(o.cost) && Number.isNaN(r.totals.cost.total) && !o.noEff && o.Eideal > 0,
+    `E ${o.E} cost ${o.cost} total ${r.totals.cost.total}`);
+}
+
+// Review of 6c4f0fa, item 10: the cost counts the days the run integrated. A whole day of the example of pumping between
+// tanks at 1 per kWh, then the same run stopped after 36 steps of 10 min (6 h): its days are 0.25 and it has no estimate
+// for a year, its total and its series stay.
+console.log('\nThe cost counts the time integrated');
+{
+  const costModel = () => {
+    const m = PumpIt.examples.get('pump').build();
+    Object.assign(m.solution.time, { on: true, start: q(0, 'h'), stop: q(24, 'h'), step: q(10, 'min') });
+    m.solution.time.tariff = { use: true, currency: '', t: [0], v: [1], tUnit: 'h' };
+    return m;
+  };
+  const full = TM.run(M.effective(costModel(), 'base'));
+  const C = full.totals.cost;
+  check('a whole day: 357.73 and 130 573.00 in a year, 1 day', full.ok && near(C.total, 357.73, 0.005) && near(C.annual, 130573.00, 0.5) && near(C.days, 1, 1e-12), `${C.total} ${C.annual} ${C.days}`);
+  const job = TM.start(M.effective(costModel(), 'base'));
+  for (let i = 0; i < 36; i++) job.step(0);
+  job.cancel();
+  const part = job.result();
+  const P = part.totals.cost;
+  check('stopped at 6 h: 0.25 day, 89.43356, no estimate for a year', near(P.days, 0.25, 1e-12) && near(P.total, 89.43356, 5e-6) && Number.isNaN(P.annual), `${P.days} ${P.total} ${P.annual}`);
+  check('and its totals and series stay', part.ok && part.stopped && part.stopped.reason === 'cancel' && part.totals.pumps[2].E > 0 && part.times.length > 0);
+}
+
+// Review of 6c4f0fa, item 11: without an efficiency curve the energy and the cost are those of the power given to the
+// liquid, with their marker; with the curve of the example, the energy of the shaft and no marker.
+console.log('\nAn efficiency assumed is told in the totals');
+{
+  const hour = (eff) => {
+    const m = PumpIt.examples.get('pump').build();
+    Object.assign(m.solution.time, { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(10, 'min') });
+    m.solution.time.tariff = { use: true, currency: '', t: [0], v: [1], tUnit: 'h' };
+    if (eff) m.junctions.find((j) => j.id === 2).eff = eff;
+    return TM.run(M.effective(m, 'base'));
+  };
+  const none = hour({ x: [], y: [], xUnit: 'm³/h', fit: '2' }), o = none.totals.pumps[2];
+  check('no efficiency curve: 11.014 kWh given to the liquid, marked, the cost too', near(o.Eideal / 3.6e6, 11.014, 5e-4) && near(o.E, o.Eideal, 1e-6) && o.noEff && none.totals.cost.noEff,
+    `${o.E / 3.6e6} ${o.Eideal / 3.6e6} ${o.noEff}`);
+  const curve = hour(null), c = curve.totals.pumps[2];
+  check('with the curve: 14.906 kWh at the shaft, no marker', near(c.E / 3.6e6, 14.906, 5e-4) && !c.noEff && !curve.totals.cost.noEff, `${c.E / 3.6e6}`);
+  // the extremes of the power: marked without the curve (the power given to the liquid), not with it
+  const xn = none.extremes.pumps[2], xc = curve.extremes.pumps[2];
+  check('extremes: the power without the curve is marked, with the curve it is not', xn.noEff === true && Number.isFinite(xn.Pmax.v) && !xc.noEff,
+    `${xn.noEff} ${xc.noEff}`);
+}
+
+// Review of 6c4f0fa, item 12: the extremes of a compressor are of its power given to the gas and of its isentropic head,
+// at the first time when nothing changes, and its total is the energy given to the gas.
+console.log('\nThe extremes of a compressor');
+{
+  const m = PumpIt.examples.get('airPlant').build();
+  Object.assign(m.solution.time, { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(10, 'min') });
+  const r = TM.run(M.effective(m, 'base'));
+  const X = r.extremes.pumps[2], o = r.totals.pumps[2];
+  check('92.432 kW and 24 786.07 m, highest and lowest, at 0 h', r.ok && near(X.Pmax.v / 1e3, 92.432, 5e-4) && near(X.Pmin.v / 1e3, 92.432, 5e-4) && near(X.Hmax.v, 24786.07, 0.005) && near(X.Hmin.v, 24786.07, 0.005)
+    && X.Pmax.t === 0 && X.Hmax.t === 0 && X.gas, `${X.Pmax && X.Pmax.v} ${X.Hmax && X.Hmax.v}`);
+  const Pg = r.series.pumps[2].Pgas;
+  check('the same as the samples recorded', Pg.every((v) => near(v, X.Pmax.v, 1e-6)), `${Pg[0]}`);
+  check('1 h: 92.432 kWh given to the gas, no marker', near(o.E / 3.6e6, 92.432, 5e-4) && !o.noEff, `${o.E / 3.6e6}`);
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

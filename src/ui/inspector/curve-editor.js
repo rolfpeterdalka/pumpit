@@ -83,9 +83,24 @@
           const terms = cv.a.map((a, i) => `${i === 0 ? '' : a >= 0 ? ' + ' : ' − '}${F.fmt(i === 0 ? a : Math.abs(a), 4)}${i ? '·Q' + (i > 1 ? '<sup>' + i + '</sup>' : '') : ''}`).join('');
           s.appendChild(hint(tx('fit', { terms })));
         }
+        if (o.yCat === 'pct') pctHints(s, c, cv);
       } catch (e) { s.appendChild(hint(F.esc(e.message))); }
     }
     return s;
+  }
+
+  // an efficiency curve: points outside 0 to 100 % (0 only at zero flow), or a fit that leaves the range between them
+  function pctHints(s, c, cv) {
+    const ptsOk = c.y.every((y, i) => Number.isFinite(y) && y <= 100 && (y > 0 || (y === 0 && c.x[i] === 0)));
+    if (!ptsOk) { s.appendChild(hint(F.esc(tx('pctPoints')))); return; }
+    const lo = Math.min(...c.x), hi = Math.max(...c.x);
+    let worst = null;
+    for (let i = 0; i <= 200; i++) {
+      const x = lo + (hi - lo) * i / 200, y = H.evalCurve(cv, x);
+      // zero flow may have no efficiency
+      if (y > 100 + 1e-9 || (y <= 0 && x > 0)) { if (worst === null || Math.abs(y - 50) > Math.abs(worst - 50)) worst = y; }
+    }
+    if (worst !== null) s.appendChild(hint(F.esc(tx('pctFit', { v: F.fmt(worst, 4) }))));
   }
 
   // small plot of the points against the fitted curve

@@ -22,13 +22,56 @@
         const o = M.getObj(e, objKey);
         if (o) M.setPath(o, path, M.clone(s.overrides[k]));
       }
+      if (s.parent) exclusiveMode(s, e);
     }
     return e;
+  }
+
+  // The mode of calculation of a scenario is one choice: the time simulation (sol|time.on) or the water hammer
+  // (sol|surge.on), never both (decision W-19). A scenario that turns one on turns the other off at its own level, so
+  // that its choice holds whatever its parent chooses later; a scenario that sets both on is left as it is (the
+  // checklist tells). The base is what it is.
+  const MODE = { 'time.on': 'surge.on', 'surge.on': 'time.on' };
+  function modeSet(s, what) {
+    if (('sol|' + what + '.on') in s.overrides) return s.overrides['sol|' + what + '.on'];
+    const b = s.overrides['sol|' + what];
+    return b && typeof b === 'object' ? b.on : undefined;
+  }
+  function exclusiveMode(s, e) {
+    const tOn = modeSet(s, 'time'), sOn = modeSet(s, 'surge'), sol = e.solution;
+    if (tOn === true && sOn !== true && sol.surge && typeof sol.surge === 'object') sol.surge.on = false;
+    if (sOn === true && tOn !== true && sol.time && typeof sol.time === 'object') sol.time.on = false;
   }
 
   function effValue(m, sid, objKey, path) {
     const o = M.getObj(effective(m, sid), objKey);
     return o ? M.getPath(o, path) : undefined;
+  }
+
+  // a block of fields: a plain object, not a quantity { value, unit } nor a list
+  const isBlock = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && !('value' in v && 'unit' in v);
+
+  // An override of a whole block (objKey|path) split into overrides of the fields of the block that differ from the
+  // parent: the scenario sees the same model, and the fields it did not change follow the parent again. Not possible
+  // when the block or the parent's is not a block of fields, or when the parent has a field the override lacks (it would
+  // come back); returns whether it was split.
+  function splitBlock(m, s, objKey, path) {
+    const k = objKey + '|' + path;
+    const mine = effValue(m, s.id, objKey, path), theirs = effValue(m, s.parent, objKey, path);
+    if (!isBlock(mine) || !isBlock(theirs) || Object.keys(theirs).some((f) => !(f in mine))) return false;
+    for (const ok of Object.keys(s.overrides)) if (ok === k || ok.startsWith(k + '.')) delete s.overrides[ok];
+    for (const f of Object.keys(mine)) if (!M.deepEqual(mine[f], theirs[f])) s.overrides[k + '.' + f] = M.clone(mine[f]);
+    return true;
+  }
+  // the overrides of whole blocks above a field (objKey|a for objKey|a.b.c, then objKey|a.b), split down to the field;
+  // returns false when one of them cannot be
+  function splitAbove(m, s, objKey, path) {
+    const ps = path.split('.');
+    for (let n = 1; n < ps.length; n++) {
+      const up = ps.slice(0, n).join('.');
+      if ((objKey + '|' + up) in s.overrides && !splitBlock(m, s, objKey, up)) return false;
+    }
+    return true;
   }
 
   // edit: equal to the inherited value = relink to the parent; different = break the link of that attribute only
@@ -40,23 +83,50 @@
       return;
     }
     const k = objKey + '|' + path;
+    // a field of a block the scenario overrides as a whole: the block first becomes overrides of its own fields
+    const split = splitAbove(m, s, objKey, path);
     // more specific overrides of this scenario inside the path no longer apply
     for (const ok of Object.keys(s.overrides)) if (ok.startsWith(k + '.')) delete s.overrides[ok];
     const inherited = effValue(m, s.parent, objKey, path);
-    if (M.deepEqual(inherited, value)) delete s.overrides[k];
+    // (a block that could not be split still holds the field: the value stays an override of its own)
+    if (split && M.deepEqual(inherited, value)) delete s.overrides[k];
     else s.overrides[k] = M.clone(value);
   }
 
-  function isOverridden(m, sid, objKey, path) {
+  // (the two switches of the mode of calculation are one choice: either marks both)
+  function isOverridden(m, sid, objKey, path, unit = true) {
     const s = scen(m, sid);
     if (!s || !s.parent) return false;
     const k = objKey + '|' + path;
+    if (unit && objKey === 'sol' && MODE[path] && isOverridden(m, sid, objKey, MODE[path], false)) return true;
     return Object.keys(s.overrides).some((ok) => ok === k || ok.startsWith(k + '.') || k.startsWith(ok + '.'));
   }
-  function clearOverride(m, sid, objKey, path) {
+  // the value of the parent back. A field of a block the scenario overrides as a whole: the block is split first, so
+  // that only that field follows the parent (a block that cannot be split takes the parent's value of the field)
+  function clearOverride(m, sid, objKey, path, unit = true) {
     const s = scen(m, sid);
+    if (!s || !s.parent) return;
+    // the mode of calculation comes back whole: both switches follow the parent again
+    if (unit && objKey === 'sol' && MODE[path]) clearOverride(m, sid, objKey, MODE[path], false);
     const k = objKey + '|' + path;
+    const split = splitAbove(m, s, objKey, path);
     for (const ok of Object.keys(s.overrides)) if (ok === k || ok.startsWith(k + '.')) delete s.overrides[ok];
+    if (!split) s.overrides[k] = M.clone(effValue(m, s.parent, objKey, path));
+  }
+
+  // A file written before the fields of these blocks were saved one by one: the overrides of a whole block of the
+  // friction of a pipe or of the losses at the pipes of a junction become overrides of the fields that differ from the
+  // parent, from the base to the leaves; no effective value changes.
+  const SPLIT_ON_LOAD = /^(friction|pipeK|pipeK\.[^.]+)$/;
+  function splitBlocksOnLoad(m) {
+    const order = [];
+    const walk = (id) => m.scenarios.list.filter((s) => s.parent === id).forEach((s) => { order.push(s); walk(s.id); });
+    for (const r of m.scenarios.list.filter((s) => !s.parent)) walk(r.id);
+    for (const s of order) {
+      if (!s.overrides) continue;
+      const keys = Object.keys(s.overrides).filter((k) => SPLIT_ON_LOAD.test(k.split('|')[1] || '')).sort((a, b) => a.length - b.length);
+      for (const k of keys) if (k in s.overrides) { const [objKey, path] = k.split('|'); splitBlock(m, s, objKey, path); }
+    }
   }
 
   function removeObjectOverrides(m, objKey) {
@@ -88,7 +158,7 @@
   }
 
   Object.assign(M, {
-    chain, effective, effValue, setField, isOverridden, clearOverride, removeObjectOverrides,
+    chain, effective, effValue, setField, isOverridden, clearOverride, splitBlocksOnLoad, removeObjectOverrides,
     addScenario, deleteScenario, descendants,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

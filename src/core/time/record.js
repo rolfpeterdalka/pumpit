@@ -105,9 +105,16 @@
     }
     for (const id in sol.pumps) {
       const r = sol.pumps[id], o = X.pumps[id] || (X.pumps[id] = {});
-      const P = Number.isFinite(r.Pshaft) ? r.Pshaft : r.Pideal;
+      // a compressor: the power given to the gas and the isentropic head; a pump: the power of the shaft (that given to
+      // the liquid without an efficiency curve, none with an efficiency that cannot be used) and the head
+      const gas = r.Pgas !== undefined || r.dHs !== undefined;
+      const P = gas ? r.Pgas : r.etaInvalid ? NaN : Number.isFinite(r.Pshaft) ? r.Pshaft : r.Pideal;
+      const H = gas ? r.dHs : r.dH;
+      if (gas) o.gas = true;
+      // (noEff: a pump without an efficiency curve, whose power is the one given to the liquid, as in its totals)
+      if (!gas && r.etaAssumed && Number.isFinite(P)) o.noEff = true;
       ext(o, 'Qmax', r.Q, tk); ext(o, 'Qmin', r.Q, tk);
-      ext(o, 'Hmax', r.dH, tk); ext(o, 'Hmin', r.dH, tk);
+      ext(o, 'Hmax', H, tk); ext(o, 'Hmin', H, tk);
       ext(o, 'Pmax', P, tk); ext(o, 'Pmin', P, tk);
     }
   }
@@ -116,6 +123,8 @@
   // tariff at the time of the step tk (§9.5)
   function recordTotals(R, plan, w, sol, model, tanks, wasOn, tk) {
     const T = R.totals, rho = sol.fluid.rho;
+    // the time integrated so far, which the cost counts its days by
+    if (w > 0) T.span = (T.span || 0) + w;
     const on = new Map();
     for (const j of model.junctions) {
       const tm = plan.timeDef(j);
@@ -134,7 +143,10 @@
         // the power of the shaft, the one given to the gas by a compressor, or the one given to the liquid without an
         // efficiency curve
         let pw = NaN;
-        if (Number.isFinite(r.Pshaft)) pw = r.Pshaft;
+        // an efficiency curve that gives nothing usable at a step it runs (outside 0 to 100 %, or no speed of its
+        // control): the energy and its cost are not known
+        if (run && r.etaInvalid) { o.E = NaN; if (plan.tariff) o.cost = NaN; }
+        else if (Number.isFinite(r.Pshaft) && !r.etaAssumed) pw = r.Pshaft;
         else if (Number.isFinite(r.Pgas)) pw = r.Pgas;
         else if (run && Number.isFinite(r.Pideal)) { pw = r.Pideal; o.noEff = true; }
         if (Number.isFinite(pw)) {

@@ -108,6 +108,7 @@ PumpIt.i18n.add('pt-BR', {
     pump: {
       label: 'Bomba',
       check: {
+        effRange: 'pontos de eficiência acima de 0 e até 100% (0 apenas na vazão zero)',
         ratio: 'razão de compressão',
         ratioGasOnly: 'razão de compressão fixa só no modo compressível (gás)',
         etaGas: 'eficiência entre 0 e 100%',
@@ -120,6 +121,9 @@ PumpIt.i18n.add('pt-BR', {
       },
       error: { curve: 'Bomba J{id}: {message}' },
       warn: {
+        effRange: 'Bomba J{id}: a curva de eficiência ajustada dá {eta}% no ponto de operação, fora de 0 a 100%. Os pontos digitados estão dentro da faixa: revise o ajuste (a interpolação linear segue os pontos). A potência no eixo não está disponível.',
+        effRangeGas: 'Compressor J{id}: a curva de eficiência dá {eta}% no ponto de operação, fora de 0 a 100%. A potência entregue ao gás não está disponível, e a temperatura de descarga usa a eficiência limitada a 1 a 100%.',
+        effNoSpeed: 'Bomba J{id}: sem a rotação do controle, a eficiência e a potência no eixo não estão disponíveis.',
         curveRises: 'Bomba J{id}: a curva ajustada sobe em parte da faixa de vazão; confira o ajuste.',
         noZeroHead: 'Bomba J{id}: a curva ajustada não cruza o eixo de altura zero.',
         fixedNegative: 'Bomba de vazão fixa J{id} adicionando pressão negativa ({dp} kgf/cm²).',

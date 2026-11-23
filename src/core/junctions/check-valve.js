@@ -27,6 +27,7 @@
   PumpIt.junctionTypes.register({
     type: 'check', order: 75, group: 'valves',
     pipes: [2, 2], directional: true,
+    lossModels: ['K', 'Cv', 'Kv'],
 
     defaults: () => ({ lossModel: 'K', K: 2, Cv: 100, Kv: 86, vClose: q(0, 'm/s'), dPopen: q(0, 'kgf/cm²'), closed: false }),
 

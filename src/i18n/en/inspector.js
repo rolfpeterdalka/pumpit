@@ -261,6 +261,8 @@ PumpIt.i18n.add('en', {
       clear: 'Clear',
       fit: 'Fit (table units): y = {terms}',
       plotAria: 'Points and fitted curve',
+      pctPoints: 'Efficiency points must be above 0 % and at most 100 % (0 % only at zero flow); the pump stays pending in the checklist.',
+      pctFit: 'The fitted curve reaches {v} % between the points, outside 0 to 100 %: no shaft power where it does. Linear interpolation follows the points.',
     },
     view3: {
       title: '3D drawing',

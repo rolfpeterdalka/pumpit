@@ -11,6 +11,7 @@
   PumpIt.junctionTypes.register({
     type: 'reliefValve', order: 140, group: 'protection',
     pipes: [1, 2], multi: true,
+    lossModels: ['Cv', 'Kv', 'CdA'],
     offered: () => !!SD(),
 
     defaults: () => ({

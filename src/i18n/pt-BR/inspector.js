@@ -261,6 +261,8 @@ PumpIt.i18n.add('pt-BR', {
       clear: 'Limpar',
       fit: 'Ajuste (unidades da tabela): y = {terms}',
       plotAria: 'Pontos e curva ajustada',
+      pctPoints: 'Os pontos de eficiência devem ficar acima de 0 % e até 100 % (0 % só na vazão zero); a bomba fica pendente no checklist.',
+      pctFit: 'A curva ajustada chega a {v} % entre os pontos, fora de 0 a 100 %: sem potência no eixo onde isso acontece. A interpolação linear segue os pontos.',
     },
     view3: {
       title: 'Desenho 3D',

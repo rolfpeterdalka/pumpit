@@ -552,5 +552,54 @@ if (PumpIt) {
   }
 }
 
+// ------------------------------------------------------------------ review of 6c4f0fa
+// Item 2: the volume flows of a pipe follow the ends of its reference direction, as rhoIn, rhoOut, Vin and Vout; a pipe
+// turned against the flow keeps Q·ρ = ṁ at each end (Q at the start of the reference direction, Qout at its end).
+if (PumpIt) {
+  const M = PumpIt.model;
+  const solve = (m) => PumpIt.solver.run(M.effective(m, 'base'));
+  const m = PumpIt.examples.get('air').build();
+  const a = solve(m).pipes[1];
+  M.swapEnds(m.pipes.find((p) => p.id === 1));
+  const b = solve(m).pipes[1];
+  const h = (x) => (x * 3600).toFixed(2);
+  const ends = (r) => near(r.Q * r.rhoIn, r.m, 1e-12) && near(r.Qout * r.rhoOut, r.m, 1e-12);
+  ok('6c4f0fa-2 J1 → J2: Q·ρ = ṁ at each end, 917.91 and 1203.66 m³/h', ends(a) && near(a.Q * 3600, 917.91, 1e-5) && near(a.Qout * 3600, 1203.66, 1e-5), `${h(a.Q)} ${h(a.Qout)}`);
+  ok('6c4f0fa-2 reversed: −1203.66 at the start and −917.91 at the end, Q·ρ = ṁ at each end', ends(b) && b.m < 0
+    && near(b.Q * 3600, -1203.66, 1e-5) && near(b.Qout * 3600, -917.91, 1e-5) && near(b.rhoIn, 5.292522, 1e-6) && near(b.rhoOut, 6.940133, 1e-6), `${h(b.Q)} ${h(b.Qout)} m ${b.m}`);
+}
+
+// Item 3: a compressor under flow control reads its efficiency at the speed the control finds, whatever speed was typed
+// before, in the isothermal and the adiabatic models (with the temperature the gas leaves with); a fitted efficiency
+// above 100 % gives no power to the gas and a warning
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  const pump = (gasMode, mode, speed, eff) => {
+    const m = PumpIt.examples.get('pump').build();
+    Object.assign(m.system, { regime: 'compressible', gasMode });
+    const j2 = m.junctions.find((j) => j.id === 2);
+    Object.assign(j2, { mode, speed, setQ: q(80, 'm³/h') });
+    if (eff) j2.eff = eff;
+    const r = PumpIt.solver.run(M.effective(m, 'base'));
+    return { r, p: r.pumps[2] };
+  };
+  const a = pump('isothermal', 'controlFlow', 100).p, b = pump('isothermal', 'controlFlow', 70).p;
+  ok('6c4f0fa-3 isothermal, flow control after 100 % and after 70 %: 90.8229 %, 79.121 % and 11.147 W in both',
+    [a, b].every((p) => near(p.speed, 90.8229, 1e-6) && near(p.eta * 100, 79.121, 1e-5) && near(p.Pgas, 11.147, 1e-4)), `${a.eta * 100} ${b.eta * 100} ${a.Pgas} ${b.Pgas}`);
+  const fx = pump('isothermal', 'curve', a.speed).p;
+  ok('6c4f0fa-3 isothermal: the same as the machine at that fixed speed', near(fx.eta, a.eta, 1e-6) && near(fx.Pgas, a.Pgas, 1e-6), `${fx.eta * 100} ${fx.Pgas}`);
+  const c = pump('adiabatic', 'controlFlow', 100), d = pump('adiabatic', 'controlFlow', 70);
+  const e = pump('adiabatic', 'curve', c.p.speed);
+  ok('6c4f0fa-3 adiabatic: the same speed, efficiency, power and discharge temperatures after 100 % and after 70 %',
+    near(c.p.speed, d.p.speed, 1e-9) && near(c.p.eta, d.p.eta, 1e-9) && near(c.p.Pgas, d.p.Pgas, 1e-9) && near(c.p.T0out, d.p.T0out, 1e-12) && near(c.r.pipes[2].Tout, d.r.pipes[2].Tout, 1e-12),
+    `${c.p.speed} ${d.p.speed}`);
+  ok('6c4f0fa-3 adiabatic: as at the fixed speed, 79.121 %, 11.140 W, T0 out 293.5643 K and 293.5628 K at the end of P2',
+    near(c.p.eta * 100, 79.121, 1e-5) && near(c.p.Pgas, 11.140, 1e-4) && Math.abs(c.p.T0out - 293.5643) < 1e-4 && Math.abs(c.r.pipes[2].Tout - 293.5628) < 1e-4
+    && near(e.p.eta, c.p.eta, 1e-6) && near(e.p.Pgas, c.p.Pgas, 1e-6) && Math.abs(e.r.pipes[2].Tout - c.r.pipes[2].Tout) < 1e-6, `${c.p.eta * 100} ${c.p.Pgas} ${c.p.T0out} ${c.r.pipes[2].Tout}`);
+  const hi = pump('isothermal', 'curve', 100, { x: [0, 40, 80, 120], y: [0, 85, 98, 99], xUnit: 'm³/h', fit: '2' });
+  const wh = hi.r.warnings.filter((w) => w.obj === 'j:2' && w.text.includes('outside 0 to 100%'));
+  ok('6c4f0fa-4 a compressor whose fitted efficiency passes 100 %: no power to the gas, a warning', hi.p.eta > 1 && Number.isNaN(hi.p.Pgas) && hi.p.etaInvalid && wh.length === 1, `${hi.p.eta * 100}`);
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);
