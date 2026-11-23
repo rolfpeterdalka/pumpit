@@ -12,7 +12,7 @@
 
   // the field of each pipe message (core.checklist.pipe.*)
   const PIPE = {
-    length: 'length', diameter: 'geometry.d', annulus: 'geometry.dOuter', rectangle: 'geometry.width',
+    length: 'length', diameter: 'geometry.d', annulus: 'geometry.dOuter', annulusInner: 'geometry.dInner', rectangle: 'geometry.width',
     noncircular: 'geometry.area', roughness: 'friction.eps', relRoughness: 'friction.rel', frictionFactor: 'friction.f',
     hwC: 'friction.C', nParallel: 'nParallel', idReduction: 'idReduction',
   };

@@ -25,6 +25,7 @@ PumpIt.i18n.add('pt-BR', {
       systemRequired: 'Sistema (altura necessária)',
       notes: 'Curva do sistema obtida rodando o solver com vazão fixa na bomba em {n} pontos (o restante do modelo como está no cenário {name}).',
       notesNoPoint: ' Execute o modelo para marcar o ponto de operação.',
+      notesNoSpeed: ' O controle não encontrou rotação para o ponto de ajuste, por isso a curva da bomba não é traçada.',
     },
     profile: {
       needsTwo: 'Desenhe pelo menos duas junções ligadas por tubos.',

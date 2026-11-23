@@ -1,10 +1,11 @@
 // System curve of a pump: sweeps fixed flows through the pump and records the head the system requires,
-// alongside the pump curve at the current speed.
+// alongside the pump curve at the current speed. opts.speed (%): the speed of the pump curve when it is not the speed
+// typed, as for a pump whose control finds its speed (the speed of its result); NaN draws no pump curve.
 (function (root) {
   const PumpIt = root.PumpIt;
   const U = PumpIt.units, H = PumpIt.hyd, M = PumpIt.model;
 
-  function systemCurve(eff, pumpId, npts = 16) {
+  function systemCurve(eff, pumpId, npts = 16, opts = {}) {
     if (M.isCompressible(eff)) return null; // a head curve against a liquid system: not drawn for a gas
     const j0 = eff.junctions.find((j) => j.id === pumpId);
     if (!j0 || j0.type !== 'pump') return null;
@@ -14,10 +15,12 @@
     if (j0.mode !== 'fixedFlow' && c && c.x.length) {
       try { cv = H.makeCurve(c.x.map((v) => U.toSI(v, c.xUnit, 'volFlow')), c.y.map((v) => U.toSI(v, c.yUnit, 'head')), c.fit); } catch (e) { cv = null; }
     }
-    const s = j0.speed / 100, N = j0.nPumps || 1;
+    const s = ('speed' in opts ? opts.speed : j0.speed) / 100, N = j0.nPumps || 1;
+    if (!(s > 0)) cv = null;
     let qmax = cv ? cv.xmax * N * s * 1.25 : 0;
     if (!cv) {
-      const qf = j0.mode === 'fixedFlow' ? U.toSI(j0.fixedFlow.value, j0.fixedFlow.unit, 'flow', { rho: fl.rho }) / fl.rho : 0;
+      const qf = j0.mode === 'fixedFlow' ? U.toSI(j0.fixedFlow.value, j0.fixedFlow.unit, 'flow', { rho: fl.rho }) / fl.rho
+        : j0.mode === 'controlFlow' ? U.toSI(j0.setQ.value, j0.setQ.unit, 'flow', { rho: fl.rho }) / fl.rho : 0;
       qmax = qf > 0 ? qf * 2 : 0.05;
     }
     const sys = [], pump = [];

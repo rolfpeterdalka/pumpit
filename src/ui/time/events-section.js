@@ -12,9 +12,10 @@
   const tx = (key, params) => t('time.system.events.' + key, params);
   const JOINS = () => PumpIt.time.events.JOINS;
 
-  // the events of the model become the list given (one undo step, a new calculation)
-  app.setEvents = (list) => {
-    app.pushUndo();
+  // the events of the model become the list given (one undo step, a new calculation); snap: the model before as JSON,
+  // when the caller changed the model already (a new name carried to the junctions and the scenarios)
+  app.setEvents = (list, snap) => {
+    app.pushUndo(snap);
     app.model.events = list;
     app.changed();
   };
@@ -48,9 +49,11 @@
       name.addEventListener('change', () => {
         const v = name.value.trim();
         if (!v || list.some((x, k) => k !== i && x.name === v)) { name.value = e.name || ''; return; }
+        // the name, the list and the references to it in the junctions and the scenarios: one edit, one undo step
+        const snap = JSON.stringify(app.model);
         if (e.name && e.name !== v) rename(list, e.name, v);
         e.name = v;
-        save();
+        app.setEvents(list, snap);
       });
       box.appendChild(field(tx('name'), name));
       // a condition or a join of other events

@@ -111,6 +111,7 @@ PumpIt.i18n.add('pt-BR', {
       basis: 'Valores',
       bases: { absolute: 'Absolutos', relative: '% do regime permanente' },
       basisHint: 'Valores relativos são uma porcentagem do valor que a junção tem no regime permanente.',
+      basisNoSteady: 'Os valores não podem acompanhar a troca: o valor de regime desta grandeza é zero ou desconhecido. As tabelas e os valores ficam como estavam.',
       start: 'Início',
       starts: { time: 'Pelo relógio', single: 'Depois de um evento', dualCyclic: 'Dois eventos alternados', dualSequential: 'Dois eventos em sequência', combined: 'Evento composto' },
       startHint: 'Pelo relógio, o tempo da tabela é o tempo da simulação. Depois de um evento, ele conta do passo em que o evento disparou, e a tabela vale a partir do passo seguinte. Dois eventos alternados trocam entre as suas tabelas (liga e desliga); em sequência, a segunda tabela fica até o fim.',

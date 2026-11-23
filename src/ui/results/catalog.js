@@ -29,11 +29,14 @@
   const head = (p, x) => p / (x.rho * x.g);
 
   // an output: k = the field of the row (or the name of the value v works out), g = its group, c = its unit category
-  // ('txt': a text; none: a number without unit); more: u = its unit when not the default of the category, x = fixed
+  // ('txt': a text; none: a number without unit); more: u = its unit when not the default of the category, pct = a
+  // percentage (a number without unit, in %), x = fixed
   // decimals (the classic columns of the pipe table, on screen and in Excel), v(row, ctx) = the value when it is
   // not the field k of the row, ctx = { rho, g, fluid, patm } of the results
   const o = (k, g, c, more) => Object.assign({ k, g }, c === 'txt' ? { t: 'txt' } : c ? { c } : {}, more);
   const ID = { k: 'id', t: 'id', g: 'ident' };
+  // a percentage (a speed, an efficiency, an opening): a number without unit, drawn on a scale of its own in %
+  const PCT = { pct: true };
 
   const CATALOG = {
     liquid: {
@@ -69,8 +72,8 @@
         o('Q', 'flow', 'volFlow'), o('m', 'flow', 'massFlow'),
         o('P0in', 'press', 'pressure'), o('P0out', 'press', 'pressure'), o('Pin', 'press', 'pressure'), o('Pout', 'press', 'pressure'),
         o('dH', 'rise', 'head'), o('dP', 'rise', 'dp'), o('dPs', 'rise', 'dp', { v: (r) => r.Pout - r.Pin }),
-        o('speed', 'perf'), o('etaPct', 'perf'), o('Pideal', 'perf', 'power'), o('Pshaft', 'perf', 'power'),
-        o('QBEP', 'bep', 'volFlow'), o('bepPct', 'bep'),
+        o('speed', 'perf', '', PCT), o('etaPct', 'perf', '', PCT), o('Pideal', 'perf', 'power'), o('Pshaft', 'perf', 'power'),
+        o('QBEP', 'bep', 'volFlow'), o('bepPct', 'bep', '', PCT),
         o('NPSHA', 'npsh', 'head'), o('NPSHR', 'npsh', 'head'),
         o('NPSHmargin', 'npsh', 'head', { v: (r) => r.NPSHA - r.NPSHR }), o('NPSHratio', 'npsh', '', { v: (r) => r.NPSHA / r.NPSHR }),
       ],
@@ -79,7 +82,7 @@
         o('Q', 'flow', 'volFlow'), o('m', 'flow', 'massFlow'),
         o('Pin', 'press', 'pressure'), o('Pout', 'press', 'pressure'), o('P0in', 'press', 'pressure'), o('P0out', 'press', 'pressure'),
         o('dP', 'loss', 'dp'), o('dPs', 'loss', 'dp', { v: staticDrop }), o('hL', 'loss', 'head', { v: (r, x) => head(r.dP, x) }),
-        o('Cv', 'coef'), o('Kv', 'coef', '', { v: (r) => r.Cv * KV_PER_CV }), o('K', 'coef'), o('open', 'coef'),
+        o('Cv', 'coef'), o('Kv', 'coef', '', { v: (r) => r.Cv * KV_PER_CV }), o('K', 'coef'), o('open', 'coef', '', PCT),
       ],
     },
     // compressible mode (R-25): heads (HGL, EGL, head loss) mean nothing for a gas and are left out
@@ -117,8 +120,8 @@
         o('m', 'flow', 'massFlow'), o('Q', 'flow', 'volFlow'), o('QN', 'flow', 'normFlow'),
         o('P0in', 'press', 'pressure'), o('P0out', 'press', 'pressure'), o('Pin', 'press', 'pressure'), o('Pout', 'press', 'pressure'),
         o('ratio', 'rise'), o('dP', 'rise', 'dp'), o('dPs', 'rise', 'dp', { v: (r) => r.Pout - r.Pin }), o('dHs', 'rise', 'head'),
-        o('speed', 'perf'), o('etaPct', 'perf'), o('Pgas', 'perf', 'power'),
-        o('QBEP', 'bep', 'volFlow'), o('bepPct', 'bep'),
+        o('speed', 'perf', '', PCT), o('etaPct', 'perf', '', PCT), o('Pgas', 'perf', 'power'),
+        o('QBEP', 'bep', 'volFlow'), o('bepPct', 'bep', '', PCT),
         o('T0in', 'temp', 'temperature'), o('T0out', 'temp', 'temperature'),
       ],
       valves: [
@@ -127,7 +130,7 @@
         o('Pin', 'press', 'pressure'), o('Pout', 'press', 'pressure'), o('P0in', 'press', 'pressure'), o('P0out', 'press', 'pressure'),
         o('dP', 'loss', 'dp'), o('dPs', 'loss', 'dp', { v: staticDrop }),
         o('chokedTxt', 'compressible', 'txt'),
-        o('K', 'coef'), o('Cv', 'coef'), o('Kv', 'coef', '', { v: (r) => r.Cv * KV_PER_CV }), o('open', 'coef'),
+        o('K', 'coef'), o('Cv', 'coef'), o('Kv', 'coef', '', { v: (r) => r.Cv * KV_PER_CV }), o('open', 'coef', '', PCT),
       ],
     },
   };

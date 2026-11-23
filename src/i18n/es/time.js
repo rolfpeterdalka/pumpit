@@ -111,6 +111,7 @@ PumpIt.i18n.add('es', {
       basis: 'Valores',
       bases: { absolute: 'Absolutos', relative: '% del régimen permanente' },
       basisHint: 'Los valores relativos son un porcentaje del valor que la unión tiene en el régimen permanente.',
+      basisNoSteady: 'Los valores no pueden seguir el cambio: el valor de régimen de esta magnitud es cero o desconocido. Las tablas y los valores quedan como estaban.',
       start: 'Inicio',
       starts: { time: 'Por el reloj', single: 'Después de un evento', dualCyclic: 'Dos eventos alternados', dualSequential: 'Dos eventos en secuencia', combined: 'Evento compuesto' },
       startHint: 'Por el reloj, el tiempo de la tabla es el tiempo de la simulación. Después de un evento, cuenta desde el paso en que el evento se disparó, y la tabla vale desde el paso siguiente. Dos eventos alternados cambian entre sus tablas (encender y apagar); en secuencia, la segunda tabla queda hasta el final.',

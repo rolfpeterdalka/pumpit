@@ -24,6 +24,7 @@ PumpIt.i18n.add('pt-BR', {
       cellRow: 'Linha {n}',
       cellEmpty: '{where}: a célula está vazia, e o valor anterior continua valendo.',
       cellInvalid: '{where}: “{text}” não é um número, e o valor anterior continua valendo.',
+      cellRule: '{where}: “{text}” não é aceito ({why}), e o valor anterior continua valendo.',
       cellRestore: 'Esc restaura {value}.',
     },
     toggle: { hide: 'Recolher o painel de propriedades', show: 'Mostrar o painel de propriedades' },
@@ -33,6 +34,7 @@ PumpIt.i18n.add('pt-BR', {
       to: 'Converter para',
       result: 'Resultado',
       apply: 'Converter',
+      patmRef: 'Um valor manométrico deste campo é lido em relação à atmosfera padrão, {p} kPa(a), e não ao próprio campo.',
       why: {
         empty: 'O campo está vazio: digite um valor antes de convertê-lo.',
         patm: 'Falta a pressão ambiente do sistema, que liga as pressões manométricas às absolutas.',
@@ -196,6 +198,7 @@ PumpIt.i18n.add('pt-BR', {
       item: 'Item',
       value: 'Valor',
       qtyAria: 'Quantidade',
+      qtyRule: 'a quantidade é zero ou mais',
       remove: 'Remover acessório',
       addAria: 'Adicionar acessório',
       add: 'Adicionar acessório…',

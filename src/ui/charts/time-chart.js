@@ -16,16 +16,23 @@
   const X_UNITS = ['s', 'min', 'h', 'd', 'clock'];
 
   // the quantities an object can draw: the numeric outputs of its table (with their unit category), or the fields of a tank
+  // A quantity of the catalog draws when the rows of the object over time give a number for it: a field of its series,
+  // one the rows work out (the efficiency in % from eta) or one of its formulas. Its panel: its unit category, 'pct' for a
+  // percentage, 'none' for another number without unit.
   function quantities(run, kind, id) {
     if (kind === 'tanks') return UI.timeResults.tankCols(run.series.tanks[id]).filter(([, c]) => c !== 'txt').map(([k, c]) => ({ k, c, label: UI.timeResults.tankLabel(k) }));
-    const regime = C.regimeOf(app.currentResults());
+    const res = app.currentResults();
+    const regime = C.regimeOf(res);
     const fields = run.series[kind][id] || {};
-    const out = Cat.outputs(regime, kind).filter((e) => e.c && !e.t && (e.k in fields || e.v)).map((e) => ({ k: e.k, c: e.c, label: Cat.label(regime, kind, e.k), e }));
+    const row = UI.timeResults.rowAt(run, kind, id, 0), ctx = C.ctxOf(res);
+    const numeric = (e) => { if (!e.v && !(e.k in row)) return false; try { return typeof Cat.value(e, row, ctx) === 'number'; } catch (x) { return false; } };
+    const out = Cat.outputs(regime, kind).filter((e) => !e.t && (e.k in fields || numeric(e)))
+      .map((e) => ({ k: e.k, c: e.c || (e.pct ? 'pct' : null), label: Cat.label(regime, kind, e.k), e }));
     if (kind === 'junctions' && run.series.inputs[id]) {
       const j = PumpIt.model.getObj(app.eff(), 'j:' + id);
       const def = j && PumpIt.junctionTypes.get(j.type);
       const qt = j && j.time && def && def.time && def.time.quantities ? (def.time.quantities(j, { gas: PumpIt.model.isCompressible(app.eff()) }) || []).find((x) => x.what === j.time.what) : null;
-      if (qt) out.push({ k: '@input', c: qt.cat === 'none' || qt.cat === 'percent' ? null : qt.cat, label: t('time.results.input', { what: t('time.data.whats.' + j.time.what) }) });
+      if (qt) out.push({ k: '@input', c: qt.cat === 'none' ? null : qt.cat === 'percent' ? 'pct' : qt.cat, label: t('time.results.input', { what: t('time.data.whats.' + j.time.what) }) });
     }
     return out;
   }
@@ -79,15 +86,18 @@
     });
     let html = '';
     for (const [cat, list] of byCat) {
-      const u = cat === 'none' ? '' : app.outUnit('tchart.' + cat, cat);
-      const conv = (v) => (cat === 'none' ? v : F.conv(v, cat, u, ctx));
+      // a number without unit and a percentage are drawn as they are, the percentage on its scale in %
+      const plain = cat === 'none' || cat === 'pct';
+      const u = plain ? '' : app.outUnit('tchart.' + cat, cat);
+      const unitText = cat === 'pct' ? '%' : u ? F.unit(u) : '';
+      const conv = (v) => (plain ? v : F.conv(v, cat, u, ctx));
       const series = list.map(({ s, i, kind, id, q }) => {
         const ys = values(run, kind, id, q).map(conv);
         return { name: seriesName(run, s), color: COLORS[i % COLORS.length], pts: xs.map((x, n) => [x, ys[n]]), at: [xs[ic], ys[ic]] };
       });
-      const unitSel = cat === 'none' ? '' : `<select class="unit-sel" data-t="tchart" data-c="${cat}" data-cat="${cat}" aria-label="${F.esc(tx('unit'))}">${U.list(cat).map((x) => F.option(x, F.unit(x), x === u)).join('')}</select>`;
+      const unitSel = plain ? '' : `<select class="unit-sel" data-t="tchart" data-c="${cat}" data-cat="${cat}" aria-label="${F.esc(tx('unit'))}">${U.list(cat).map((x) => F.option(x, F.unit(x), x === u)).join('')}</select>`;
       html += `<div class="tc-panel"><div class="tc-panel-head">${unitSel}</div>${lineChart({
-        title: list.map((x) => x.q.label).join(', '), xLabel, yLabel: list.length === 1 ? `${list[0].q.label}${u ? ' (' + F.unit(u) + ')' : ''}` : (u ? F.unit(u) : ''),
+        title: list.map((x) => x.q.label).join(', '), xLabel, yLabel: list.length === 1 ? withUnit(list[0].q.label, unitText) : unitText,
         series: series.map((x) => ({ name: x.name, pts: x.pts, color: x.color, width: 2 })),
         points: series.map((x) => ({ x: x.at[0], y: x.at[1], color: x.color })), xTick,
       })}</div>`;
@@ -95,6 +105,9 @@
     box.innerHTML = html;
     notes.textContent = tx('cursorNote', { t: UI.timeFormat.clock(run.times[ic]) });
   }
+
+  // the label of an axis with its unit, unless the label already tells it ("Rotação (%)")
+  const withUnit = (label, unit) => (unit && !label.includes(`(${unit})`) ? `${label} (${unit})` : label);
 
   // the name of a series: its object and its quantity
   function seriesName(run, s) {

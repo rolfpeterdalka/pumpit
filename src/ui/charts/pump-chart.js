@@ -9,16 +9,18 @@
   const app = PumpIt.app;
   const { t } = PumpIt.i18n;
   const tx = (key, params) => t('charts.pump.' + key, params);
-  // The curves of a pump, by the version of the model, the scenario, the pump and the recorded step of the time cursor
-  // (-1: the steady state). Playing the run fills it a step at a time: it keeps the last few, and it is emptied when the
-  // run changes. A change of unit only converts what is drawn.
+  // The curves of a pump, by the version of the model, the scenario, the pump, the recorded step of the time cursor
+  // (-1: the steady state) and the speed of its curve. Playing the run fills it a step at a time: it keeps the last few,
+  // and it is emptied when the run changes. A change of unit only converts what is drawn.
   const cache = { run: null, map: new Map() };
   const KEEP = 12;
-  function curvesOf(model, pid, step, run) {
+  // the modes in which the control finds the speed of the pump
+  const CONTROLLED = ['controlFlow', 'controlDischarge', 'controlSuction'];
+  function curvesOf(model, pid, step, run, speed) {
     if (cache.run !== run) { cache.run = run; cache.map.clear(); }
-    const key = app.version + '|' + app.scenario().id + '|' + pid + '|' + step;
+    const key = app.version + '|' + app.scenario().id + '|' + pid + '|' + step + '|' + speed;
     if (!cache.map.has(key)) {
-      cache.map.set(key, PumpIt.solver.systemCurve(model, pid, 20));
+      cache.map.set(key, PumpIt.solver.systemCurve(model, pid, 20, { speed }));
       if (cache.map.size > KEEP) cache.map.delete(cache.map.keys().next().value);
     }
     return cache.map.get(key);
@@ -43,23 +45,28 @@
     const run = app.timeRun();
     const step = run ? app.cursorIndex() : -1;
     const model = run ? app.cursorModel() : eff;
-    const d = curvesOf(model, pid, step, run);
-    if (!d || !d.sys.length) { box.innerHTML = `<div class="empty">${tx('failed')}</div>`; return; }
-    const cq = (Q) => U.fromSI(Q, qu, 'volFlow'), ch = (h) => U.fromSI(h, hu, 'head');
+    // the speed of the curve: the one typed, or for a pump whose control finds its speed the one of its result in the
+    // scenario and the step shown (none when the control could not find it, or without a result)
     const res = app.currentResults();
     const pr = res && res.ok && res.pumps[pid];
-    const op = pr ? [{ x: cq(pr.Q), y: ch(pr.dH), color: 'var(--sel)', label: tx('operation', { q: F.fmt(cq(pr.Q), 4), qu: F.unit(qu), h: F.fmt(ch(pr.dH), 4), hu: F.unit(hu) }) }] : [];
     const j = model.junctions.find((p) => p.id === pid);
+    const controlled = CONTROLLED.includes(j.mode);
+    const speed = controlled ? (pr && Number.isFinite(pr.speed) ? pr.speed : NaN) : j.speed;
+    const d = curvesOf(model, pid, step, run, speed);
+    if (!d || !d.sys.length) { box.innerHTML = `<div class="empty">${tx('failed')}</div>`; return; }
+    const cq = (Q) => U.fromSI(Q, qu, 'volFlow'), ch = (h) => U.fromSI(h, hu, 'head');
+    const op = pr ? [{ x: cq(pr.Q), y: ch(pr.dH), color: 'var(--sel)', label: tx('operation', { q: F.fmt(cq(pr.Q), 4), qu: F.unit(qu), h: F.fmt(ch(pr.dH), 4), hu: F.unit(hu) }) }] : [];
     box.innerHTML = lineChart({
       title: tx('title'), xLabel: tx('xLabel', { u: F.unit(qu) }), yLabel: tx('yLabel', { u: F.unit(hu) }), xMin: 0, yMin: 0,
       series: (d.pump.length ? [
-        { name: tx('pumpSeries', { speed: F.fmt(j.speed, 4) }) + (j.nPumps > 1 ? tx('parallel', { n: j.nPumps }) : ''), pts: d.pump.map(([q, h]) => [cq(q), ch(h)]), color: 'var(--accent)' },
+        { name: tx('pumpSeries', { speed: controlled ? F.fmt(speed, 5) : F.inputStr(speed) }) + (j.nPumps > 1 ? tx('parallel', { n: j.nPumps }) : ''), pts: d.pump.map(([q, h]) => [cq(q), ch(h)]), color: 'var(--accent)' },
       ] : []).concat([
         { name: j.mode === 'fixedFlow' ? tx('systemRequired') : tx('system'), pts: d.sys.map(([q, h]) => [cq(q), ch(h)]), color: '#c0612b', dash: '7 5' },
       ]),
       points: op,
     });
-    notes.innerHTML = tx('notes', { n: d.sys.length, name: F.esc(app.scenario().name) }) + (pr ? '' : tx('notesNoPoint'));
+    notes.innerHTML = tx('notes', { n: d.sys.length, name: F.esc(app.scenario().name) }) + (pr ? '' : tx('notesNoPoint'))
+      + (controlled && pr && !Number.isFinite(speed) ? tx('notesNoSpeed') : '');
   }
 
   PumpIt.ui.pumpChart = { render: pumpChart };

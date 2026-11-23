@@ -30,7 +30,13 @@
     if (!pos(p.length)) need('length');
     const g = p.geometry;
     if (g.kind === 'circular' && !pos(g.d)) need('diameter');
-    if (g.kind === 'annulus' && !(pos(g.dOuter) && fin(g.dInner) && g.dOuter.value > 0)) need('annulus');
+    // an annulus: an outer diameter above zero, and an inner one from zero to less than it, compared in the same unit
+    if (g.kind === 'annulus') {
+      const len = (x) => { try { return fin(x) ? PumpIt.units.toSI(x.value, x.unit, 'length') : NaN; } catch (e) { return NaN; } };
+      const a = len(g.dOuter), b = len(g.dInner);
+      if (!(a > 0)) need('annulus');
+      else if (!(b >= 0 && b < a)) need('annulusInner');
+    }
     if (g.kind === 'rectangular' && !(pos(g.width) && pos(g.height))) need('rectangle');
     if (g.kind === 'noncircular' && !(pos(g.area) && pos(g.perim))) need('noncircular');
     const f = p.friction;
@@ -40,6 +46,8 @@
     if (f.model === 'hw' && !(f.C > 0)) need('hwC');
     if (!(Number.isInteger(p.nParallel) && p.nParallel >= 1)) need('nParallel');
     if (!(p.idReduction >= 0 && p.idReduction < 100)) need('idReduction');
+    // the quantity of a fitting: zero or more (none given counts one)
+    if ((p.fittings || []).some((it) => !((it.qty ?? 1) >= 0))) need('fittingQty');
     if (surgeOn(m)) for (const k of PumpIt.surge.inputs.checkPipe(m, p)) miss.push(t('surge.checklist.pipe.' + k));
     return miss;
   }

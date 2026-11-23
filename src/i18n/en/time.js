@@ -111,6 +111,7 @@ PumpIt.i18n.add('en', {
       basis: 'Values',
       bases: { absolute: 'Absolute', relative: '% of the steady value' },
       basisHint: 'Relative values are a percentage of the value the junction has in the steady state.',
+      basisNoSteady: 'The values cannot follow: the steady value of this quantity is zero or not known. The tables and the values stay as they were.',
       start: 'Start',
       starts: { time: 'By the clock', single: 'After an event', dualCyclic: 'Two events, alternating', dualSequential: 'Two events, in sequence', combined: 'Combined event' },
       startHint: 'By the clock, the time of the table is the time of the simulation. After an event, it counts from the step where the event fired, and the table applies from the next step on. Two alternating events switch between their tables (on and off); in sequence, the second table stays to the end.',

@@ -41,18 +41,37 @@
   // material keeps the size when both catalogues mean the same sizes (carbon and stainless steel) and otherwise takes the
   // size whose bore is closest to the pipe's, with the roughness of the material; a series that the size lacks becomes
   // the nearest one (decision P-07 of docs/pipe-library.md).
-  function fitPipe(sid, key, path, before) {
+  // restore: the material came back from the parent scenario (app.clearOv). The diameter, and with a new material the
+  // roughness, that the catalogue gave the material of the child go back to the parent too; a roughness or a geometry
+  // the user changed on their own in the child stay.
+  function fitPipe(sid, key, path, before, restore = false) {
     const mat = M.getObj(M.effective(app.model, sid), key).material;
-    if (!D.PIPE_KINDS.includes(mat.kind)) return;
-    const newKind = path === 'material.kind' && before.material.kind !== mat.kind;
+    const newKind = before.material.kind !== mat.kind;
     const g = before.geometry;
+    const own = (p) => M.isOverridden(app.model, sid, key, p);
+    // what the catalogue gave the material of the child before: its bore and its default roughness
+    const wasCatalogue = D.PIPE_KINDS.includes(before.material.kind);
+    const dims = wasCatalogue ? D.pipeDims(before.material) : null;
+    const catalogueId = dims ? +dims.id.toFixed(2) : NaN;
+    const fromCatalogue = (gg) => wasCatalogue && gg.kind === 'circular' && gg.d && gg.d.unit === 'mm' && gg.d.value === catalogueId;
+    if (restore && newKind && wasCatalogue && own('friction') && M.deepEqual(before.friction, defaultFriction(before.material.kind))) {
+      M.clearOverride(app.model, sid, key, 'friction');
+    }
+    if (!D.PIPE_KINDS.includes(mat.kind)) {
+      // back to a material without a catalogue: the geometry the catalogue gave goes back to the parent
+      if (restore && own('geometry') && fromCatalogue(g)) M.clearOverride(app.model, sid, key, 'geometry');
+      return;
+    }
     const refId = g.kind === 'circular' && g.d && Number.isFinite(g.d.value) ? U.toSI(g.d.value, g.d.unit, 'length') * 1000 : NaN;
+    // a grade the catalogue of the child gave means nothing to a material without grades
+    if (restore && newKind && !D.pipeGrades(mat.kind).length && own('material.grade')) M.clearOverride(app.model, sid, key, 'material.grade');
     const fit = D.fitMaterial(mat, { refId, resize: newKind && !D.sameSizes(before.material.kind, mat.kind) });
     for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && fit[f] !== mat[f]) M.setField(app.model, sid, key, 'material.' + f, fit[f]);
     M.setField(app.model, sid, key, 'geometry.kind', 'circular');
     M.setField(app.model, sid, key, 'geometry.d', { value: +D.pipeDims(fit).id.toFixed(2), unit: 'mm' });
-    if (newKind) M.setField(app.model, sid, key, 'friction', { model: 'roughness', eps: { value: D.pipeEps(mat.kind), unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
+    if (newKind && !restore) M.setField(app.model, sid, key, 'friction', defaultFriction(mat.kind));
   }
+  const defaultFriction = (kind) => ({ model: 'roughness', eps: { value: D.pipeEps(kind), unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
   // several fields of one object in a single step (one undo snapshot, one recalculation): [[path, value], ...]
   app.setVals = (key, pairs) => {
     app.pushUndo();
@@ -60,7 +79,16 @@
     for (const [path, value] of pairs) M.setField(app.model, sid, key, path, value);
     app.changed();
   };
-  app.clearOv = (key, path) => { app.pushUndo(); M.clearOverride(app.model, app.model.scenarios.current, key, path); app.changed(); };
+  // the value of the parent back: for the material of a pipe, with the catalogue rules of an edit (fitPipe), in the
+  // same undo step
+  app.clearOv = (key, path) => {
+    app.pushUndo();
+    const sid = app.model.scenarios.current;
+    const before = key.startsWith('p:') && (path === 'material' || path.startsWith('material.')) ? M.getObj(M.effective(app.model, sid), key) : null;
+    M.clearOverride(app.model, sid, key, path);
+    if (before) fitPipe(sid, key, path, before, true);
+    app.changed();
+  };
 
   // ------------------------------------------------------------ objects
   app.addJunction = (type, x, y, opts = {}) => {

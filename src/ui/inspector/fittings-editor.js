@@ -25,6 +25,7 @@
         const at = `${NC.row(i + 1)} · ${D.fittingName(it)}`;
         const qn = NC.input({
           id: `fit-q-${key}-${i}`, aria: tx('qtyAria'), value: it.qty, errs, attrs: { style: 'width:44px' },
+          check: (n) => (n >= 0 ? '' : tx('qtyRule')),
           where: NC.where(at, tx('qtyAria')), onCommit: (n) => { it.qty = n; save(); },
         });
         const vn = NC.input({

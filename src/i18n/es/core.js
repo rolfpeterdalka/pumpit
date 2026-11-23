@@ -99,6 +99,7 @@ PumpIt.i18n.add('es', {
         length: 'longitud',
         diameter: 'diámetro',
         annulus: 'diámetros del anillo',
+        annulusInner: 'anillo: diámetro interior de 0 hasta menos que el exterior',
         rectangle: 'ancho y alto',
         noncircular: 'área y perímetro mojado',
         roughness: 'rugosidad',
@@ -107,6 +108,7 @@ PumpIt.i18n.add('es', {
         hwC: 'coeficiente C',
         nParallel: 'número de tuberías en paralelo',
         idReduction: 'reducción de diámetro',
+        fittingQty: 'accesorios: cantidad cero o mayor',
       },
       junction: {
         pipesExact: 'requiere {n} tubería(s); tiene {has}',
@@ -305,6 +307,7 @@ PumpIt.i18n.add('es', {
       badFluid: 'Propiedades del fluido no válidas.',
       zeroGravity: 'Gravedad cero: las salidas en altura (HGL, EGL, ΔH) no tienen sentido.',
       badGeometry: 'Tubería P{id}: geometría no válida.',
+      badFittings: 'Tubería P{id}: accesorio con cantidad negativa.',
       needsTwoPipes: 'Unión J{id}: requiere 2 tuberías.',
       notDirectional: 'Unión J{id} ({label}): una tubería debe llegar a ella y la otra salir.',
       pipeNotConnected: 'Tubería P{id}: debe estar conectada a dos uniones.',

@@ -24,6 +24,7 @@ PumpIt.i18n.add('en', {
       cellRow: 'Row {n}',
       cellEmpty: '{where}: the cell is empty, and the value before stays.',
       cellInvalid: '{where}: “{text}” is not a number, and the value before stays.',
+      cellRule: '{where}: “{text}” is not accepted ({why}), and the value before stays.',
       cellRestore: 'Esc brings back {value}.',
     },
     toggle: { hide: 'Collapse the properties panel', show: 'Show the properties panel' },
@@ -33,6 +34,7 @@ PumpIt.i18n.add('en', {
       to: 'Convert to',
       result: 'Result',
       apply: 'Convert',
+      patmRef: 'A gauge value of this field is read against the standard atmosphere, {p} kPa(a), not against the field itself.',
       why: {
         empty: 'The field is empty: type a value before converting it.',
         patm: 'The ambient pressure of the system is missing; it links gauge and absolute pressures.',
@@ -196,6 +198,7 @@ PumpIt.i18n.add('en', {
       item: 'Item',
       value: 'Value',
       qtyAria: 'Quantity',
+      qtyRule: 'a quantity is zero or more',
       remove: 'Remove fitting',
       addAria: 'Add fitting',
       add: 'Add fitting…',

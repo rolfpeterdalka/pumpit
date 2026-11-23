@@ -12,10 +12,14 @@
 
   // What a conversion of the field of objKey may need, as the core reads the same quantities: the ambient pressure
   // of the scenario; for a liquid its density; for a gas the normal density and, for a volume at the conditions of
-  // the point, the density at the junction from the results of the current scenario.
-  function context(objKey) {
+  // the point, the density at the junction from the results of the current scenario. The core reads the ambient
+  // pressure itself, typed as a gauge pressure, against the standard atmosphere (U.PATM): its own field converts
+  // against that fixed reference, never against itself.
+  const isPatm = (objKey, path) => objKey === 'sys' && path === 'patm';
+  function context(objKey, path) {
     const eff = app.eff(), sys = eff.system, ctx = {};
-    try { ctx.patm = U.toSI(sys.patm.value, sys.patm.unit, 'pressure'); } catch (e) { /* no ambient pressure */ }
+    if (isPatm(objKey, path)) ctx.patm = U.PATM;
+    else try { ctx.patm = U.toSI(sys.patm.value, sys.patm.unit, 'pressure'); } catch (e) { /* no ambient pressure */ }
     if (M.isCompressible(eff)) {
       try { ctx.rhoN = PumpIt.fluids.normalDensity(PumpIt.fluids.evaluateGas(sys).MW); } catch (e) { /* incomplete gas */ }
       const res = app.okResults();
@@ -50,14 +54,14 @@
   function open(objKey, path, label, cat, opener) {
     const q = app.getVal(objKey, path) || {};
     const from = q.unit, v = q.value === null || q.value === undefined ? NaN : q.value;
-    const c = context(objKey);
+    const c = context(objKey, path);
     const units = UI.forms.unitOptions(cat, from);
     const body = el('div', { class: 'conv' });
     body.innerHTML = `<p class="muted small conv-field">${F.esc(label)}</p>
       <div class="conv-row"><span>${F.esc(tx('current'))}</span><b class="num">${Number.isFinite(v) ? `${F.esc(show(v))} ${F.esc(F.unit(from))}` : '—'}</b></div>
       <div class="conv-row"><label for="conv-unit">${F.esc(tx('to'))}</label><select id="conv-unit" class="unit">${units}</select></div>
       <div class="conv-row"><span>${F.esc(tx('result'))}</span><b class="num" id="conv-out" aria-live="polite"></b></div>
-      <p class="hint conv-why" id="conv-why" hidden></p>`;
+      <p class="hint conv-why" id="conv-why" hidden></p>${isPatm(objKey, path) && cat === 'pressure' ? `<p class="muted small conv-ref">${F.esc(tx('patmRef', { p: show(U.PATM / 1000) }))}</p>` : ''}`;
     const sel = body.querySelector('#conv-unit');
     // the first unit other than the current one
     const other = [...sel.options].find((o) => o.value !== from);

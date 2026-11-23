@@ -101,6 +101,7 @@ PumpIt.i18n.add('en', {
         length: 'length',
         diameter: 'diameter',
         annulus: 'annulus diameters',
+        annulusInner: 'annulus: inner diameter from 0 to less than the outer one',
         rectangle: 'width and height',
         noncircular: 'area and wetted perimeter',
         roughness: 'roughness',
@@ -109,6 +110,7 @@ PumpIt.i18n.add('en', {
         hwC: 'C coefficient',
         nParallel: 'number of parallel pipes',
         idReduction: 'diameter reduction',
+        fittingQty: 'fittings: quantity of zero or more',
       },
       junction: {
         pipesExact: 'needs {n} pipe(s); has {has}',
@@ -307,6 +309,7 @@ PumpIt.i18n.add('en', {
       badFluid: 'Invalid fluid properties.',
       zeroGravity: 'Zero gravity: head outputs (HGL, EGL, ΔH) are meaningless.',
       badGeometry: 'Pipe P{id}: invalid geometry.',
+      badFittings: 'Pipe P{id}: a fitting with a negative quantity.',
       needsTwoPipes: 'Junction J{id}: needs 2 pipes.',
       notDirectional: 'Junction J{id} ({label}): one pipe must arrive at it and the other leave it.',
       pipeNotConnected: 'Pipe P{id}: must be connected to two junctions.',

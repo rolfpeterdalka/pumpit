@@ -19,7 +19,12 @@
       const gm = p.geometry;
       let A, Dh;
       if (gm.kind === 'circular') { const d = si(gm.d, 'length'); A = Math.PI * d * d / 4; Dh = d; }
-      else if (gm.kind === 'annulus') { const a = si(gm.dOuter, 'length'), b = si(gm.dInner, 'length'); A = Math.PI * (a * a - b * b) / 4; Dh = a - b; }
+      else if (gm.kind === 'annulus') {
+        const a = si(gm.dOuter, 'length'), b = si(gm.dInner, 'length');
+        // an inner diameter below zero or not less than the outer one is no annulus (its area and Dh could still come out positive)
+        if (!(b >= 0 && b < a)) { errors.push(t('core.solver.badGeometry', { id: p.id })); continue; }
+        A = Math.PI * (a * a - b * b) / 4; Dh = a - b;
+      }
       else if (gm.kind === 'rectangular') { const w = si(gm.width, 'length'), h = si(gm.height, 'length'); A = w * h; Dh = 2 * w * h / (w + h); }
       else { A = si(gm.area, 'area'); Dh = 4 * A / si(gm.perim, 'length'); }
       const red = 1 - (p.idReduction || 0) / 100;
@@ -35,6 +40,8 @@
       else fm = 'none';
       const fT = H.craneFT(Dh);
       let Ksum = 0;
+      // a negative quantity would turn a loss into a gain
+      if ((p.fittings || []).some((it) => !((it.qty ?? 1) >= 0))) { errors.push(t('core.solver.badFittings', { id: p.id })); continue; }
       for (const it of p.fittings || []) Ksum += (it.qty ?? 1) * (it.model === 'KfT' ? it.value * fT : it.value);
       const ju = jById.get(p.up), jd = jById.get(p.down);
       pp.set(p.id, {

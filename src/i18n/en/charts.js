@@ -26,6 +26,7 @@ PumpIt.i18n.add('en', {
       systemRequired: 'System (required head)',
       notes: 'System curve obtained by running the solver with a fixed flow in the pump at {n} points (the rest of the model as it is in scenario {name}).',
       notesNoPoint: ' Run the model to mark the operating point.',
+      notesNoSpeed: ' The control found no speed for its set point, so the pump curve is not drawn.',
     },
     profile: {
       needsTwo: 'Draw at least two junctions connected by pipes.',

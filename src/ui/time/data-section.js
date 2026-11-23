@@ -60,6 +60,39 @@
   }
   const tempUnit = () => { const T = app.eff().system.fluidGas && app.eff().system.fluidGas.T; return (T && T.unit) || 'K'; };
 
+  // The tables of junction j with their values in the basis v ('absolute' or 'relative'), through SI as the calculation
+  // reads a relative table (src/core/time/tables.js): % of the steady value in SI (an absolute pressure; a speed in % of
+  // the nominal one is its own SI). null when the numbers cannot follow, without a steady value other than zero or with
+  // a unit that does not convert: the caller then leaves the tables and the basis as they were.
+  function rebase(j, qt, tables, v) {
+    const ctx = fluidCtx(), cat = qt.cat === 'none' ? 'none' : qt.cat;
+    const unit = unitFor(qt.cat, v);
+    let steady = NaN;
+    try { steady = qt.steady(j, (x, c) => U.toSI(x.value, x.unit, c, ctx)); } catch (e) { /* not known */ }
+    if (!Number.isFinite(steady) || steady === 0) return null;
+    const conv = (x, vUnit) => {
+      const y = v === 'relative' ? (U.toSI(x, vUnit, cat, ctx) / steady) * 100 : U.fromSI((x / 100) * steady, unit, cat, ctx);
+      if (!Number.isFinite(y)) throw new Error('not finite');
+      return +y.toPrecision(6);
+    };
+    try {
+      return tables.map((tb0) => {
+        const tb = M.clone(tb0);
+        tb.v = tb0.v.map((x) => conv(x, tb0.vUnit));
+        tb.vUnit = unit;
+        // the temperature of a second column: % of the absolute steady temperature, or a temperature
+        if (qt.second && PumpIt.time.tables.hasSecond(tb)) {
+          const K = (x, u) => U.toSI(x, u, 'temperature'), T0 = steady2In(j, qt, 'absolute'), Tu = tempUnit();
+          const T0K = K(T0, Tu);
+          if (v === 'relative' && T0K > 0) tb.v2 = tb.v2.map((x) => +((K(x, tb.v2Unit) / T0K) * 100).toPrecision(6));
+          else if (v === 'absolute' && T0K > 0) tb.v2 = tb.v2.map((x) => +U.fromSI((x / 100) * T0K, Tu, 'temperature').toPrecision(6));
+          tb.v2Unit = v === 'relative' ? '%' : Tu;
+        }
+        return tb;
+      });
+    } catch (e) { return null; }
+  }
+
   // new time data: the first quantity of the junction, by the clock, its steady value held for an hour
   function newData(j, qt) {
     const unit = unitFor(qt.cat, 'absolute');
@@ -107,31 +140,11 @@
     }))));
     if (!qt) { s.appendChild(UI.forms.hint(F.esc(tx('whatGone')))); return; }
     // absolute or relative values: the numbers of the tables follow, when the steady value is known
-    s.appendChild(field(tx('basis'), select('basis', PumpIt.time.inputs.BASES.map((b) => [b, tx('bases.' + b)]), d.basis, (v) => write((n) => {
-      // through SI, as the calculation reads a relative table: % of the steady value in SI (an absolute pressure)
-      const ctx = fluidCtx(), cat = qt.cat === 'none' ? 'none' : qt.cat;
-      let steady = NaN;
-      try { steady = qt.steady(j, (x, c) => U.toSI(x.value, x.unit, c, ctx)); } catch (e) { /* not known: the numbers stay */ }
-      for (const tb of n.tables || []) {
-        const unit = unitFor(qt.cat, v);
-        if (qt.cat !== 'percent' && Number.isFinite(steady) && steady !== 0) {
-          try {
-            if (v === 'relative') tb.v = tb.v.map((x) => +((U.toSI(x, tb.vUnit, cat, ctx) / steady) * 100).toPrecision(6));
-            else tb.v = tb.v.map((x) => +U.fromSI((x / 100) * steady, unit, cat, ctx).toPrecision(6));
-          } catch (e) { /* a unit that does not convert: the numbers stay */ }
-        }
-        tb.vUnit = unit;
-        // the temperature of a second column: % of the absolute steady temperature, or a temperature
-        if (qt.second && PumpIt.time.tables.hasSecond(tb)) {
-          const K = (x, u) => U.toSI(x, u, 'temperature'), T0 = steady2In(j, qt, 'absolute'), Tu = tempUnit();
-          const T0K = K(T0, Tu);
-          if (v === 'relative' && T0K > 0) tb.v2 = tb.v2.map((x) => +((K(x, tb.v2Unit) / T0K) * 100).toPrecision(6));
-          else if (v === 'absolute' && T0K > 0) tb.v2 = tb.v2.map((x) => +U.fromSI((x / 100) * T0K, Tu, 'temperature').toPrecision(6));
-          tb.v2Unit = v === 'relative' ? '%' : Tu;
-        }
-      }
-      n.basis = v;
-    })), { info: tx('basisHint') }));
+    s.appendChild(field(tx('basis'), select('basis', PumpIt.time.inputs.BASES.map((b) => [b, tx('bases.' + b)]), d.basis, (v) => {
+      const tables = rebase(j, qt, d.tables || [], v);
+      if (!tables) { app.toast(tx('basisNoSteady')); app.renderAll(); return; }
+      write((n) => { n.tables = tables; n.basis = v; });
+    }), { info: tx('basisHint') }));
     // how the tables start: the conditions and the tables the trigger needs are added
     s.appendChild(field(tx('start'), select('start', E().STARTS.map((x) => [x, tx('starts.' + x)]), d.start, (v) => write((n) => {
       n.start = v;
@@ -328,5 +341,5 @@
     return html;
   }
 
-  UI.timeData = { newData, newCondition, DEFAULT_UNIT, modelData, conditionText, conditionBlock };
+  UI.timeData = { newData, newCondition, DEFAULT_UNIT, modelData, conditionText, conditionBlock, rebase };
 })(window);

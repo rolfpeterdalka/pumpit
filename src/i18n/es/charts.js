@@ -25,6 +25,7 @@ PumpIt.i18n.add('es', {
       systemRequired: 'Sistema (altura necesaria)',
       notes: 'Curva del sistema obtenida ejecutando el solver con caudal fijo en la bomba en {n} puntos (el resto del modelo como está en el escenario {name}).',
       notesNoPoint: ' Ejecute el modelo para marcar el punto de operación.',
+      notesNoSpeed: ' El control no encontró una velocidad para su consigna, por eso la curva de la bomba no se traza.',
     },
     profile: {
       needsTwo: 'Dibuje al menos dos uniones conectadas por tuberías.',

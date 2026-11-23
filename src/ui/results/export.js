@@ -63,13 +63,17 @@
   const sheets = (res, eff) => Cat.TABLES.map((tb) => sheet(tb, res, eff)).filter((s) => s.rows.length);
 
   // The sheet that says where the tables of objects come from: the model, the scenario, the analysis and, with a run of
-  // the time simulation, the time and the recorded step of the time cursor, which gave their values (the series sheets
-  // cover every recorded step). at = { time, step } of the cursor, or null for the steady state.
+  // the time simulation, the time of the time cursor, the step of the simulation it shows (as the time bar numbers it),
+  // the index of its recorded sample and, for a sample at the exact time of an event between two steps, those steps; they
+  // gave the values of the tables (the series sheets cover every recorded sample). at = { time, step, sample, exact } of
+  // the cursor, or null for the steady state.
   function contextSheet({ title, scenario, analysis, at, clock }) {
     const ex = (k, p) => t('results.export.context.' + k, p);
     const rows = [[ex('model'), title || '', ''], [ex('scenario'), scenario || '', ''], [ex('analysis'), ex('analyses.' + analysis), '']];
     if (at) {
       rows.push([ex('time'), at.time, 's'], [ex('clock'), clock || '', ''], [ex('step'), at.step, '']);
+      if (at.exact) rows.push([ex('exact'), ex('exactBetween', { k: at.step, k1: at.step + 1 }), '']);
+      rows.push([ex('sample'), at.sample, '']);
       rows.push([ex('tables'), ex('tablesAtCursor'), '']);
     } else rows.push([ex('tables'), ex('tablesSteady'), '']);
     return {
@@ -86,7 +90,8 @@
     if (!res) { app.toast(t('results.export.noResults')); return; }
     // the tables of objects come from the same results as the screen: those of the step of the time cursor with a run
     const run = app.timeRun();
-    const at = run ? { time: app.cursorTime(), step: app.cursorIndex() } : null;
+    const i = run ? app.cursorIndex() : -1;
+    const at = run ? { time: app.cursorTime(), step: run.steps ? run.steps[i] : i, sample: i, exact: !!(run.exact && run.exact[i]) } : null;
     const surgeSheets = UI.surgeResults ? UI.surgeResults.sheets() : [];
     const analysis = run ? 'time' : surgeSheets.length ? 'surge' : 'steady';
     const ctx = contextSheet({ title: app.model.title, scenario: app.scenario().name, analysis, at, clock: at && UI.timeFormat ? UI.timeFormat.clock(at.time) : '' });
