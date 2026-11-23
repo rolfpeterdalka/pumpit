@@ -142,12 +142,13 @@
     const solOk = s.tolRel > 0 && s.maxIter >= 1 && s.relax > 0 && s.relax <= 1;
     const pipesBad = [...undef.keys()].filter((k) => k[0] === 'p').length;
     const jBad = [...undef.keys()].filter((k) => k[0] === 'j').length;
-    // key: the object the item checks, where it has one (the solution control and the system)
+    // key: the object the item checks, where it has one (the solution control and the system); net: the item of the
+    // pipes or of the junctions, empty when the network has none (the undefined objects are counted in undef)
     const items = [
       { key: 'sol', label: t('core.checklist.items.solution'), ok: solOk },
       { key: 'sys', label: t('core.checklist.items.system'), ok: fluidMiss.length === 0, detail: fluidMiss.join(', ') },
-      { label: t('core.checklist.items.pipes'), ok: eff.pipes.length > 0 && pipesBad === 0, detail: eff.pipes.length ? t('core.checklist.items.pipesIncomplete', { bad: pipesBad, n: eff.pipes.length }) : t('core.checklist.items.noPipes') },
-      { label: t('core.checklist.items.junctions'), ok: eff.junctions.length > 0 && jBad === 0, detail: eff.junctions.length ? t('core.checklist.items.junctionsIncomplete', { bad: jBad, n: eff.junctions.length }) : t('core.checklist.items.noJunctions') },
+      { net: 'pipes', empty: !eff.pipes.length, label: t('core.checklist.items.pipes'), ok: eff.pipes.length > 0 && pipesBad === 0, detail: eff.pipes.length ? t('core.checklist.items.pipesIncomplete', { bad: pipesBad, n: eff.pipes.length }) : t('core.checklist.items.noPipes') },
+      { net: 'junctions', empty: !eff.junctions.length, label: t('core.checklist.items.junctions'), ok: eff.junctions.length > 0 && jBad === 0, detail: eff.junctions.length ? t('core.checklist.items.junctionsIncomplete', { bad: jBad, n: eff.junctions.length }) : t('core.checklist.items.noJunctions') },
     ];
     // the time control, when the time simulation is on (§3 of its specification)
     if (timeOn(eff)) {

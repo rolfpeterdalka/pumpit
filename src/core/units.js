@@ -139,5 +139,29 @@
   // text shown for a unit: the symbol itself, unless the language catalog gives another one (core.units.label)
   const label = (unit) => PumpIt.i18n.lookup('core.units.label.' + unit) ?? unit;
 
-  PumpIt.units = { CATS, G0, PATM, PSI, toSI, fromSI, list, has, isVolumetric, isNormal, label, q: (value, unit) => ({ value, unit }) };
+  // Conversion of a typed value to another unit of its category (the "Convert value" command of the inspector).
+  // A flow converts directly within its family (mass, volume, normal volume) and needs a density only between
+  // families; a pressure needs the ambient pressure only between a gauge and an absolute unit.
+  const flowFamily = (unit) => (unit in CATS.massFlow ? 'massFlow' : unit in CATS.normFlow ? 'normFlow' : 'volFlow');
+  const isGauge = (unit) => !!(CATS.pressure[unit] && CATS.pressure[unit].g);
+  // what the conversion lacks in ctx: null when it can be done, 'patm', 'rho' (volume to mass or normal volume) or
+  // 'rhoN' (normal volume to mass or volume)
+  function convertNeeds(from, to, cat, ctx = {}) {
+    if (cat === 'pressure') return isGauge(from) !== isGauge(to) && !(ctx.patm > 0) ? 'patm' : null;
+    if (cat !== 'flow') return null;
+    const a = flowFamily(from), b = flowFamily(to);
+    if (a === b) return null;
+    if ((a === 'volFlow' || b === 'volFlow') && !(ctx.rho > 0)) return 'rho';
+    if ((a === 'normFlow' || b === 'normFlow') && !(normalRho(ctx) > 0)) return 'rhoN';
+    return null;
+  }
+  function convert(v, from, to, cat, ctx = {}) {
+    if (cat === 'flow' && flowFamily(from) === flowFamily(to)) return fromSI(toSI(v, from, flowFamily(from)), to, flowFamily(to));
+    return fromSI(toSI(v, from, cat, ctx), to, cat, ctx);
+  }
+
+  PumpIt.units = {
+    CATS, G0, PATM, PSI, toSI, fromSI, list, has, isVolumetric, isNormal, isGauge, flowFamily, convertNeeds, convert, label,
+    q: (value, unit) => ({ value, unit }),
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

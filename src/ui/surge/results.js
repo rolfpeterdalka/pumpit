@@ -35,7 +35,8 @@
     return (key[0] === 'p' ? 'P' : 'J') + key.slice(2) + (o && o.name ? ' ' + o.name : '');
   }
   const card = (title, body, hint, buttons = '') => `<div class="card"><div class="card-head"><h3>${F.esc(title)}</h3>${hint ? `<span class="muted small">${F.esc(hint)}</span>` : ''}${buttons ? `<div class="btn-row">${buttons}</div>` : ''}</div>${body}</div>`;
-  const table = (id, th, rows) => `<div class="table-scroll"><table class="grid" id="${id}"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  // objects: a table whose rows are objects, with the object first (its column stays at the left edge, F.objId)
+  const table = (id, th, rows, objects) => `<div class="table-scroll"><table class="grid${objects ? ' objects' : ''}" id="${id}"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
   const copyBtn = (id) => `<button class="btn small" data-scopy="${id}" type="button">${F.esc(t('results.copyTable'))}</button>`;
 
   // ------------------------------------------------------------ the summary of the run
@@ -61,8 +62,8 @@
   function sectioningCard(run) {
     const sec = run.sectioning;
     const th = ['pipe', 'L', 'a', 'n', 'aAdj', 'variance', 'R'].map((k, i) => `<th class="${i ? '' : 'txt'}">${F.esc(t('surge.system.cols.' + k))}</th>`).join('');
-    const rows = Object.values(run.pipes).map((p) => `<tr data-key="p:${p.id}"><td class="txt">P${p.id}${p.id === sec.controller ? ` <span class="muted small">${F.esc(t('surge.system.controller'))}</span>` : ''}</td><td class="num">${F.fmt(p.L, 5)}</td><td class="num">${F.fmt(p.a, 5)}</td><td class="num">${p.n}</td><td class="num">${F.fmt(p.aAdj, 5)}</td><td class="num">${F.fixed(100 * p.variance, 3)}</td><td class="num">${F.fmt(p.R, 4)}</td></tr>`).join('');
-    return card(tx('sectioning'), table('su-sec', th, rows), tx('sectioningHint'), copyBtn('su-sec'));
+    const rows = Object.values(run.pipes).map((p) => `<tr data-key="p:${p.id}"><td class="txt">${F.objId('P' + p.id)}${p.id === sec.controller ? ` <span class="muted small">${F.esc(t('surge.system.controller'))}</span>` : ''}</td><td class="num">${F.fmt(p.L, 5)}</td><td class="num">${F.fmt(p.a, 5)}</td><td class="num">${p.n}</td><td class="num">${F.fmt(p.aAdj, 5)}</td><td class="num">${F.fixed(100 * p.variance, 3)}</td><td class="num">${F.fmt(p.R, 4)}</td></tr>`).join('');
+    return card(tx('sectioning'), table('su-sec', th, rows, true), tx('sectioningHint'), copyBtn('su-sec'));
   }
 
   // the extremes of the junctions: each of their series, largest and smallest with the time
@@ -76,7 +77,7 @@
         const e = X[id] && X[id][f];
         if (!e) continue;
         const cat = FIELD_CAT[f] || null, k = 'jx.' + f;
-        rows.push(`<tr data-key="j:${id}"><td class="txt">${F.esc(objName('j:' + id))}</td><td class="txt">${F.esc(tx('fields.' + f))}${cat === 'percent' ? ' (%)' : cat ? ` (${F.esc(F.unit(unitOf(k, cat)))})` : ''}</td><td class="num">${val(e.max, cat === 'percent' ? null : cat, k, cx)}</td><td class="num">${time(e.tmax)}</td><td class="num">${val(e.min, cat === 'percent' ? null : cat, k, cx)}</td><td class="num">${time(e.tmin)}</td></tr>`);
+        rows.push(`<tr data-key="j:${id}"><td class="txt">${F.objId(objName('j:' + id))}</td><td class="txt">${F.esc(tx('fields.' + f))}${cat === 'percent' ? ' (%)' : cat ? ` (${F.esc(F.unit(unitOf(k, cat)))})` : ''}</td><td class="num">${val(e.max, cat === 'percent' ? null : cat, k, cx)}</td><td class="num">${time(e.tmax)}</td><td class="num">${val(e.min, cat === 'percent' ? null : cat, k, cx)}</td><td class="num">${time(e.tmin)}</td></tr>`);
       }
       // the reference point of the four-quadrant data of a pump, and the scales of its table at the steady state
       const fq = o.info && o.info.fourQuad;
@@ -85,19 +86,19 @@
           ['QR', `${F.fmt(fq.QR * 1000, 6)} L/s`], ['HR', `${F.fmt(fq.HR, 6)} m`], ['TR', `${F.fmt(fq.TR, 6)} N·m`],
           ['NR', `${F.fmt(fq.NR * 60 / (2 * Math.PI), 6)} rpm`], ['cH', F.fmt(fq.cH, 6)], ['cB', F.fmt(fq.cB, 6)],
         ];
-        for (const [k, v] of vals) rows.push(`<tr data-key="j:${id}"><td class="txt">${F.esc(objName('j:' + id))}</td><td class="txt">${F.esc(tx('four.' + k, { ref: tx('four.refs.' + fq.ref) }))}</td><td class="num">${F.esc(v)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`);
+        for (const [k, v] of vals) rows.push(`<tr data-key="j:${id}"><td class="txt">${F.objId(objName('j:' + id))}</td><td class="txt">${F.esc(tx('four.' + k, { ref: tx('four.refs.' + fq.ref) }))}</td><td class="num">${F.esc(v)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`);
       }
       // the volumes a tank overflowed and missed over the run
       for (const k of ['over', 'deficit']) {
         const v = o.totals && o.totals[k];
         if (!(v > 0)) continue;
         const kk = 'jx.' + k;
-        rows.push(`<tr data-key="j:${id}"><td class="txt">${F.esc(objName('j:' + id))}</td><td class="txt">${F.esc(tx('totals.' + k))} (${F.esc(F.unit(unitOf(kk, 'volume')))})</td><td class="num">${val(v, 'volume', kk, cx)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`);
+        rows.push(`<tr data-key="j:${id}"><td class="txt">${F.objId(objName('j:' + id))}</td><td class="txt">${F.esc(tx('totals.' + k))} (${F.esc(F.unit(unitOf(kk, 'volume')))})</td><td class="num">${val(v, 'volume', kk, cx)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`);
       }
     }
     if (!rows.length) return '';
     const th = ['junction', 'quantity', 'max', 'tmax', 'min', 'tmin'].map((k, i) => `<th class="${i < 2 ? 'txt' : ''}">${F.esc(tx('cols.' + k))}</th>`).join('');
-    return card(tx('junctions'), table('su-jx', th, rows.join('')), tx('junctionsHint'), copyBtn('su-jx'));
+    return card(tx('junctions'), table('su-jx', th, rows.join(''), true), tx('junctionsHint'), copyBtn('su-jx'));
   }
 
   // the unbalanced forces of the force sets (phase G3): where each set is, its value in the steady state, its largest and
@@ -136,9 +137,9 @@
       const e = pipeExtremes(run, id), X = e.X;
       const V = X.Vmax[e.iV] > 0;
       const vap = Number.isFinite(run.env.pv) && X.pmin[e.iMin] <= run.env.pv * (1 + 1e-9);
-      return `<tr data-key="p:${id}" data-pipe="${id}"><td class="txt">${F.esc(objName('p:' + id))}</td><td class="num">${val(X.pmax[e.iMax], 'pressure', 'p', cx)}</td><td class="num">${e.iMax}</td><td class="num">${time(X.tpmax[e.iMax])}</td><td class="num${vap ? ' bad' : ''}">${val(X.pmin[e.iMin], 'pressure', 'p', cx)}</td><td class="num">${e.iMin}</td><td class="num">${time(X.tpmin[e.iMin])}</td><td class="num">${V ? val(X.Vmax[e.iV], 'volume', 'V', cx) : '—'}</td><td class="num">${V ? time(X.tVmax[e.iV]) : '—'}</td></tr>`;
+      return `<tr data-key="p:${id}" data-pipe="${id}"><td class="txt">${F.objId(objName('p:' + id))}</td><td class="num">${val(X.pmax[e.iMax], 'pressure', 'p', cx)}</td><td class="num">${e.iMax}</td><td class="num">${time(X.tpmax[e.iMax])}</td><td class="num${vap ? ' bad' : ''}">${val(X.pmin[e.iMin], 'pressure', 'p', cx)}</td><td class="num">${e.iMin}</td><td class="num">${time(X.tpmin[e.iMin])}</td><td class="num">${V ? val(X.Vmax[e.iV], 'volume', 'V', cx) : '—'}</td><td class="num">${V ? time(X.tVmax[e.iV]) : '—'}</td></tr>`;
     }).join('');
-    let html = card(tx('envelopes'), table('su-env', th, rows), tx('envelopesHint'), copyBtn('su-env'));
+    let html = card(tx('envelopes'), table('su-env', th, rows, true), tx('envelopesHint'), copyBtn('su-env'));
     // the stations of one pipe
     const pick = ids.includes(app.prefs.surgePipe) ? app.prefs.surgePipe : ids[0];
     const p = run.pipes[pick], X = run.extremes.pipes[pick];

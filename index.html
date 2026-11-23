@@ -51,10 +51,25 @@
           <div id="menu-examples"></div>
         </div>
       </div>
-      <!-- how the drawing looks (D-36 of docs/3D-VIEWS.md); the marks of the choices: src/ui/topbar/options.js -->
+      <!-- the language, light or dark mode and how the drawing looks (D-36 of docs/3D-VIEWS.md); the marks of the
+           choices: src/ui/topbar/options.js -->
       <div class="menu">
         <button class="btn ghost" data-menu="options" id="btn-menu-options" data-i18n="app.menu.options">Options</button>
         <div class="menu-pop" id="menu-options" hidden>
+          <!-- the language and the light or dark mode (src/ui/topbar/language.js and theme.js), with the ids they always had -->
+          <div class="menu-label" data-i18n="app.language">Language</div>
+          <div class="menu-lang">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1.7 8h12.6M8 1.7c-2.3 2.5-2.3 10.1 0 12.6M8 1.7c2.3 2.5 2.3 10.1 0 12.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+            <select id="lang-select" aria-label="Language" title="Language" data-i18n-aria-label="app.language" data-i18n-title="app.language"></select>
+          </div>
+          <div class="menu-label" data-i18n="app.menu.theme">Theme</div>
+          <!-- title, label and text set by src/ui/topbar/theme.js: the mode the button switches to -->
+          <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode">
+            <svg class="moon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M13.19 8.74A5.6 5.6 0 1 1 7.26 2.81A4.3 4.3 0 0 0 13.19 8.74Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            <svg class="sun" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13v1.8M1.2 8H3M13 8h1.8M3.19 3.19l1.27 1.27M11.54 11.54l1.27 1.27M3.19 12.81l1.27-1.27M11.54 4.46l1.27-1.27" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span class="theme-text">Switch to dark mode</span>
+          </button>
+          <div class="menu-sep"></div>
           <div class="menu-label" data-i18n="app.menu.grid3d">3D grid</div>
           <button data-act="grid-step" data-value="0.5" aria-pressed="false" title="Fine grid: 0.5 du" data-i18n="network.view3.density.fine" data-i18n-title="network.view3.densityTitle.fine">Fine</button>
           <button data-act="grid-step" data-value="1" aria-pressed="false" title="Medium grid: 1 du" data-i18n="network.view3.density.medium" data-i18n-title="network.view3.densityTitle.medium">Medium</button>
@@ -77,7 +92,7 @@
           <button data-act="select-all" data-i18n="app.menu.selectAll">Select all <kbd>Ctrl A</kbd></button>
           <div class="menu-sep"></div>
           <button data-act="reverse" data-i18n="app.menu.reverse">Reverse pipe direction</button>
-          <button data-act="delete" data-i18n="app.menu.delete">Delete selection <kbd>Del</kbd></button>
+          <button data-act="delete" data-i18n="app.menu.delete">Delete from the network in every scenario <kbd>Del</kbd></button>
           <div class="menu-sep"></div>
           <button data-act="fit" data-i18n="app.menu.fit">Fit drawing to screen</button>
           <button data-act="toggle-grid" data-i18n="app.menu.grid">Grid and snapping</button>
@@ -121,16 +136,6 @@
       </button>
       <div class="menu-pop right" id="checklist-pop" hidden></div>
     </div>
-
-    <div class="lang">
-      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1.7 8h12.6M8 1.7c-2.3 2.5-2.3 10.1 0 12.6M8 1.7c2.3 2.5 2.3 10.1 0 12.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
-      <select id="lang-select" aria-label="Language" title="Language" data-i18n-aria-label="app.language" data-i18n-title="app.language"></select>
-    </div>
-    <!-- title and label set by src/ui/topbar/theme.js: the mode the button switches to -->
-    <button class="btn ghost icon theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode">
-      <svg class="moon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M13.19 8.74A5.6 5.6 0 1 1 7.26 2.81A4.3 4.3 0 0 0 13.19 8.74Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-      <svg class="sun" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.2V3M8 13v1.8M1.2 8H3M13 8h1.8M3.19 3.19l1.27 1.27M11.54 11.54l1.27 1.27M3.19 12.81l1.27-1.27M11.54 4.46l1.27-1.27" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    </button>
   </header>
 
   <div class="tabs" role="tablist">
@@ -455,6 +460,7 @@
 <script src="src/ui/common/dom.js" charset="utf-8"></script>
 <script src="src/ui/common/dialogs.js" charset="utf-8"></script>
 <script src="src/ui/common/tips.js" charset="utf-8"></script>
+<script src="src/ui/common/focus-keep.js" charset="utf-8"></script>
 <script src="src/ui/common/download.js" charset="utf-8"></script>
 <script src="src/ui/common/xlsx.js" charset="utf-8"></script>
 <!-- Junction types: interface side (symbol, form, summaries, result rows), one file per type -->
@@ -500,6 +506,8 @@
 <script src="src/ui/help/tour.js" charset="utf-8"></script>
 <!-- Inspector (properties panel) and the system window -->
 <script src="src/ui/inspector/forms.js" charset="utf-8"></script>
+<script src="src/ui/inspector/value-convert.js" charset="utf-8"></script>
+<script src="src/ui/inspector/pending.js" charset="utf-8"></script>
 <script src="src/ui/inspector/inspector.js" charset="utf-8"></script>
 <script src="src/ui/inspector/selection-panel.js" charset="utf-8"></script>
 <script src="src/ui/inspector/system-panel.js" charset="utf-8"></script>

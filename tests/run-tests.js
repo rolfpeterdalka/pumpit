@@ -38,6 +38,15 @@ console.log('\nProperties and correlations');
   check('Conversion gpm → m³/s', rel(U.toSI(100, 'gpm', 'volFlow'), 6.30902e-3) < 1e-5);
   check('Conversion bar(g) → absolute Pa', U.toSI(1, 'bar(g)', 'pressure', { patm: 101325 }) === 201325);
   check('Conversion °F → K', rel(U.toSI(212, '°F', 'temperature'), 373.15) < 1e-12);
+  // the Convert value command of the inspector: flows within a family need no density, pressures need the ambient
+  // pressure only between gauge and absolute units, and what is missing is named
+  check('Convert 15 m → 15000 mm', rel(U.convert(15, 'm', 'mm', 'length'), 15000) < 1e-12);
+  check('Convert 20 °C → 68 °F', rel(U.convert(20, '°C', '°F', 'temperature'), 68) < 1e-12);
+  check('Convert m³/h → L/s without a density', U.convertNeeds('m³/h', 'L/s', 'flow', {}) === null && rel(U.convert(36, 'm³/h', 'L/s', 'flow'), 10) < 1e-12);
+  check('Convert m³/h → kg/s needs the density', U.convertNeeds('m³/h', 'kg/s', 'flow', {}) === 'rho' && rel(U.convert(36, 'm³/h', 'kg/s', 'flow', { rho: 1000 }), 10) < 1e-12);
+  check('Convert Nm³/h → kg/h needs the normal density', U.convertNeeds('Nm³/h', 'kg/h', 'flow', {}) === 'rhoN' && rel(U.convert(100, 'Nm³/h', 'kg/h', 'flow', { rhoN: 1.293 }), 129.3) < 1e-12);
+  check('Convert bar(g) → bar(a) needs the ambient pressure', U.convertNeeds('bar(g)', 'bar(a)', 'pressure', {}) === 'patm' && rel(U.convert(1, 'bar(g)', 'bar(a)', 'pressure', { patm: 101325 }), 2.01325) < 1e-12);
+  check('Convert bar(g) → kPa(g) without it', U.convertNeeds('bar(g)', 'kPa(g)', 'pressure', {}) === null && rel(U.convert(1, 'bar(g)', 'kPa(g)', 'pressure', {}), 100) < 1e-12);
   const c = H.polyfit([0, 1, 2, 3], [5, 3, -3, -13], 2);
   check('Exact polynomial fit (5 − 2x²)', Math.abs(c[0] - 5) < 1e-9 && Math.abs(c[1]) < 1e-9 && Math.abs(c[2] + 2) < 1e-9);
 }

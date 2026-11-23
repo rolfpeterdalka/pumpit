@@ -221,6 +221,8 @@ PumpIt.i18n.add('es', {
     noItems: 'Ningún elemento de este tipo en el modelo.',
     subNoResults: 'Escenario {name}: sin resultados.',
     noResults: 'El cálculo es automático. Complete la lista de verificación (arriba a la derecha) para ver caudales, presiones y avisos.',
+    viewPending: 'Ver pendientes',
+    columnsButton: 'Columnas…',
     subRefused: 'Escenario {name}: el cálculo fue rechazado.',
     refused: 'No fue posible calcular',
     error: 'Error',

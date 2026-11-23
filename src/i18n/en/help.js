@@ -49,11 +49,11 @@ PumpIt.i18n.add('en', {
         },
         language: {
           title: 'Language',
-          body: 'Switches the whole interface between Portuguese, English and Spanish, at once. The names you typed are not translated.',
+          body: 'In the [[t:app.menu.options]] menu: switches the whole interface between Portuguese, English and Spanish, at once. The names you typed are not translated.',
         },
         theme: {
           title: 'Light or dark mode',
-          body: 'The sun and the moon switch the screen between the light and the dark mode. Without a choice, the app follows the mode of the system; the choice is kept in this browser.',
+          body: 'In the [[t:app.menu.options]] menu, the item with the sun or the moon switches the screen between the light and the dark mode. Without a choice, the app follows the mode of the system; the choice is kept in this browser.',
         },
         tabs: {
           title: 'Tabs',
@@ -81,7 +81,7 @@ PumpIt.i18n.add('en', {
         },
         inspector: {
           title: 'Properties',
-          body: 'Shows and edits the selected object: it opens when you select something and collapses when nothing is selected. Opened by its arrow with nothing selected, it sums up the system and has the button that opens the window of the system properties. Whatever an object still needs appears in a red box; the <b>i</b> next to a field shows a note about it when the mouse rests on it.',
+          body: 'Shows and edits the selected object: it opens when you select something and collapses when nothing is selected. A pipe or a junction has two tabs, [[t:inspector.tabs.props]] and [[t:inspector.tabs.results]]. Opened by its arrow with nothing selected, it sums up the system and has the button that opens the window of the system properties. Whatever an object still needs appears in a red box; the <b>i</b> next to a field shows a note about it when the mouse rests on it.',
         },
         panel: {
           title: 'Collapse the panel',
@@ -179,7 +179,7 @@ PumpIt.i18n.add('en', {
             title: 'Overview',
             body: `<p>The screen has five areas. Click the buttons to see each one lit up:</p>
 <ol>
-<li>[[show:menus|Top bar]]: menus, model title, scenarios, calculation status, language and light or dark mode.</li>
+<li>[[show:menus|Top bar]]: menus (the language and the light or dark mode are in [[t:app.menu.options]]), model title, scenarios and calculation status.</li>
 <li>[[show:tabs|Tabs]]: [[t:app.tabs.net]], [[t:app.tabs.data]], [[t:app.tabs.out]] and [[t:app.tabs.charts]].</li>
 <li>[[show:palette|Palette]], on the left: the tools and the junction types.</li>
 <li>[[show:canvas|Drawing area]], in the middle: the network, the views, the results on the drawing and the zoom.</li>
@@ -216,14 +216,15 @@ PumpIt.i18n.add('en', {
             body: `<p>The panel on the right follows the selection:</p>
 <ul>
 <li><b>Nothing selected</b>: the panel collapses. Opened by its arrow, it shows a summary of the system and the [[t:inspector.system.open]] button, which opens the [[t:inspector.system.title]] window — regime, fluid, environment, solution control and the current scenario. See [[go:system.fluid|System and solution]].</li>
-<li><b>A pipe</b>: quick results, name, geometry, friction, fittings and special condition.</li>
-<li><b>A junction</b>: quick results, name, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] and the data of its type.</li>
+<li><b>A pipe</b>: name, geometry, friction, fittings and special condition.</li>
+<li><b>A junction</b>: name, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] and the data of its type.</li>
 <li><b>Several objects</b>: the count and the copy, paste and delete actions.</li>
 </ul>
+<p>A pipe or a junction shows two tabs under its title: [[t:inspector.tabs.props]], with the fields above, the curves and whatever the object still lacks, and [[t:inspector.tabs.results]], with the main values of the last calculation (flow, pressures, the head of a pump). A newly selected object opens on [[t:inspector.tabs.props]]; while it stays selected, the tab you chose stays through every new calculation. The arrow keys move from one tab to the other.</p>
 <h4>Fields</h4>
 <ul>
 <li>Type the value and confirm with <kbd>Enter</kbd> or by leaving the field. A comma or a point works as the decimal separator.</li>
-<li>Next to each quantity there is a list of units. <b>Changing the unit does not convert the number</b>: the value is read in the new unit. Pick the unit first and type the value in it.</li>
+<li>Next to each quantity there is a list of units. <b>Changing the unit does not convert the number</b>: the value is read in the new unit. Pick the unit first and type the value in it. To convert a value already typed, use the button with two arrows next to the unit ([[t:inspector.fields.convert]]).</li>
 <li>In a child scenario, a coloured dot next to the label marks a value changed in this scenario. Click the dot to inherit the parent's value again.</li>
 <li>The red <b>Undefined</b> box lists what the object still needs to enter the calculation.</li>
 <li>An <b>i</b> in a circle, next to a field or to the title of a section, holds a note: rest the mouse on it, or reach it with <kbd>Tab</kbd>, to read it.</li>
@@ -309,7 +310,7 @@ PumpIt.i18n.add('en', {
 <li><b>Change the type of a junction</b>: in the panel, change [[t:inspector.junction.type]]. Name, elevation, position and the compatible data — such as the per-pipe losses and the loss model of valves — are kept.</li>
 <li><b>Reverse a pipe</b>: the [[t:inspector.pipe.reverse]] button in the panel, the [[t:app.menu.edit]] → [[t:app.menu.reverse]] menu or a right click on the pipe.</li>
 <li><b>Copy and paste</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copies the selected junctions, the ends of the selected pipes and the pipes between them, with the values of the current scenario; <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes a shifted copy, and each new paste shifts a little further.</li>
-<li><b>Delete</b>: <kbd>Del</kbd>. Deleting a junction also deletes the pipes connected to it. To keep them, use [[t:network.menu.disconnectPipes]] first (see [[go:draw.connect|Disconnecting and reconnecting pipes]]).</li>
+<li><b>Delete</b>: <kbd>Del</kbd>. Deleting a junction also deletes the pipes connected to it. To keep them, use [[t:network.menu.disconnectPipes]] first (see [[go:draw.connect|Disconnecting and reconnecting pipes]]). Deleting changes the network of every scenario; to take a pipe out of one scenario only, use [[t:network.menu.closePipe]] in its right-click menu.</li>
 <li><b>Undo and redo</b>: <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
 </ul>
 <p class="tip"><b>Tip:</b> the shortcuts do nothing while you type in a field. So <kbd>Del</kbd> erases text, not objects.</p>`,
@@ -728,9 +729,9 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li>[[t:results.tabs.valves]]: by default state, flow, ΔP0, inlet static pressure, effective Cv and K.</li>
 <li>[[t:results.tabs.warnings]]: the full list of warnings.</li>
 </ul>
-<p>Click a row, or a warning, to find the object on the drawing. Every numeric column picks its own unit in the header.</p>
+<p>Click a row, or a warning, to find the object on the drawing: when it is out of sight, the drawing moves across just enough to show it, at the same zoom (in 3D the camera keeps its angle). The object in the first column is a button too, which Tab reaches and Enter uses, and that column stays at the left edge while a wide table scrolls across. Every numeric column picks its own unit in the header.</p>
 <h4>Choosing the columns</h4>
-<p>The button with three columns at the head of each table opens the window [[t:results.setup.title]]. On the left, under [[t:results.setup.available]], are the outputs the table can still show, in groups (pressures, losses, grade lines, NPSH…) and with a filter. On the right, under [[t:results.setup.shown]], are the columns of the table, in order, each with its unit.</p>
+<p>The button [[t:results.columnsButton]] at the head of each table opens the window [[t:results.setup.title]]. On the left, under [[t:results.setup.available]], are the outputs the table can still show, in groups (pressures, losses, grade lines, NPSH…) and with a filter. On the right, under [[t:results.setup.shown]], are the columns of the table, in order, each with its unit.</p>
 <ul>
 <li>Click to select one or more outputs; [[t:results.setup.add]] and [[t:results.setup.remove]] move the selected ones across, and a double click moves one. The arrows move the selected columns up or down. The first column, which finds the object, always stays.</li>
 <li>Liquids and gases have columns of their own: switch between [[t:results.setup.liquid]] and [[t:results.setup.gas]]; a dot marks the fluid of the open model.</li>
@@ -891,7 +892,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
           },
           language: {
             title: 'Language and numbers',
-            body: `<p>The selector at the top right switches the whole interface between <b>Português</b>, <b>English</b> and <b>Español</b>, without reloading the page: menus, panels, tables, charts, warnings and this help. The choice is remembered, and on the first visit the app follows the browser's language.</p>
+            body: `<p>The language selector, in the [[t:app.menu.options]] menu, switches the whole interface between <b>Português</b>, <b>English</b> and <b>Español</b>, without reloading the page: menus, panels, tables, charts, warnings and this help. The choice is remembered, and on the first visit the app follows the browser's language.</p>
 <ul>
 <li>Numbers follow the language (decimal comma or point); when typing, both work.</li>
 <li>The names you type — title, objects, scenarios — are never translated.</li>
@@ -906,7 +907,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <tr><td><kbd>V</kbd> · <kbd>P</kbd></td><td>[[t:network.palette.select]] and [[t:network.palette.pipe]] tools</td></tr>
 <tr><td><kbd>1</kbd> · <kbd>2</kbd></td><td>[[t:network.view3.mode.2d]] and [[t:network.view3.mode.3d]] views</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Lets go of the pipe being drawn, then leaves the tool</td></tr>
-<tr><td><kbd>Del</kbd></td><td>Deletes the selection</td></tr>
+<tr><td><kbd>Del</kbd></td><td>Deletes the selection from the network, in every scenario</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Undo · redo</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> · <kbd>Ctrl</kbd>+<kbd>V</kbd> · <kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Copy · paste · select all</td></tr>
 <tr><td><kbd>Home</kbd> · <kbd>+</kbd> · <kbd>−</kbd></td><td>Fit · zoom in · zoom out</td></tr>

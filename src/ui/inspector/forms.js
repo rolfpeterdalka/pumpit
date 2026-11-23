@@ -78,13 +78,49 @@
     const id = idOf(objKey, path);
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
     inp.value = F.inputStr(v.value);
-    const us = el('select', { class: 'unit', 'aria-label': t('inspector.fields.unitOf', { label }), id: id + '-u', disabled: opts.disabled }, unitOptions(cat, v.unit));
+    // the input unit: changing it keeps the number (15 m becomes 15 mm), as its note says when it gets the focus
+    const us = el('select', {
+      class: 'unit has-tip', 'aria-label': t('inspector.fields.unitOf', { label }), 'aria-describedby': unitTip(),
+      id: id + '-u', disabled: opts.disabled,
+    }, unitOptions(cat, v.unit));
     inp.addEventListener('change', () => {
       const n = F.parseNum(inp.value);
       app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value });
     });
-    us.addEventListener('change', () => app.setVal(objKey, path, { value: v.value, unit: us.value }));
-    return wrap(objKey, path, label, inp, Object.assign({ after: us }, opts));
+    // the number in the field, which a click on the selector may have just confirmed
+    us.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
+    return wrap(objKey, path, label, inp, Object.assign({}, opts, { after: unitCtl(objKey, path, label, cat, inp, us, opts.disabled) }));
+  }
+
+  // the unit selector of a quantity and, beside it, the button that converts the value to another unit (a command of
+  // its own: src/ui/inspector/value-convert.js); a number typed and not yet confirmed is confirmed first, as leaving
+  // the field would
+  function unitCtl(objKey, path, label, cat, inp, us, disabled) {
+    const cv = el('button', {
+      type: 'button', class: 'conv-btn', id: us.id.replace(/-u$/, '-c'), disabled,
+      title: t('inspector.fields.convert'), 'aria-label': t('inspector.fields.convertOf', { label }),
+    }, CONVERT_ICON);
+    cv.addEventListener('click', () => {
+      const q = app.getVal(objKey, path), n = F.parseNum(inp.value);
+      const stored = q && Number.isFinite(q.value) ? q.value : NaN;
+      if (!(n === stored || (Number.isNaN(n) && Number.isNaN(stored)))) inp.dispatchEvent(new Event('change'));
+      UI.valueConvert.open(objKey, path, label, cat, cv);
+    });
+    const span = el('span', { class: 'unit-ctl' });
+    span.append(us, cv);
+    return span;
+  }
+
+  // the note of every input unit selector: one hidden text in the page, kept in the current language
+  const CONVERT_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function unitTip() {
+    const id = 'tip-input-unit';
+    if (!document.getElementById(id)) {
+      const s = el('span', { id, class: 'info-text', hidden: true, 'data-i18n': 'inspector.fields.unitTip' });
+      s.textContent = t('inspector.fields.unitTip');
+      document.body.appendChild(s);
+    }
+    return id;
   }
 
   // plain number
@@ -123,7 +159,7 @@
     const g = el('div', { class: 'seg', role: 'radiogroup', id, 'aria-label': label });
     for (const [val, lab] of options) {
       const on = String(val) === String(v);
-      const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: on ? 'on' : null, 'data-v': val }, F.esc(lab));
+      const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: on ? 'on' : null, 'data-v': val, id: (id + '-' + val).replace(/[^a-zA-Z0-9_-]/g, '_') }, F.esc(lab));
       b.addEventListener('click', () => { if (!on) app.setVal(objKey, path, val); });
       g.appendChild(b);
     }
@@ -157,5 +193,5 @@
   // a line of text that stays in sight: a state (an isolated pipe, the fitted curve) or an error; notes go in info()
   function hint(t) { return el('p', { class: 'hint' }, t); }
 
-  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, idOf, wrap };
+  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, unitCtl, unitTip, idOf, wrap };
 })(typeof window !== 'undefined' ? window : globalThis);

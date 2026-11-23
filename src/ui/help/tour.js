@@ -12,17 +12,21 @@
 
   // areas of the screen, by name (the help's [[show:area]] links use them too)
   const AREAS = {
-    menus: '.menus', title: '#model-title', stamp: '#regime-stamp', scenario: '.scenario', status: '.run', language: '.lang', theme: '#theme-toggle', tabs: '.tabs',
+    menus: '.menus', title: '#model-title', stamp: '#regime-stamp', scenario: '.scenario', status: '.run', language: '.menu-lang', theme: '#theme-toggle', tabs: '.tabs',
     palette: '.palette', paletteToggle: '#palette-toggle', canvas: '#canvas-wrap', views: '#view-hud', overlay: '.overlay-pick', zoom: '.zoom',
     inspector: '#inspector', panel: '#panel-toggle', statusLine: '#status-line', help: '#btn-menu-help',
   };
   // the steps of the tour, in order (texts: help.tour.steps.<area>.title / .body)
   const STEPS = ['menus', 'title', 'stamp', 'scenario', 'status', 'language', 'theme', 'tabs', 'palette', 'canvas', 'views', 'overlay', 'zoom', 'inspector', 'panel', 'help'];
   const IN_NETWORK = new Set(['palette', 'paletteToggle', 'canvas', 'views', 'overlay', 'zoom', 'inspector', 'panel']);
+  const IN_MENU = new Set(['language', 'theme']);
 
   // an area of the network view on the screen: that view, and the palette or the properties panel open when it is the
   // one shown
   function reveal(area) {
+    // the language and the light or dark mode are items of the Options menu: it opens for them, and closes again after
+    if (IN_MENU.has(area)) { UI.menus.open('options'); return; }
+    if (!document.getElementById('menu-options').hidden) app.hideMenus();
     if (!IN_NETWORK.has(area)) return;
     if (app.view !== 'net') app.setView('net');
     if (area === 'palette') UI.palette.setCollapsed(false);
@@ -65,6 +69,7 @@
     document.body.appendChild(layer);
     tour = { layer, dims, hole, card, at: from };
     card.addEventListener('click', (e) => {
+      e.stopPropagation(); // a click on the card does not close the Options menu its steps open (menus.js)
       const b = e.target.closest('[data-tour]');
       if (b) step(b.dataset.tour);
     });
@@ -148,6 +153,7 @@
 
   function end() {
     if (!tour) return;
+    app.hideMenus(); // the Options menu, opened for a step
     tour.layer.remove();
     tour = null;
     window.removeEventListener('keydown', onKey, true);

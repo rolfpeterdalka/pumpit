@@ -23,9 +23,10 @@
     const th = cols.map((c) => `<th class="${c.t ? 'txt' : ''}">${F.esc(C.colLabel(table, c))}${c.c ? C.unitSelect(table, c) : ''}</th>`).join('');
     const body = rows.map((r) => `<tr data-key="${r.key}">${cols.map((c) => {
       const txt = C.cellValue(c, r, ctx, table);
+      if (c.t === 'id') return `<td class="txt">${F.objId(txt)}</td>`; // the object: a button that finds it on the drawing
       return `<td class="${c.t ? 'txt' : 'num'}${txt === '—' ? ' na' : ''}">${F.esc(txt)}</td>`;
     }).join('')}</tr>`).join('');
-    return `<div class="table-scroll"><table class="grid" data-table="${table}"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="table-scroll"><table class="grid objects" data-table="${table}"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
 
   function render(container, tabsEl, subEl) {
@@ -46,7 +47,9 @@
     const scn = app.scenario();
     if (!res) {
       subEl.textContent = tx('subNoResults', { name: scn.name });
-      container.innerHTML = `<div class="card"><div class="empty">${tx('noResults')}</div></div>`;
+      // a model not yet complete: the same checklist as at the top, opened on its first entry
+      const pending = !app.validation().ok ? `<p><button type="button" class="btn small" data-pending>${F.esc(tx('viewPending'))}</button></p>` : '';
+      container.innerHTML = `<div class="card"><div class="empty">${tx('noResults')}${pending}</div></div>`;
       return;
     }
     if (!res.ok) {
@@ -63,7 +66,7 @@
     else {
       const title = tx('tabs.' + tab);
       const pick = F.esc(tx('setup.open'));
-      const cols = `<button class="btn small icon cols-open" data-columns="${tab}" type="button" title="${pick}" aria-label="${pick}">${COLUMNS_ICON}</button>`;
+      const cols = `<button class="btn small cols-open" data-columns="${tab}" type="button" title="${pick}">${COLUMNS_ICON}<span>${F.esc(tx('columnsButton'))}</span></button>`;
       const xl = `<button class="btn small primary" data-xlsx type="button" title="${F.esc(tx('exportExcelTitle'))}">${tx('exportExcel')}</button>`;
       container.innerHTML = `<div class="card"><div class="card-head"><h3>${title}</h3><div class="btn-row">${cols}${xl}<button class="btn small" data-copy="${tab}" type="button">${tab === 'pipes' ? tx('copyExcel') : tx('copyTable')}</button></div></div>${resultTable(tab, res, eff)}</div>`;
     }
@@ -107,9 +110,9 @@
     if (bnd.length) {
       const fcat = gas ? 'massFlow' : 'volFlow', fkey = gas ? 'm' : 'net';
       const flowOf = (net) => U.fromSI(gas ? net : net / fl.rho, app.outUnit('bnd.' + fkey, fcat), fcat);
-      html += `<div class="card"><div class="card-head"><h3>${tx('boundaries.title')}</h3><span class="muted small">${tx('boundaries.hint')}</span></div><div class="table-scroll"><table class="grid"><thead><tr><th class="txt">${tx('boundaries.junction')}</th><th class="txt">${tx('boundaries.type')}</th><th>${tx(gas ? 'boundaries.netMass' : 'boundaries.netFlow')}${C.unitSelect('bnd', { k: fkey, c: fcat }, tx('boundaries.flowUnit'))}</th><th>${tx('boundaries.stagnation')}${C.unitSelect('bnd', { k: 'P0', c: 'pressure' }, tx('boundaries.pressureUnit'))}</th></tr></thead><tbody>${bnd.map(({ j, r }) => {
+      html += `<div class="card"><div class="card-head"><h3>${tx('boundaries.title')}</h3><span class="muted small">${tx('boundaries.hint')}</span></div><div class="table-scroll"><table class="grid objects"><thead><tr><th class="txt">${tx('boundaries.junction')}</th><th class="txt">${tx('boundaries.type')}</th><th>${tx(gas ? 'boundaries.netMass' : 'boundaries.netFlow')}${C.unitSelect('bnd', { k: fkey, c: fcat }, tx('boundaries.flowUnit'))}</th><th>${tx('boundaries.stagnation')}${C.unitSelect('bnd', { k: 'P0', c: 'pressure' }, tx('boundaries.pressureUnit'))}</th></tr></thead><tbody>${bnd.map(({ j, r }) => {
         const net = views.get(j.type).boundaryFlow(r);
-        return `<tr data-key="j:${j.id}"><td class="txt">J${j.id} ${F.esc(j.name)}</td><td class="txt">${M.JT[j.type].label}</td><td class="num">${F.fmt(flowOf(net), 5)}</td><td class="num">${F.fmt(F.conv(r.P0in, 'pressure', app.outUnit('bnd.P0', 'pressure'), ctx), 5)}</td></tr>`;
+        return `<tr data-key="j:${j.id}"><td class="txt">${F.objId(`J${j.id} ${j.name || ''}`.trim())}</td><td class="txt">${M.JT[j.type].label}</td><td class="num">${F.fmt(flowOf(net), 5)}</td><td class="num">${F.fmt(F.conv(r.P0in, 'pressure', app.outUnit('bnd.P0', 'pressure'), ctx), 5)}</td></tr>`;
       }).join('')}</tbody></table></div></div>`;
     }
     html += warningsCard(res);
@@ -126,6 +129,7 @@
     });
     // table buttons, and a click on a row (or warning) selects its object
     $('#view-out').addEventListener('click', (e) => {
+      if (e.target.closest('[data-pending]')) { e.stopPropagation(); UI.checklist.open({ focus: true }); return; }
       const w = e.target.closest('[data-columns]');
       if (w) { UI.columnWindow.open(w.dataset.columns, C.regimeOf(app.currentResults())); return; }
       const x = e.target.closest('[data-xlsx]');

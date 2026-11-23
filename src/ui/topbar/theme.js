@@ -29,6 +29,8 @@
     b.dataset.mode = dark ? 'dark' : 'light';
     b.title = label;
     b.setAttribute('aria-label', label);
+    const text = b.querySelector('.theme-text'); // the button is an item of the Options menu
+    if (text) text.textContent = label;
   }
 
   function toggle() {

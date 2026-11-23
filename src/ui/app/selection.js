@@ -33,14 +33,15 @@
   };
 
   // selects an object and shows it on the network view, with the properties panel open (from tables, warnings and the
-  // checklist)
+  // checklist); the drawing moves only when the object is out of sight (canvas.js)
   app.gotoKey = (key) => {
-    if (!key) return;
+    if (!key || !M.getObj(app.model, key)) return;
     app.selSet = new Set([key]);
     app.sel = hitOf(key);
     app.setView('net');
     UI.inspector.setCollapsed(false);
     UI.inspector.render();
+    UI.canvas.show(app.sel);
   };
 
   app.keyOf = keyOf;

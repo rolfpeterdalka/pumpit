@@ -4,6 +4,17 @@
 .insp-head h3 { margin: 0; font: 600 17px/1.2 var(--f-display); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; text-wrap: balance; }
 .insp-head h3 .id { font: 500 13px var(--f-mono); color: var(--accent); }
 .insp-head .meta { font-size: 12px; color: var(--ink-3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* the two tabs of a pipe or a junction (inspector.js), at the foot of its header: their line is the header's own */
+.insp-tabs { display: flex; gap: 2px; margin: 2px -16px -10px; padding: 0 10px; }
+.insp-tab {
+  border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 6px 10px 6px; cursor: pointer;
+  color: var(--ink-2); font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.insp-tab:hover { color: var(--ink); }
+.insp-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.insp-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.insp-pane[hidden] { display: none; }
+.insp-pane:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .insp-sec { padding: 10px 16px 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
 .insp-sec > h4 { margin: 2px 0 2px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; display: flex; align-items: center; gap: 5px; }
 .field { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr); gap: 8px; align-items: center; }
@@ -23,6 +34,23 @@
 .field .ctl > input.txt { font-family: var(--f-ui); }
 .field .ctl > select { flex: 1 1 auto; width: 100%; }
 .field .ctl > select.unit { flex: 0 0 auto; width: auto; max-width: 96px; }
+/* the input unit and the button that converts the value (forms.unitCtl) */
+.field .ctl > .unit-ctl { display: flex; flex: 0 0 auto; gap: 2px; min-width: 0; }
+.field .ctl > .unit-ctl > select.unit { width: auto; max-width: 92px; }
+.conv-btn {
+  display: inline-grid; place-items: center; flex: none; width: 22px; padding: 0; border: 1px solid transparent;
+  border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer;
+}
+.conv-btn:hover, .conv-btn:focus-visible { color: var(--accent); border-color: var(--line); background: var(--sunk); }
+.conv-btn:disabled { opacity: .35; cursor: default; }
+.conv-btn svg { display: block; }
+/* the window of Convert value (value-convert.js) */
+.conv { display: grid; gap: 8px; min-width: min(320px, 80vw); }
+.conv .conv-field { margin: 0; }
+.conv-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px; align-items: center; }
+.conv-row > span, .conv-row > label { color: var(--ink-2); font-size: 13px; }
+.conv-row > b { font-weight: 500; }
+.conv .conv-why { margin: 0; color: var(--warn, var(--ink-2)); }
 .field .ctl > input[type="text"] { min-width: 64px; }
 .field .ctl > span { white-space: nowrap; }
 .field.check { grid-template-columns: auto 1fr; justify-content: start; }
@@ -32,7 +60,11 @@
 .field.wide .seg button { flex: 1 1 0; min-width: 0; padding: 5px 8px; }
 .field .sr-label { font-size: 0; gap: 0; }
 .field .sr-label:not(:has(.ov-dot)) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.field.overridden .ctl > input, .field.overridden .ctl > select { background: var(--override); }
+/* a field the checklist asks for (pending.js) */
+.field.invalid .ctl > input, .field.invalid .ctl > select { border-color: var(--crit); }
+.field.invalid > label, .field.invalid > .lab > label { color: var(--crit); }
+.missing:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.field.overridden .ctl > input, .field.overridden .ctl > select, .field.overridden .ctl > .unit-ctl > select { background: var(--override); }
 .ov-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sel); border: 0; padding: 0; cursor: pointer; flex: none; }
 .readout { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-2); }
 .readout b { font-family: var(--f-mono); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }

@@ -49,11 +49,11 @@ PumpIt.i18n.add('es', {
         },
         language: {
           title: 'Idioma',
-          body: 'Cambia toda la interfaz entre portugués, inglés y español, al instante. Los nombres que usted escribió no se traducen.',
+          body: 'En el menú [[t:app.menu.options]]: cambia toda la interfaz entre portugués, inglés y español, al instante. Los nombres que usted escribió no se traducen.',
         },
         theme: {
           title: 'Modo claro u oscuro',
-          body: 'El sol y la luna alternan la pantalla entre el modo claro y el oscuro. Sin una elección, la aplicación sigue el modo del sistema; la elección se guarda en este navegador.',
+          body: 'En el menú [[t:app.menu.options]], el elemento con el sol o la luna alterna la pantalla entre el modo claro y el oscuro. Sin una elección, la aplicación sigue el modo del sistema; la elección se guarda en este navegador.',
         },
         tabs: {
           title: 'Pestañas',
@@ -81,7 +81,7 @@ PumpIt.i18n.add('es', {
         },
         inspector: {
           title: 'Propiedades',
-          body: 'Muestra y edita el objeto seleccionado: se abre cuando selecciona algo y se contrae cuando no hay nada seleccionado. Abierto por su flecha sin nada seleccionado, resume el sistema y trae el botón que abre la ventana de las propiedades del sistema. Lo que le falta a un objeto aparece en un recuadro rojo; la <b>i</b> junto a un campo muestra una nota sobre él cuando el ratón pasa por encima.',
+          body: 'Muestra y edita el objeto seleccionado: se abre cuando selecciona algo y se contrae cuando no hay nada seleccionado. Una tubería o una unión tiene dos pestañas, [[t:inspector.tabs.props]] y [[t:inspector.tabs.results]]. Abierto por su flecha sin nada seleccionado, resume el sistema y trae el botón que abre la ventana de las propiedades del sistema. Lo que le falta a un objeto aparece en un recuadro rojo; la <b>i</b> junto a un campo muestra una nota sobre él cuando el ratón pasa por encima.',
         },
         panel: {
           title: 'Contraer el panel',
@@ -179,7 +179,7 @@ PumpIt.i18n.add('es', {
             title: 'Visión general',
             body: `<p>La pantalla tiene cinco áreas. Haga clic en los botones para ver cada una resaltada:</p>
 <ol>
-<li>[[show:menus|Barra superior]]: menús, título del modelo, escenarios, estado del cálculo, idioma y modo claro u oscuro.</li>
+<li>[[show:menus|Barra superior]]: menús (el idioma y el modo claro u oscuro están en [[t:app.menu.options]]), título del modelo, escenarios y estado del cálculo.</li>
 <li>[[show:tabs|Pestañas]]: [[t:app.tabs.net]], [[t:app.tabs.data]], [[t:app.tabs.out]] y [[t:app.tabs.charts]].</li>
 <li>[[show:palette|Paleta]], a la izquierda: las herramientas y los tipos de unión.</li>
 <li>[[show:canvas|Área de dibujo]], en el centro: la red, las vistas, los resultados en el dibujo y el zoom.</li>
@@ -216,14 +216,15 @@ PumpIt.i18n.add('es', {
             body: `<p>El panel de la derecha cambia según la selección:</p>
 <ul>
 <li><b>Nada seleccionado</b>: el panel se contrae. Abierto por su flecha, muestra un resumen del sistema y el botón [[t:inspector.system.open]], que abre la ventana [[t:inspector.system.title]] — régimen, fluido, ambiente, control de la solución y el escenario actual. Vea [[go:system.fluid|Sistema y solución]].</li>
-<li><b>Una tubería</b>: resultados rápidos, nombre, geometría, fricción, accesorios y condición especial.</li>
-<li><b>Una unión</b>: resultados rápidos, nombre, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] y los datos propios del tipo.</li>
+<li><b>Una tubería</b>: nombre, geometría, fricción, accesorios y condición especial.</li>
+<li><b>Una unión</b>: nombre, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] y los datos propios del tipo.</li>
 <li><b>Varios objetos</b>: el recuento y las acciones de copiar, pegar y eliminar.</li>
 </ul>
+<p>Una tubería o una unión muestra dos pestañas bajo su título: [[t:inspector.tabs.props]], con los campos de arriba, las curvas y lo que aún le falta al objeto, y [[t:inspector.tabs.results]], con los valores principales del último cálculo (caudal, presiones, la altura de una bomba). Un objeto recién seleccionado se abre en [[t:inspector.tabs.props]]; mientras siga seleccionado, la pestaña elegida se mantiene en cada nuevo cálculo. Las flechas del teclado pasan de una pestaña a otra.</p>
 <h4>Campos</h4>
 <ul>
 <li>Escriba el valor y confirme con <kbd>Enter</kbd> o saliendo del campo. La coma o el punto sirven como separador decimal.</li>
-<li>Junto a cada magnitud hay una lista de unidades. <b>Cambiar la unidad no convierte el número</b>: el valor pasa a leerse en la nueva unidad. Elija primero la unidad y escriba el valor en ella.</li>
+<li>Junto a cada magnitud hay una lista de unidades. <b>Cambiar la unidad no convierte el número</b>: el valor pasa a leerse en la nueva unidad. Elija primero la unidad y escriba el valor en ella. Para convertir un valor ya escrito, use el botón de dos flechas junto a la unidad ([[t:inspector.fields.convert]]).</li>
 <li>En un escenario hijo, un punto de color junto a la etiqueta indica un valor cambiado en este escenario. Haga clic en el punto para volver a heredar el valor del padre.</li>
 <li>El recuadro rojo <b>Indefinido</b> lista lo que le falta al objeto para entrar en el cálculo.</li>
 <li>Una <b>i</b> en un círculo, junto a un campo o al título de una sección, guarda una nota: pase el ratón sobre ella, o llegue a ella con <kbd>Tab</kbd>, para leerla.</li>
@@ -309,7 +310,7 @@ PumpIt.i18n.add('es', {
 <li><b>Cambiar el tipo de una unión</b>: en el panel, cambie [[t:inspector.junction.type]]. El nombre, la cota, la posición y los datos compatibles — como las pérdidas por tubería y el modelo de pérdida de las válvulas — se conservan.</li>
 <li><b>Invertir el sentido de una tubería</b>: el botón [[t:inspector.pipe.reverse]] del panel, el menú [[t:app.menu.edit]] → [[t:app.menu.reverse]] o el clic derecho sobre la tubería.</li>
 <li><b>Copiar y pegar</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copia las uniones seleccionadas, los extremos de las tuberías seleccionadas y las tuberías entre ellas, con los valores del escenario actual; <kbd>Ctrl</kbd>+<kbd>V</kbd> pega una copia desplazada, y cada pegado nuevo desplaza un poco más.</li>
-<li><b>Eliminar</b>: <kbd>Supr</kbd>. Eliminar una unión elimina también las tuberías unidas a ella. Para conservarlas, use antes [[t:network.menu.disconnectPipes]] (vea [[go:draw.connect|Desconectar y reconectar tuberías]]).</li>
+<li><b>Eliminar</b>: <kbd>Supr</kbd>. Eliminar una unión elimina también las tuberías unidas a ella. Para conservarlas, use antes [[t:network.menu.disconnectPipes]] (vea [[go:draw.connect|Desconectar y reconectar tuberías]]). Eliminar cambia la red de todos los escenarios; para quitar una tubería de un solo escenario, use [[t:network.menu.closePipe]] en su menú del clic derecho.</li>
 <li><b>Deshacer y rehacer</b>: <kbd>Ctrl</kbd>+<kbd>Z</kbd> y <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
 </ul>
 <p class="tip"><b>Consejo:</b> los atajos no actúan mientras usted escribe en un campo. Así, <kbd>Supr</kbd> borra texto, no objetos.</p>`,
@@ -728,9 +729,9 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <li>[[t:results.tabs.valves]]: por defecto, estado, caudal, ΔP0, presión estática a la entrada, Cv y K efectivos.</li>
 <li>[[t:results.tabs.warnings]]: la lista completa de avisos.</li>
 </ul>
-<p>Haga clic en una fila, o en un aviso, para ubicar el objeto en el dibujo. Cada columna numérica elige su propia unidad en el encabezado.</p>
+<p>Haga clic en una fila, o en un aviso, para ubicar el objeto en el dibujo: cuando está fuera de la pantalla, el dibujo se desplaza solo lo necesario para mostrarlo, con el mismo zoom (en 3D la cámara mantiene el ángulo). El objeto de la primera columna también es un botón, que Tab alcanza y Enter acciona, y esa columna queda fija a la izquierda cuando una tabla ancha se desplaza hacia el lado. Cada columna numérica elige su propia unidad en el encabezado.</p>
 <h4>Elegir las columnas</h4>
-<p>El botón con tres columnas, arriba de cada tabla, abre la ventana [[t:results.setup.title]]. A la izquierda, en [[t:results.setup.available]], están las salidas que la tabla todavía puede mostrar, en grupos (presiones, pérdidas, líneas de carga, NPSH…) y con un filtro. A la derecha, en [[t:results.setup.shown]], están las columnas de la tabla, en orden, cada una con su unidad.</p>
+<p>El botón [[t:results.columnsButton]], arriba de cada tabla, abre la ventana [[t:results.setup.title]]. A la izquierda, en [[t:results.setup.available]], están las salidas que la tabla todavía puede mostrar, en grupos (presiones, pérdidas, líneas de carga, NPSH…) y con un filtro. A la derecha, en [[t:results.setup.shown]], están las columnas de la tabla, en orden, cada una con su unidad.</p>
 <ul>
 <li>Haga clic para seleccionar una o más salidas; [[t:results.setup.add]] y [[t:results.setup.remove]] pasan las seleccionadas al otro lado, y un doble clic pasa una sola. Las flechas suben o bajan las columnas seleccionadas. La primera columna, que ubica el objeto, queda siempre.</li>
 <li>Los líquidos y los gases tienen columnas propias: alterne entre [[t:results.setup.liquid]] y [[t:results.setup.gas]]; un punto marca el fluido del modelo abierto.</li>
@@ -891,7 +892,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
           },
           language: {
             title: 'Idioma y números',
-            body: `<p>El selector de la esquina superior derecha cambia toda la interfaz entre <b>Português</b>, <b>English</b> y <b>Español</b>, sin recargar la página: menús, paneles, tablas, gráficos, avisos y esta ayuda. La elección queda guardada, y en la primera visita la aplicación sigue el idioma del navegador.</p>
+            body: `<p>El selector de idioma, en el menú [[t:app.menu.options]], cambia toda la interfaz entre <b>Português</b>, <b>English</b> y <b>Español</b>, sin recargar la página: menús, paneles, tablas, gráficos, avisos y esta ayuda. La elección queda guardada, y en la primera visita la aplicación sigue el idioma del navegador.</p>
 <ul>
 <li>Los números siguen el idioma (coma o punto decimal); al escribir, los dos sirven.</li>
 <li>Los nombres que usted escribe — título, objetos, escenarios — nunca se traducen.</li>
@@ -906,7 +907,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <tr><td><kbd>V</kbd> · <kbd>P</kbd></td><td>Herramientas [[t:network.palette.select]] y [[t:network.palette.pipe]]</td></tr>
 <tr><td><kbd>1</kbd> · <kbd>2</kbd></td><td>Vistas [[t:network.view3.mode.2d]] y [[t:network.view3.mode.3d]]</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Suelta la tubería en curso y luego sale de la herramienta</td></tr>
-<tr><td><kbd>Supr</kbd></td><td>Elimina la selección</td></tr>
+<tr><td><kbd>Supr</kbd></td><td>Elimina la selección de la red, en todos los escenarios</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Deshacer · rehacer</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> · <kbd>Ctrl</kbd>+<kbd>V</kbd> · <kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Copiar · pegar · seleccionar todo</td></tr>
 <tr><td><kbd>Inicio</kbd> · <kbd>+</kbd> · <kbd>−</kbd></td><td>Encuadrar · acercar · alejar</td></tr>

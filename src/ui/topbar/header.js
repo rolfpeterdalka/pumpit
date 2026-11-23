@@ -33,7 +33,7 @@
     // checklist and calculation state
     const v = app.validation();
     const r = app.currentResults();
-    const bad = v.items.filter((i) => !i.ok).length;
+    const bad = UI.checklist.count(v);
     let cls = 'bad', txt = t('app.status.pending', { n: bad });
     if (v.ok && r && r.ok && r.converged) { cls = 'ok'; txt = t('app.status.calculated'); }
     else if (v.ok && r && r.ok) { cls = 'warn'; txt = t('app.status.notConverged'); }

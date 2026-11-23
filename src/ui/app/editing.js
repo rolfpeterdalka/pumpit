@@ -98,12 +98,20 @@
     M.removeObjectOverrides(app.model, 'p:' + pid);
   }
 
+  // What deleting the selection removes from the network, in every scenario (the topology is shared): the selected
+  // junctions and pipes, plus the pipes connected to those junctions; `extra` counts the pipes that were not selected.
+  app.deletionOf = () => {
+    const jIds = new Set([...app.selSet].filter((k) => k[0] === 'j').map((k) => Number(k.slice(2))));
+    const pIds = new Set([...app.selSet].filter((k) => k[0] === 'p').map((k) => Number(k.slice(2))));
+    const chosen = pIds.size;
+    for (const p of app.model.pipes) if (jIds.has(p.up) || jIds.has(p.down)) pIds.add(p.id);
+    return { jIds, pIds, extra: pIds.size - chosen };
+  };
+
   app.deleteSelection = () => {
     if (!app.selSet.size) return;
     app.pushUndo();
-    const jIds = new Set([...app.selSet].filter((k) => k[0] === 'j').map((k) => Number(k.slice(2))));
-    const pIds = new Set([...app.selSet].filter((k) => k[0] === 'p').map((k) => Number(k.slice(2))));
-    for (const p of app.model.pipes) if (jIds.has(p.up) || jIds.has(p.down)) pIds.add(p.id);
+    const { jIds, pIds } = app.deletionOf();
     app.model.pipes = app.model.pipes.filter((p) => !pIds.has(p.id));
     pIds.forEach(dropPipeRefs);
     app.model.junctions = app.model.junctions.filter((j) => !jIds.has(j.id));

@@ -4,7 +4,7 @@ Conceived by **Rolf Peter Dalka**. Free software under the GNU Affero General Pu
 
 Web simulator of pipe networks for liquids (incompressible flow) and gases (compressible flow), in steady state or over time (a sequence of steady states: tanks that fill and empty, pumps that start and stop, demands that follow a profile). The user draws the network (pipes and junctions) and fills in the properties. The calculation runs again automatically after every change. Results appear in tables, charts, a data card per object (right click) and on the drawing itself.
 
-The product uses no trademarks, names, icons, texts or screens of any commercial software. The interface is available in Portuguese, English and Spanish (selector at the top right), in a light and a dark mode (the sun and moon button next to it); the code and its documentation are in English.
+The product uses no trademarks, names, icons, texts or screens of any commercial software. The interface is available in Portuguese, English and Spanish (selector in the Options menu), in a light and a dark mode (the sun and moon button next to it); the code and its documentation are in English.
 
 ## How to use
 
@@ -113,7 +113,7 @@ Pump It can follow the pressure waves of a liquid network after a fast change: a
 
 ## Languages
 
-The selector at the top right switches the whole interface between **Português**, **English** and **Español** at once: menus, panels, tables, charts, warnings and the checklist, without reloading the page. The choice is remembered by the browser; on the first visit the app follows the browser's language (English when it is none of the three).
+The language selector, in the Options menu, switches the whole interface between **Português**, **English** and **Español** at once: menus, panels, tables, charts, warnings and the checklist, without reloading the page. The choice is remembered by the browser; on the first visit the app follows the browser's language (English when it is none of the three).
 
 - Numbers follow the language: decimal comma in Portuguese and Spanish, decimal point in English. Typed numbers are accepted with either separator.
 - Unit symbols stay the same, except water column, shown as mH₂O in English.
@@ -251,7 +251,7 @@ Reference: the clean-room specification (`Clean Room.md`), sections 0 to 8.
 | Files | Save and open `.json`; import `.fth` and `.aro` models (one scenario at a time, with a report); open a file dropped on the window; copy and paste the model; export the results to `.xlsx` (a sheet per table); export and import the profile of result columns; automatic saving in the browser |
 | Languages | Portuguese, English and Spanish, switched live; numbers in the format of the language |
 | Properties | Inspector on the right for the selection, open while something is selected and collapsed otherwise (the arrow on its edge also collapses it or brings it back); the system properties in a window of their own; the notes of the fields behind an *i* that shows them on hover |
-| Appearance | Light and dark mode, switched by the sun and moon button at the top right and remembered by the browser; without a choice, the mode of the system |
+| Appearance | Light and dark mode, switched in the Options menu and remembered by the browser; without a choice, the mode of the system |
 
 Removed on request: area change, bend, dead end and the design factors. Older models are converted when opened: a bend or an area change becomes a generic component with a K, a dead end becomes a zero imposed flow. Bend and check-valve losses are still available as pipe fittings (Crane). The check valve was removed too, and came back with the time simulation, whose specification asks for it.
 

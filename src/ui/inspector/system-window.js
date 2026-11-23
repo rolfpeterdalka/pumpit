@@ -49,8 +49,8 @@
   function render() {
     if (!isOpen()) return;
     const { back, body } = box;
-    const focusId = document.activeElement && body.contains(document.activeElement) ? document.activeElement.id : null;
-    const scroll = body.scrollTop;
+    if (UI.focusKeep.defer(body, render)) return; // a field left for another control: drawn again after the click
+    const kept = UI.focusKeep.save(body);
     back.querySelector('#sys-title').textContent = tx('title');
     back.querySelector('#sys-meta').innerHTML = UI.systemForm.meta();
     const x = back.querySelector('#sys-x');
@@ -60,8 +60,7 @@
     back.querySelector('#sys-done').textContent = t('app.dialog.close');
     body.innerHTML = '';
     UI.systemForm.build(body);
-    body.scrollTop = scroll;
-    if (focusId) { const f = document.getElementById(focusId); if (f) f.focus({ preventScroll: true }); }
+    UI.focusKeep.restore(kept);
   }
 
   function open() {

@@ -167,8 +167,8 @@
   function table(title, cols, rows, hint) {
     if (!rows.length) return '';
     const th = `<th class="txt">${F.esc(tx('object'))}</th>` + cols.map(([label, k, cat]) => `<th>${cat ? head(label, k, cat) : F.esc(label)}</th>`).join('');
-    const body = rows.map((r) => `<tr data-key="${r.key}"><td class="txt">${F.esc(objName(r.key))}</td>${r.cells.map((c) => `<td class="num">${c}</td>`).join('')}</tr>`).join('');
-    return `<div class="card"><div class="card-head"><h3>${F.esc(title)}</h3>${hint ? `<span class="muted small">${F.esc(hint)}</span>` : ''}</div><div class="table-scroll"><table class="grid"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+    const body = rows.map((r) => `<tr data-key="${r.key}"><td class="txt">${F.objId(objName(r.key))}</td>${r.cells.map((c) => `<td class="num">${c}</td>`).join('')}</tr>`).join('');
+    return `<div class="card"><div class="card-head"><h3>${F.esc(title)}</h3>${hint ? `<span class="muted small">${F.esc(hint)}</span>` : ''}</div><div class="table-scroll"><table class="grid objects"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div></div>`;
   }
   // an extreme: its value and the time it came
   const at = (x, cat, k, ctx) => (x ? `${val(x.v, cat, k, ctx)}` : '—');

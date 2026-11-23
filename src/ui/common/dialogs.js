@@ -13,8 +13,22 @@
     toast.h = setTimeout(() => { box.hidden = true; }, 3800);
   }
 
-  // actions: [{ label, primary, onClick }]; onClick returning false keeps the box open
-  function modal({ title, body, actions }) {
+  // The box keeps the focus while it is open: what is behind it (the page, and a window it was opened over) takes no
+  // focus and no clicks, and Tab and Shift+Tab go round its visible and enabled controls. It opens on its first field,
+  // or on its main action, and gives the focus back, when it closes, to the control that opened it (the same control
+  // drawn again, found by its id), inside the window it was opened over.
+  let opener = null, openerId = null;
+  let inerted = []; // the elements the box made inert (those already inert, behind a window, stay as they were)
+
+  // actions: [{ label, primary, onClick }]; onClick returning false keeps the box open. opener: the control that opens
+  // the box, when it is not the one with the focus
+  function modal({ title, body, actions, opener: from }) {
+    if (PumpIt.ui.tips) PumpIt.ui.tips.hide(); // a note left open by the field behind would cover the box
+    if (!isModalOpen()) {
+      const o = from || document.activeElement;
+      opener = o && o !== document.body ? o : null;
+      openerId = opener && opener.id ? opener.id : null;
+    }
     $('#modal-title').textContent = title;
     const b = $('#modal-body');
     b.innerHTML = '';
@@ -29,12 +43,45 @@
       btn.addEventListener('click', () => { if (act.onClick && act.onClick() === false) return; closeModal(); });
       a.appendChild(btn);
     }
+    if (isModalOpen()) { focusFirst(); return; }
     $('#modal').hidden = false;
-    const first = b.querySelector('input, textarea') || a.querySelector('.primary');
-    if (first) setTimeout(() => first.focus(), 0);
+    // everything else in the app, the windows included, keeps still behind the box
+    const box = $('#modal');
+    inerted = [...box.parentElement.children].filter((e) => e !== box && e.id !== 'toast' && !e.inert).map((e) => { e.inert = true; return e; });
+    focusFirst();
   }
-  function closeModal() { $('#modal').hidden = true; }
+  // the first field of the box, or else its main action (or its first control that can take the focus)
+  function focusFirst() {
+    const box = $('#modal .modal');
+    const reach = PumpIt.ui.focusKeep.tabbables(box);
+    const first = reach.find((e) => e.matches('input, textarea, select')) || reach.find((e) => e.matches('.primary')) || reach[0];
+    if (first) first.focus(); else box.focus();
+  }
+  function closeModal() {
+    if (!isModalOpen()) return;
+    $('#modal').hidden = true;
+    inerted.forEach((e) => { e.inert = false; });
+    inerted = [];
+    // the control that opened the box, or its new copy; a menu item, hidden again, gives the focus to its menu
+    let to = opener && opener.isConnected ? opener : openerId ? document.getElementById(openerId) : null;
+    opener = null; openerId = null;
+    if (to && !PumpIt.ui.focusKeep.tabbables(to.parentElement || document).includes(to)) {
+      const menu = to.closest('.menu');
+      to = menu ? menu.querySelector('[data-menu]') : null;
+    }
+    if (to) to.focus({ preventScroll: true });
+  }
   const isModalOpen = () => !$('#modal').hidden;
+  // Tab and Shift+Tab go round the controls of the box
+  function trap(e) {
+    if (e.key !== 'Tab' || !isModalOpen()) return;
+    const reach = PumpIt.ui.focusKeep.tabbables($('#modal .modal'));
+    e.preventDefault();
+    if (!reach.length) return;
+    const i = reach.indexOf(document.activeElement);
+    const next = e.shiftKey ? reach[i <= 0 ? reach.length - 1 : i - 1] : reach[i < 0 || i === reach.length - 1 ? 0 : i + 1];
+    next.focus();
+  }
 
   function askText(title, label, initial, onOk) {
     const wrap = document.createElement('div');
@@ -61,6 +108,8 @@
   // clicking the dimmed background closes the box
   function bind() {
     $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+    $('#modal').addEventListener('keydown', trap);
+    $('#modal .modal').tabIndex = -1; // a box with nothing to focus takes the focus itself
   }
 
   PumpIt.ui.dialogs = { toast, modal, closeModal, isModalOpen, askText, confirmBox, copyText, bind };

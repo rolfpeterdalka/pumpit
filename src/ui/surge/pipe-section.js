@@ -21,10 +21,10 @@
     const id = UI.forms.idOf(key, path);
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', placeholder: opts.placeholder || null });
     inp.value = F.inputStr(val.value);
-    const us = el('select', { class: 'unit', 'aria-label': t('inspector.fields.unitOf', { label }), id: id + '-u' }, UI.forms.unitOptions(cat, val.unit || unit0));
+    const us = el('select', { class: 'unit has-tip', 'aria-label': t('inspector.fields.unitOf', { label }), 'aria-describedby': UI.forms.unitTip(), id: id + '-u' }, UI.forms.unitOptions(cat, val.unit || unit0));
     inp.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(key, path, Number.isFinite(n) ? { value: n, unit: us.value } : null); });
-    us.addEventListener('change', () => app.setVal(key, path, { value: Number.isFinite(val.value) ? val.value : null, unit: us.value }));
-    return UI.forms.wrap(key, path, label, inp, Object.assign({}, opts, { after: us }));
+    us.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(key, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
+    return UI.forms.wrap(key, path, label, inp, Object.assign({}, opts, { after: UI.forms.unitCtl(key, path, label, cat, inp, us) }));
   }
   // a choice whose stored value may be missing (the default of the data of the pipe)
   function choice(key, path, label, options, value, opts = {}) {

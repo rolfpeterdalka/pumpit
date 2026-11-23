@@ -57,10 +57,10 @@
     area = { w: r.width, h: r.height, panel };
     if (was && was.panel !== panel && was.w && r.width && was.h === r.height) {
       if (in3d()) UI.nav3d.keepPlace(was.w, r.width);
-      reveal(was.w, r.width);
-      return;
-    }
-    if (in3d() || !autoFit) render(); else fitSchematic();
+      // an object chosen in a table comes into sight below, with the final size of the area
+      if (shown) render(); else reveal(was.w, r.width);
+    } else if (in3d() || !autoFit) render(); else fitSchematic();
+    if (shown) { const hit = shown; shown = null; bringIntoSight(hit); }
   }
 
   // The selected object, when the panel that just opened covers it and it was in sight before, comes back into sight:
@@ -84,6 +84,72 @@
     }
     const p = m.pipes.find((q) => q.id === hit.id), a = p && at(p, 'up'), b = p && at(p, 'down');
     return a && b ? view.tx + ((a.x + b.x) / 2) * view.s : null;
+  }
+
+  // ---------- an object chosen elsewhere: a table, a warning, the checklist (app.gotoKey) ----------
+  // It comes into sight when it is outside the useful part of the drawing area: the view moves across, as little as
+  // needed for its symbol and its labels, at the same zoom (in 3D also the same orientation and projection). An object
+  // already in sight leaves the view where it is; framing the whole network stays the command of its own.
+  let shown = null; // the object waiting for the drawing area to take its final size (resized), when it is about to change
+  function show(hit) {
+    if (!svg || !hit) return;
+    const r = wrap.getBoundingClientRect();
+    if (area && r.width > 0 && Math.abs(r.width - area.w) < 0.5 && Math.abs(r.height - area.h) < 0.5) bringIntoSight(hit);
+    else shown = hit;
+  }
+  function bringIntoSight(hit) {
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const room = usefulArea(r);
+    if (in3d()) { UI.nav3d.bringIntoSight(hit, room); return; }
+    render(); // the labels of the selection, at the current view
+    const box = schematicBox(hit, r);
+    const d = box && shiftInto(box, room);
+    if (!d || (!d.dx && !d.dy)) return;
+    view.tx += d.dx; view.ty += d.dy;
+    autoFit = false;
+    render();
+  }
+  // The part of the drawing area (px from its top left) that no control covers: below the view switch and the view
+  // cube, above the results on the drawing, the zoom and the legend, inside the arrows of the palette and the panel.
+  const ROOM_GAP = 10;
+  function usefulArea(r) {
+    const room = { x0: 0, y0: 0, x1: r.width, y1: r.height };
+    for (const el of wrap.querySelectorAll('#view-hud, #view-cube, .canvas-tools > *, #legend, #palette-toggle, #panel-toggle')) {
+      if (el.hidden || !el.offsetParent) continue;
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      if (el.id === 'palette-toggle') room.x0 = Math.max(room.x0, b.right - r.left);
+      else if (el.id === 'panel-toggle') room.x1 = Math.min(room.x1, b.left - r.left);
+      else if (b.bottom - r.top < r.height / 2) room.y0 = Math.max(room.y0, b.bottom - r.top);
+      else room.y1 = Math.min(room.y1, b.top - r.top);
+    }
+    return { x0: room.x0 + ROOM_GAP, y0: room.y0 + ROOM_GAP, x1: room.x1 - ROOM_GAP, y1: room.y1 - ROOM_GAP };
+  }
+  // The shift (px) that brings a box into the room: none when it is there already; centred on an axis where it does not
+  // fit. Boxes and room in the same frame ({ x0, y0, x1, y1 }).
+  function shiftInto(box, room) {
+    const axis = (a0, a1, r0, r1) => {
+      if (a1 - a0 > r1 - r0) return (r0 + r1) / 2 - (a0 + a1) / 2;
+      if (a0 < r0) return r0 - a0;
+      if (a1 > r1) return r1 - a1;
+      return 0;
+    };
+    return { dx: axis(box.x0, box.x1, room.x0, room.x1), dy: axis(box.y0, box.y1, room.y0, room.y1) };
+  }
+  // the box (px from the top left of the drawing area) of a junction with its labels, or of the middle of a pipe: its
+  // arrow and its labels
+  function schematicBox(hit, r) {
+    const els = hit.kind === 'junction' ? svg.querySelectorAll(`g.junction[data-j="${hit.id}"]`)
+      : svg.querySelectorAll(`g.pipe[data-p="${hit.id}"] text, g.pipe[data-p="${hit.id}"] .p-arrow`);
+    let box = null;
+    for (const el of els) {
+      const b = el.getBoundingClientRect();
+      if (!b.width && !b.height) continue;
+      const q = { x0: b.left - r.left, y0: b.top - r.top, x1: b.right - r.left, y1: b.bottom - r.top };
+      box = box ? { x0: Math.min(box.x0, q.x0), y0: Math.min(box.y0, q.y0), x1: Math.max(box.x1, q.x1), y1: Math.max(box.y1, q.y1) } : q;
+    }
+    return box;
   }
 
   // floating tools over the drawing: results overlay and zoom
@@ -350,5 +416,5 @@
     else UI.drawing.render(svg, view, state);
   }
 
-  PumpIt.ui.canvas = { init, render, fit, fitSchematic, zoomBy, setTool, cancel, get tool() { return state.tool; }, view, GRID };
+  PumpIt.ui.canvas = { init, render, fit, fitSchematic, zoomBy, setTool, cancel, show, shiftInto, get tool() { return state.tool; }, view, GRID };
 })(typeof window !== 'undefined' ? window : globalThis);

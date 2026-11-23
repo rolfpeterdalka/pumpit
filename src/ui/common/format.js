@@ -57,8 +57,13 @@
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // The identifier of an object in a table (P1, J2 and its name): a button, reached with Tab, that finds the object on
+  // the drawing as a click on its row does (the row carries data-key). Tables of objects have the class "objects": their
+  // first column stays at the left edge while the table scrolls across (documents.css).
+  const objId = (text) => `<button type="button" class="obj-id" title="${esc(i18n.t('app.showObjectTitle'))}">${esc(text)}</button>`;
+
   // <option> of a select; the value attribute is only needed when the text differs from it
   const option = (value, text, selected) => `<option${String(value) !== String(text) ? ` value="${esc(value)}"` : ''}${selected ? ' selected' : ''}>${esc(text)}</option>`;
 
-  PumpIt.ui.format = { fmt, fixed, inputStr, parseNum, unit, option, locale, decimalSep, DEFAULT_OUT, conv, esc };
+  PumpIt.ui.format = { fmt, fixed, inputStr, parseNum, unit, option, locale, decimalSep, DEFAULT_OUT, conv, objId, esc };
 })(typeof window !== 'undefined' ? window : globalThis);

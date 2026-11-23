@@ -301,12 +301,12 @@
         const nT = E().TABLES[d.start] || 1, nE = E().EVENTS[d.start] || 0;
         const when = d.start === 'combined' ? d.combined || '—' : (d.when || []).slice(0, nE).map((c) => conditionText(c, eff)).join(' · ');
         const pts = (d.tables || []).slice(0, nT).map((tb) => (tb && tb.t ? tb.t.length : 0)).join(' · ');
-        return `<tr data-key="j:${j.id}"><td class="txt num">J${j.id}</td><td class="txt">${F.esc(j.name)}</td><td class="txt">${F.esc(M.JT[j.type].label)}</td><td class="txt">${d.use ? '✓' : '—'}</td>
+        return `<tr data-key="j:${j.id}"><td class="txt num">${F.objId('J' + j.id)}</td><td class="txt">${F.esc(j.name)}</td><td class="txt">${F.esc(M.JT[j.type].label)}</td><td class="txt">${d.use ? '✓' : '—'}</td>
           <td class="txt">${F.esc(tx('whats.' + d.what))}</td><td class="txt">${F.esc(tx('bases.' + d.basis))}</td><td class="txt">${F.esc(tx('starts.' + d.start))}${when ? ': ' + F.esc(when) : ''}</td>
           <td class="num">${F.esc(pts)}</td><td class="txt">${d.repeat ? '✓' : '—'}</td><td class="txt">${F.esc(tx('interps.' + d.interp))}</td></tr>`;
       }).join('');
       const th = ['junction', 'name', 'type', 'use', 'what', 'basis', 'start', 'points', 'repeat', 'interp'].map((k) => `<th class="${k === 'points' ? '' : 'txt'}">${F.esc(t('time.modelData.col.' + k))}</th>`).join('');
-      html += `<div class="card"><div class="card-head"><h3>${F.esc(tx('title'))}${off}</h3></div><div class="table-scroll"><table class="grid"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      html += `<div class="card"><div class="card-head"><h3>${F.esc(tx('title'))}${off}</h3></div><div class="table-scroll"><table class="grid objects"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }
     if (tanks.length) {
       const rows = tanks.map((j) => {
@@ -315,15 +315,15 @@
           : cyl ? `${t('time.tank.shapes.horizontalCylinder')} ${q(tk.diameter)} × ${q(tk.length)}` : q(tk.area);
         // a level unknown at the start: a dash
         const level = PumpIt.time.tanks.knownOf(tk).level ? q(j.liquidElev) : '—';
-        return `<tr data-key="j:${j.id}"><td class="txt num">J${j.id}</td><td class="txt">${F.esc(j.name)}</td><td class="txt">${F.esc(t('time.tank.models.' + tk.model))}</td><td class="num">${F.esc(q(tk.bottom))}</td><td class="num">${F.esc(q(cyl ? tk.diameter : tk.height))}</td><td class="txt">${F.esc(sec)}</td><td class="num">${F.esc(level)}</td></tr>`;
+        return `<tr data-key="j:${j.id}"><td class="txt num">${F.objId('J' + j.id)}</td><td class="txt">${F.esc(j.name)}</td><td class="txt">${F.esc(t('time.tank.models.' + tk.model))}</td><td class="num">${F.esc(q(tk.bottom))}</td><td class="num">${F.esc(q(cyl ? tk.diameter : tk.height))}</td><td class="txt">${F.esc(sec)}</td><td class="num">${F.esc(level)}</td></tr>`;
       }).join('');
       const th = ['junction', 'name', 'model', 'bottom', 'height', 'section', 'level'].map((k) => `<th class="${['bottom', 'height', 'level'].includes(k) ? '' : 'txt'}">${F.esc(t('time.modelData.col.' + k))}</th>`).join('');
-      html += `<div class="card"><div class="card-head"><h3>${F.esc(t('time.modelData.tanks'))}${off}</h3></div><div class="table-scroll"><table class="grid"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      html += `<div class="card"><div class="card-head"><h3>${F.esc(t('time.modelData.tanks'))}${off}</h3></div><div class="table-scroll"><table class="grid objects"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }
     if (vessels.length) {
-      const rows = vessels.map((j) => `<tr data-key="j:${j.id}"><td class="txt num">J${j.id}</td><td class="txt">${F.esc(j.name)}</td><td class="num">${F.esc(q(j.vessel.volume))}</td><td class="num">${F.esc(q(j.surfP))}</td></tr>`).join('');
+      const rows = vessels.map((j) => `<tr data-key="j:${j.id}"><td class="txt num">${F.objId('J' + j.id)}</td><td class="txt">${F.esc(j.name)}</td><td class="num">${F.esc(q(j.vessel.volume))}</td><td class="num">${F.esc(q(j.surfP))}</td></tr>`).join('');
       const th = [['junction', 'txt'], ['name', 'txt'], ['volume', ''], ['level', '']].map(([k, c]) => `<th class="${c}">${F.esc(k === 'level' ? t('time.vessel.start') : t('time.modelData.col.' + k))}</th>`).join('');
-      html += `<div class="card"><div class="card-head"><h3>${F.esc(t('time.modelData.vessels'))}${off}</h3></div><div class="table-scroll"><table class="grid"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      html += `<div class="card"><div class="card-head"><h3>${F.esc(t('time.modelData.vessels'))}${off}</h3></div><div class="table-scroll"><table class="grid objects"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }
     return html;
   }

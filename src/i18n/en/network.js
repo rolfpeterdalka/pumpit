@@ -78,10 +78,13 @@ PumpIt.i18n.add('en', {
       copy: 'Copy',
       copyMany: 'Copy {n} objects',
       paste: 'Paste',
-      delete: 'Delete',
-      deleteMany: 'Delete {n} objects',
+      delete: 'Delete from the network in every scenario',
+      deletePipesToo: 'also deletes {n} connected pipe(s)',
+      deleteMany: 'Delete {n} objects from the network in every scenario',
       disconnectFrom: 'Disconnect from J{id}',
       disconnectPipes: 'Disconnect pipes',
+      closePipe: 'Close pipe in this scenario',
+      reopenPipe: 'Reopen pipe in this scenario',
     },
     // the ends of pipes (docs/pipe-ends.md)
     ends: {

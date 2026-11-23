@@ -1,5 +1,6 @@
-// Inspector panel of a junction: quick results, identification (name, type, elevation), the type's own form
-// and sections (from its junction view) and, for single-node types, the per-pipe loss table.
+// Inspector panel of a junction, in two tabs (inspector.js): Properties, with what it still lacks, identification
+// (name, type, elevation), the type's own form and sections (from its junction view) and, for single-node types, the
+// per-pipe loss table; Results, with its quick results.
 (function (root) {
   const PumpIt = root.PumpIt;
   const M = PumpIt.model, UI = PumpIt.ui, I = UI.inspector;
@@ -20,8 +21,10 @@
     const v = views.get(j.type);
     const n = M.pipesAt(app.model, id).length;
     I.head(host, def.label, 'J' + id, t('inspector.junction.meta', { n, accepted: def.pipes[0] === def.pipes[1] ? def.pipes[0] : def.pipes[0] + '–' + def.pipes[1] }));
-    I.missingBox(host, key);
-    quickResults(host, id, j);
+    const pane = I.tabs(host);
+    const props = pane.props;
+    I.missingBox(props, key);
+    quickResults(pane.results, id, j);
 
     const s0 = section(t('inspector.identification'));
     s0.appendChild(text(key, 'name', t('inspector.name')));
@@ -31,15 +34,16 @@
     const tc = el('div', { class: 'ctl' }); tc.appendChild(ts); tf.appendChild(tc);
     s0.appendChild(tf);
     s0.appendChild(qty(key, 'elevation', v.elevationLabel || t('inspector.junction.elevation'), 'length', { info: v.elevationInfo }));
-    host.appendChild(s0);
+    props.appendChild(s0);
 
     const s = section(t('inspector.junction.data'));
     const sys = app.eff().system;
     const ctx = { key, j, f: UI.forms, curveEditor: UI.curveEditor.build, gas: M.isCompressible(app.eff()), adiabatic: M.isCompressible(app.eff()) && sys.gasMode === 'adiabatic' };
     if (v.form) v.form(s, ctx);
-    host.appendChild(s);
-    for (const extra of v.sections ? v.sections(ctx) : []) host.appendChild(extra);
-    if (def.multi && j.pipeK !== undefined) host.appendChild(UI.pipeLossesTable.build(key, j));
+    props.appendChild(s);
+    for (const extra of v.sections ? v.sections(ctx) : []) props.appendChild(extra);
+    if (def.multi && j.pipeK !== undefined) props.appendChild(UI.pipeLossesTable.build(key, j));
+    return pane;
   };
 
   function quickResults(host, id, j) {

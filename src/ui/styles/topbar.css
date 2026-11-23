@@ -3,7 +3,11 @@
   display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap;
   padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 8px; color: var(--accent); min-width: 0; }
+/* the brand (logo, model title and stamps) takes up to its own width and gives up room before the bar wraps: the
+   title and the stamp of the regime shrink first */
+.brand { display: flex; align-items: center; gap: 8px; color: var(--accent); min-width: 0; flex: 1 1 440px; max-width: max-content; }
+.brand > * { flex: none; }
+.brand > .title-input, .brand > .stamp { flex: 0 1 auto; min-width: 90px; }
 .brand-name { font: 600 18px/1 var(--f-display); letter-spacing: .01em; color: var(--ink); }
 .title-input {
   border: 1px solid transparent; background: transparent; border-radius: var(--r); padding: 4px 8px;
@@ -22,12 +26,13 @@
 .scenario { display: flex; align-items: center; gap: 6px; }
 .scenario select { max-width: 200px; }
 .run { display: flex; align-items: center; gap: 8px; margin-left: auto; position: relative; }
-.lang { display: flex; align-items: center; gap: 6px; color: var(--ink-3); }
-.lang select { max-width: 130px; }
+/* the language and the light or dark mode, at the top of the Options menu */
+.menu-lang { display: flex; align-items: center; gap: 8px; padding: 2px 10px 4px; color: var(--ink-3); }
+.menu-lang select { flex: 1 1 auto; min-width: 150px; }
 /* light and dark mode: the moon on the light page, the sun on the dark one (theme.js sets data-mode) */
-.theme-toggle { color: var(--ink-2); }
-.theme-toggle:hover { color: var(--ink); }
-.theme-toggle svg { display: block; }
+.theme-toggle { color: var(--ink); gap: 8px; }
+.theme-toggle svg { display: block; flex: none; color: var(--ink-2); }
+.theme-toggle:hover svg { color: var(--ink); }
 .theme-toggle .sun, .theme-toggle[data-mode="dark"] .moon { display: none; }
 .theme-toggle[data-mode="dark"] .sun { display: block; }
 .theme-toggle.turn svg { animation: theme-turn .32s ease-out; }
@@ -83,3 +88,9 @@ select:hover, input[type="text"]:hover, textarea:hover { border-color: var(--ink
 .menu-pop button.check-item { align-items: baseline; padding: 4px 6px; margin: 0 -6px; font: inherit; color: inherit; }
 .check-item .dot { transform: translateY(1px); }
 .check-item small { color: var(--ink-3); display: block; }
+/* the checklist (checklist.js): its height ends above the bottom of the window, and the list of objects scrolls */
+#checklist-pop { overflow: hidden; max-width: min(380px, calc(100vw - 24px)); }
+#checklist-pop .check-items { flex: none; }
+#checklist-pop .undef-list { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 64px; overflow-y: auto; margin: 0 -6px; padding: 0 6px 2px; }
+#checklist-pop .undef-list button { flex: none; flex-direction: column; align-items: flex-start; }
+#checklist-pop button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }

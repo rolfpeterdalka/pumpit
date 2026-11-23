@@ -1,4 +1,4 @@
-// Right click on an object: the data card plus actions (reverse, disconnect, copy, paste, delete).
+// Right click on an object: the data card plus actions (reverse, disconnect, close or reopen a pipe in the scenario, copy, paste, delete).
 (function (root) {
   const PumpIt = root.PumpIt;
   const UI = PumpIt.ui, app = PumpIt.app, M = PumpIt.model;
@@ -18,12 +18,21 @@
     const p = hit.kind === 'pipe' && !many && app.model.pipes.find((x) => x.id === hit.id);
     if (p) for (const end of M.PIPE_ENDS) if (!M.isLoose(p, end)) items.push([t('network.menu.disconnectFrom', { id: p[end] }), () => app.disconnectEnd(hit.id, end)]);
     if (hit.kind === 'junction' && !many && M.pipesAt(app.model, hit.id).length) items.push([t('network.menu.disconnectPipes'), () => app.disconnectJunction(hit.id)]);
+    // closing a pipe is a property of the current scenario (an override in a child), unlike deleting it
+    if (hit.kind === 'pipe' && !many) {
+      const closed = !!(app.effObj('p:' + hit.id) || {}).closed;
+      items.push([t(closed ? 'network.menu.reopenPipe' : 'network.menu.closePipe'), () => app.setVal('p:' + hit.id, 'closed', !closed)]);
+    }
     items.push([many ? t('network.menu.copyMany', { n: app.selSet.size }) : t('network.menu.copy'), () => app.copySelection()]);
     if (app.clipboard) items.push([t('network.menu.paste'), () => app.paste()]);
-    items.push([many ? t('network.menu.deleteMany', { n: app.selSet.size }) : t('network.menu.delete'), () => app.deleteSelection()]);
-    for (const [label, fn] of items) {
+    // deleting changes the network of every scenario, and takes the pipes of the deleted junctions with it
+    const { extra } = app.deletionOf();
+    items.push([many ? t('network.menu.deleteMany', { n: app.selSet.size }) : t('network.menu.delete'), () => app.deleteSelection(),
+      extra ? t('network.menu.deletePipesToo', { n: extra }) : '']);
+    for (const [label, fn, note] of items) {
       const b = document.createElement('button');
       b.type = 'button'; b.textContent = label;
+      if (note) { b.classList.add('with-note'); const s = document.createElement('small'); s.textContent = note; b.appendChild(s); }
       b.addEventListener('click', () => { cm.hidden = true; fn(); });
       acts.appendChild(b);
     }

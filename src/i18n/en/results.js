@@ -221,6 +221,8 @@ PumpIt.i18n.add('en', {
     noItems: 'No items of this kind in the model.',
     subNoResults: 'Scenario {name}: no results.',
     noResults: 'The calculation is automatic. Complete the checklist (top right) to see flows, pressures and warnings.',
+    viewPending: 'View pending items',
+    columnsButton: 'Columns…',
     subRefused: 'Scenario {name}: the calculation was refused.',
     refused: 'The calculation could not be done',
     error: 'Error',

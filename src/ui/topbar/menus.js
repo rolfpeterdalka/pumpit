@@ -12,6 +12,7 @@
   app.hideMenus = () => {
     $$('.menu-pop').forEach((m) => { m.hidden = true; });
     $('#ctxmenu').hidden = true;
+    $('#btn-checklist').setAttribute('aria-expanded', 'false');
   };
 
   // menu items, by their data-act attribute; each receives the item clicked
@@ -71,14 +72,18 @@
     $('#menu-examples').innerHTML = PumpIt.examples.EXAMPLES.map((ex) => `<button type="button" data-ex="${ex.id}">${F.esc(ex.name)}</button>`).join('');
   }
 
+  // opens the menu of that name (the others close), bringing its marks up to date
+  function open(name) {
+    const pop = $('#menu-' + name);
+    app.hideMenus();
+    pop.hidden = false;
+    if (ON_OPEN[name]) ON_OPEN[name](pop);
+  }
+
   function bind() {
     $$('[data-menu]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
-      const pop = $('#menu-' + b.dataset.menu);
-      const was = pop.hidden;
-      app.hideMenus();
-      pop.hidden = !was;
-      if (!pop.hidden && ON_OPEN[b.dataset.menu]) ON_OPEN[b.dataset.menu](pop);
+      if ($('#menu-' + b.dataset.menu).hidden) open(b.dataset.menu); else app.hideMenus();
     }));
     $$('.menu-pop [data-act]').forEach((b) => b.addEventListener('click', () => { app.hideMenus(); ACTIONS[b.dataset.act](b); }));
     renderExamples();
@@ -94,5 +99,5 @@
     });
   }
 
-  PumpIt.ui.menus = { ACTIONS, ON_OPEN, bind, renderExamples, openExample };
+  PumpIt.ui.menus = { ACTIONS, ON_OPEN, bind, open, renderExamples, openExample };
 })(window);

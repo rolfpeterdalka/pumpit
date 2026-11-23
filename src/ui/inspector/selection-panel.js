@@ -18,6 +18,13 @@
     if (app.clipboard) mk(t('inspector.selection.paste'), () => app.paste());
     mk(t('inspector.selection.delete'), () => app.deleteSelection());
     s.appendChild(row);
+    // what Del reaches: every scenario, when there are several, and the pipes of the selected junctions
+    const { extra } = app.deletionOf();
+    const nScn = app.model.scenarios.list.length;
+    const scope = [];
+    if (nScn > 1) scope.push(t('inspector.selection.scopeScenarios', { n: nScn }));
+    if (extra) scope.push(t('inspector.selection.scopePipes', { n: extra }));
+    if (scope.length) s.appendChild(el('p', { class: 'hint' }, F.esc(scope.join(' '))));
     host.appendChild(s);
     const list = section(t('inspector.selection.selected'));
     list.appendChild(el('p', { class: 'hint' }, keys.map((k) => (k[0] === 'p' ? 'P' : 'J') + k.slice(2)).join(', ')));

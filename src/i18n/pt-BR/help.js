@@ -49,11 +49,11 @@ PumpIt.i18n.add('pt-BR', {
         },
         language: {
           title: 'Idioma',
-          body: 'Troca toda a interface entre português, inglês e espanhol, na hora. Os nomes que você digitou não são traduzidos.',
+          body: 'No menu [[t:app.menu.options]]: troca toda a interface entre português, inglês e espanhol, na hora. Os nomes que você digitou não são traduzidos.',
         },
         theme: {
           title: 'Modo claro ou escuro',
-          body: 'O sol e a lua alternam a tela entre o modo claro e o escuro. Sem uma escolha, o app segue o modo do sistema; a escolha fica guardada neste navegador.',
+          body: 'No menu [[t:app.menu.options]], o item com o sol ou a lua alterna a tela entre o modo claro e o escuro. Sem uma escolha, o app segue o modo do sistema; a escolha fica guardada neste navegador.',
         },
         tabs: {
           title: 'Abas',
@@ -81,7 +81,7 @@ PumpIt.i18n.add('pt-BR', {
         },
         inspector: {
           title: 'Propriedades',
-          body: 'Mostra e edita o objeto selecionado: abre quando você seleciona algo e se recolhe quando nada está selecionado. Aberto pela setinha com nada selecionado, resume o sistema e traz o botão que abre a janela das propriedades do sistema. O que falta para definir um objeto aparece numa caixa vermelha; o <b>i</b> ao lado de um campo mostra uma nota sobre ele quando o mouse passa por cima.',
+          body: 'Mostra e edita o objeto selecionado: abre quando você seleciona algo e se recolhe quando nada está selecionado. Um tubo ou uma junção tem duas abas, [[t:inspector.tabs.props]] e [[t:inspector.tabs.results]]. Aberto pela setinha com nada selecionado, resume o sistema e traz o botão que abre a janela das propriedades do sistema. O que falta para definir um objeto aparece numa caixa vermelha; o <b>i</b> ao lado de um campo mostra uma nota sobre ele quando o mouse passa por cima.',
         },
         panel: {
           title: 'Recolher o painel',
@@ -179,7 +179,7 @@ PumpIt.i18n.add('pt-BR', {
             title: 'Visão geral',
             body: `<p>A tela tem cinco áreas. Clique nos botões para ver cada uma destacada:</p>
 <ol>
-<li>[[show:menus|Barra superior]]: menus, título do modelo, cenários, situação do cálculo, idioma e modo claro ou escuro.</li>
+<li>[[show:menus|Barra superior]]: menus (o idioma e o modo claro ou escuro ficam em [[t:app.menu.options]]), título do modelo, cenários e situação do cálculo.</li>
 <li>[[show:tabs|Abas]]: [[t:app.tabs.net]], [[t:app.tabs.data]], [[t:app.tabs.out]] e [[t:app.tabs.charts]].</li>
 <li>[[show:palette|Paleta]], à esquerda: as ferramentas e os tipos de junção.</li>
 <li>[[show:canvas|Área de desenho]], no centro: a rede, as vistas, os resultados no desenho e o zoom.</li>
@@ -216,14 +216,15 @@ PumpIt.i18n.add('pt-BR', {
             body: `<p>O painel à direita muda conforme a seleção:</p>
 <ul>
 <li><b>Nada selecionado</b>: o painel se recolhe. Aberto pela setinha, mostra um resumo do sistema e o botão [[t:inspector.system.open]], que abre a janela [[t:inspector.system.title]] — regime, fluido, ambiente, controle da solução e o cenário atual. Veja [[go:system.fluid|Sistema e solução]].</li>
-<li><b>Um tubo</b>: resultados rápidos, nome, geometria, atrito, acessórios e condição especial.</li>
-<li><b>Uma junção</b>: resultados rápidos, nome, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] e os dados próprios do tipo.</li>
+<li><b>Um tubo</b>: nome, geometria, atrito, acessórios e condição especial.</li>
+<li><b>Uma junção</b>: nome, [[t:inspector.junction.type]], [[t:inspector.junction.elevation]] e os dados próprios do tipo.</li>
 <li><b>Vários objetos</b>: a contagem e as ações de copiar, colar e excluir.</li>
 </ul>
+<p>Um tubo ou uma junção mostra duas abas sob o título: [[t:inspector.tabs.props]], com os campos acima, as curvas e o que ainda falta ao objeto, e [[t:inspector.tabs.results]], com os principais valores do último cálculo (vazão, pressões, a altura de uma bomba). Um objeto recém-selecionado abre em [[t:inspector.tabs.props]]; enquanto ele continua selecionado, a aba escolhida se mantém a cada novo cálculo. As setas do teclado passam de uma aba à outra.</p>
 <h4>Campos</h4>
 <ul>
 <li>Digite o valor e confirme com <kbd>Enter</kbd> ou saindo do campo. Vírgula ou ponto servem como separador decimal.</li>
-<li>Ao lado de cada grandeza há uma lista de unidades. <b>Trocar a unidade não converte o número</b>: o valor passa a ser lido na nova unidade. Escolha a unidade primeiro e digite o valor nela.</li>
+<li>Ao lado de cada grandeza há uma lista de unidades. <b>Trocar a unidade não converte o número</b>: o valor passa a ser lido na nova unidade. Escolha a unidade primeiro e digite o valor nela. Para converter um valor já digitado, use o botão de duas setas ao lado da unidade ([[t:inspector.fields.convert]]).</li>
 <li>Num cenário filho, um ponto colorido ao lado do rótulo indica um valor alterado neste cenário. Clique no ponto para voltar a herdar o valor do pai.</li>
 <li>A caixa vermelha <b>Indefinido</b> lista o que falta para o objeto entrar no cálculo.</li>
 <li>Um <b>i</b> num círculo, ao lado de um campo ou do título de uma seção, guarda uma nota: passe o mouse sobre ele, ou chegue nele com <kbd>Tab</kbd>, para ler.</li>
@@ -309,7 +310,7 @@ PumpIt.i18n.add('pt-BR', {
 <li><b>Trocar o tipo de uma junção</b>: no painel, mude [[t:inspector.junction.type]]. Nome, cota, posição e os dados compatíveis — como as perdas por tubo e o modelo de perda das válvulas — são mantidos.</li>
 <li><b>Inverter o sentido de um tubo</b>: o botão [[t:inspector.pipe.reverse]] no painel, o menu [[t:app.menu.edit]] → [[t:app.menu.reverse]] ou o clique direito no tubo.</li>
 <li><b>Copiar e colar</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copia as junções selecionadas, as pontas dos tubos selecionados e os tubos entre elas, com os valores do cenário atual; <kbd>Ctrl</kbd>+<kbd>V</kbd> cola uma cópia deslocada, e cada nova colagem desloca um pouco mais.</li>
-<li><b>Excluir</b>: <kbd>Del</kbd>. Excluir uma junção exclui também os tubos ligados a ela. Para mantê-los, use antes [[t:network.menu.disconnectPipes]] (veja [[go:draw.connect|Desconectar e reconectar tubos]]).</li>
+<li><b>Excluir</b>: <kbd>Del</kbd>. Excluir uma junção exclui também os tubos ligados a ela. Para mantê-los, use antes [[t:network.menu.disconnectPipes]] (veja [[go:draw.connect|Desconectar e reconectar tubos]]). A exclusão muda a rede de todos os cenários; para tirar um tubo de um só cenário, use [[t:network.menu.closePipe]] no menu do botão direito.</li>
 <li><b>Desfazer e refazer</b>: <kbd>Ctrl</kbd>+<kbd>Z</kbd> e <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
 </ul>
 <p class="tip"><b>Dica:</b> os atalhos não agem enquanto você digita num campo. Assim, <kbd>Del</kbd> apaga texto, e não objetos.</p>`,
@@ -728,9 +729,9 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>[[t:results.tabs.valves]]: por padrão, estado, vazão, ΔP0, pressão estática na entrada, Cv e K efetivos.</li>
 <li>[[t:results.tabs.warnings]]: a lista completa de avisos.</li>
 </ul>
-<p>Clique numa linha, ou num aviso, para localizar o objeto no desenho. Cada coluna numérica escolhe a própria unidade no cabeçalho.</p>
+<p>Clique numa linha, ou num aviso, para localizar o objeto no desenho: quando ele está fora da tela, o desenho se desloca só o necessário para mostrá-lo, no mesmo zoom (em 3D a câmera mantém o ângulo). O objeto na primeira coluna também é um botão, que o Tab alcança e o Enter aciona, e essa coluna fica presa à esquerda quando uma tabela larga rola para o lado. Cada coluna numérica escolhe a própria unidade no cabeçalho.</p>
 <h4>Escolher as colunas</h4>
-<p>O botão com três colunas, no alto de cada tabela, abre a janela [[t:results.setup.title]]. À esquerda, em [[t:results.setup.available]], ficam as saídas que a tabela ainda pode mostrar, em grupos (pressões, perdas, linhas de carga, NPSH…) e com um filtro. À direita, em [[t:results.setup.shown]], ficam as colunas da tabela, em ordem, cada uma com a sua unidade.</p>
+<p>O botão [[t:results.columnsButton]], no alto de cada tabela, abre a janela [[t:results.setup.title]]. À esquerda, em [[t:results.setup.available]], ficam as saídas que a tabela ainda pode mostrar, em grupos (pressões, perdas, linhas de carga, NPSH…) e com um filtro. À direita, em [[t:results.setup.shown]], ficam as colunas da tabela, em ordem, cada uma com a sua unidade.</p>
 <ul>
 <li>Clique para selecionar uma ou mais saídas; [[t:results.setup.add]] e [[t:results.setup.remove]] passam as selecionadas para o outro lado, e um clique duplo passa uma só. As setas sobem ou descem as colunas selecionadas. A primeira coluna, que localiza o objeto, fica sempre.</li>
 <li>Líquidos e gases têm colunas próprias: alterne entre [[t:results.setup.liquid]] e [[t:results.setup.gas]]; um ponto marca o fluido do modelo aberto.</li>
@@ -891,7 +892,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
           },
           language: {
             title: 'Idioma e números',
-            body: `<p>O seletor no canto superior direito troca a interface inteira entre <b>Português</b>, <b>English</b> e <b>Español</b>, sem recarregar a página: menus, painéis, tabelas, gráficos, avisos e esta ajuda. A escolha fica guardada, e na primeira visita o app segue o idioma do navegador.</p>
+            body: `<p>O seletor de idioma, no menu [[t:app.menu.options]], troca a interface inteira entre <b>Português</b>, <b>English</b> e <b>Español</b>, sem recarregar a página: menus, painéis, tabelas, gráficos, avisos e esta ajuda. A escolha fica guardada, e na primeira visita o app segue o idioma do navegador.</p>
 <ul>
 <li>Os números seguem o idioma (vírgula ou ponto decimal); ao digitar, os dois servem.</li>
 <li>Os nomes digitados por você — título, objetos, cenários — nunca são traduzidos.</li>
@@ -906,7 +907,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <tr><td><kbd>V</kbd> · <kbd>P</kbd></td><td>Ferramentas [[t:network.palette.select]] e [[t:network.palette.pipe]]</td></tr>
 <tr><td><kbd>1</kbd> · <kbd>2</kbd></td><td>Vistas [[t:network.view3.mode.2d]] e [[t:network.view3.mode.3d]]</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Solta o tubo em andamento e depois sai da ferramenta</td></tr>
-<tr><td><kbd>Del</kbd></td><td>Exclui a seleção</td></tr>
+<tr><td><kbd>Del</kbd></td><td>Exclui a seleção da rede, em todos os cenários</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfaz · refaz</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> · <kbd>Ctrl</kbd>+<kbd>V</kbd> · <kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Copia · cola · seleciona tudo</td></tr>
 <tr><td><kbd>Home</kbd> · <kbd>+</kbd> · <kbd>−</kbd></td><td>Enquadra · aproxima · afasta</td></tr>

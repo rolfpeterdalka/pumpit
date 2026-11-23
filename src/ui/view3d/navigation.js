@@ -192,6 +192,32 @@
     glide(V.pan(cam, vp, (-d * k) / s.k, 0));
   }
 
+  // An object chosen in a table (canvas.js, show): the camera moves across, as little as needed for the symbol and its
+  // labels to come inside room ({ x0, y0, x1, y1 }, px from the top left of the drawing area), at the depth of the
+  // object; the zoom, the orientation and the projection stay. Behind the camera, it is centred, at the same distance.
+  function bringIntoSight(hit, room) {
+    const cam = base(), vp = viewport(), p = S3.anchorOf(hit);
+    if (!p) return;
+    const s = V.project(cam, vp, p);
+    if (!s) { glide({ ...cam, target: p }); return; }
+    const d = UI.canvas.shiftInto(boxOf(hit, s), room);
+    if (!d.dx && !d.dy) { redraw(false); return; }
+    const k = cam.projection === 'ortho' ? cam.scale : V.focalPx(cam, vp) / cam.distance;
+    glide(V.pan(cam, vp, (d.dx * k) / s.k, (d.dy * k) / s.k));
+  }
+  // the box of an object on the screen around its point s, as render.js draws it: a junction symbol with its number
+  // and name under it (and a result over it), or the middle of a pipe with its labels; text about 6.4 px per character
+  function boxOf(hit, s) {
+    const key = (hit.kind === 'pipe' ? 'p:' : 'j:') + hit.id, o = app.effObj(key) || {};
+    const text = Math.max(String(hit.id).length + 1, (o.name || '').length) * 6.4 / 2;
+    if (hit.kind === 'pipe') {
+      const w = Math.max(24, text);
+      return { x0: s.x - w, x1: s.x + w, y0: s.y - (o.name ? 34 : 22), y1: s.y + 22 };
+    }
+    const half = Math.max(16, (UI.render3d.symbolRadius(s.k) * 16) / 11), w = Math.max(half, text);
+    return { x0: s.x - w, x1: s.x + w, y0: s.y - half - 18, y1: s.y + half + (o.name ? 28 : 16) };
+  }
+
   // double click on an object: the camera turns around it (unless the editor takes it: a bend inserted in the selected
   // pipe of the free 3D view)
   function dblclick(hit, e) {
@@ -253,7 +279,7 @@
 
   PumpIt.ui.nav3d = {
     down, move, up, wheel, zoomBy, fit, dblclick, lookFrom, cubeStep, setProjection, turn, spinStart, spinMove, spinEnd, key, redraw, drawn,
-    keepPlace, screenX, reveal,
+    keepPlace, screenX, reveal, bringIntoSight,
     consumedContext: () => movedLast,
   };
 })(window);

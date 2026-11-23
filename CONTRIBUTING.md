@@ -27,7 +27,7 @@ If you changed the calculation core, also run the validation against the referen
 node tests/validate-fth.js "<folder with .fth files>"
 ```
 
-There is no build: open `index.html` and check the screens you changed, in each language (selector at the top right).
+There is no build: open `index.html` and check the screens you changed, in each language (selector in the Options menu).
 
 ## Clean-room rules
 

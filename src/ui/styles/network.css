@@ -1,6 +1,6 @@
 /* Network view: palette, drawing area, floating tools, legends and the symbols on the drawing. */
 .view-net {
-  --palette-w: 88px; --inspector-w: 340px; display: grid;
+  --palette-w: 152px; --inspector-w: 340px; display: grid;
   grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--inspector-w); grid-template-areas: 'palette drawing inspector';
 }
 .view-net > .palette { grid-area: palette; }
@@ -29,16 +29,29 @@
   padding: 6px calc(6px - var(--bar, 0px)) 12px calc(6px + var(--bar, 0px));
   display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin;
 }
-/* the junction types are tools of the palette like the two above them, as wide as its column */
+/* the junction types are tools of the palette like the two above them, as wide as its column, in their groups */
 #palette-junctions { display: contents; }
+.palette-items { display: flex; flex-direction: column; gap: 2px; }
 .palette-sep { height: 1px; background: var(--line); margin: 6px 4px; }
-/* group titles must fit the narrow column in every language; a very long word wraps instead of overflowing */
-.palette-group { font-size: 9px; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-3); padding: 8px 0 2px; text-align: center; overflow-wrap: anywhere; }
-.tool {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid transparent; background: transparent;
-  border-radius: 6px; padding: 6px 2px 5px; cursor: pointer; color: var(--ink-2); font-size: 10.5px; line-height: 1.15; text-align: center;
+/* the title of a group: a button that opens and closes it (palette.js); it must fit the column in every language, and
+   a very long word wraps instead of overflowing */
+.palette-group {
+  display: flex; align-items: center; gap: 4px; width: 100%; border: 0; border-radius: 5px; background: transparent; cursor: pointer;
+  font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); padding: 8px 4px 3px; text-align: left; overflow-wrap: anywhere;
 }
-.tool svg { color: var(--ink); }
+.palette-group:hover { color: var(--ink); background: var(--sunk); }
+.palette-group:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.palette-group .chev { flex: none; transition: transform .12s; }
+.palette-group[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+/* a closed group shows only its tool in use, and its title says so */
+.palette-items.shut .tool:not(.active) { display: none; }
+.palette-group:has(+ .palette-items.shut .tool.active) { color: var(--accent); }
+/* a tool: its icon beside its name, which wraps when long */
+.tool {
+  display: flex; flex-direction: row; align-items: center; gap: 8px; border: 1px solid transparent; background: transparent;
+  border-radius: 6px; padding: 4px 6px; cursor: pointer; color: var(--ink-2); font-size: 12px; line-height: 1.2; text-align: left;
+}
+.tool svg { color: var(--ink); flex: none; }
 .tool:hover { background: var(--sunk); border-color: var(--line); }
 .tool.active { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 .canvas-wrap { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); }

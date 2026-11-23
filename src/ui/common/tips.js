@@ -2,14 +2,15 @@
 // next to the "i" under the pointer, or the one with the keyboard focus, and stays inside the window. Its text is the
 // hidden text of the "i" (.info-text), which screen readers get as the description of the button. The bubble takes no
 // clicks (a field under it can be clicked at once) and closes when the pointer leaves the "i"; Esc, a scroll or a
-// resize close it too.
+// resize close it too. A control with the class has-tip (the input unit of a quantity) shows the text its
+// aria-describedby names while it has the focus.
 (function (root) {
   const PumpIt = root.PumpIt;
   let bubble = null; // the bubble element, made on first use
   let anchor = null; // the "i" it belongs to
 
   function show(a) {
-    const text = a.querySelector('.info-text');
+    const text = a.classList.contains('has-tip') ? document.getElementById(a.getAttribute('aria-describedby')) : a.querySelector('.info-text');
     if (!text) return;
     if (!bubble) {
       bubble = document.createElement('div');
@@ -46,10 +47,10 @@
       if (anchor && (document.activeElement !== anchor || !anchor.isConnected)) hide();
     });
     document.addEventListener('focusin', (e) => {
-      const a = e.target.closest('.info');
+      const a = e.target.closest('.info, .has-tip');
       if (a) show(a); else if (anchor) hide();
     });
-    document.addEventListener('focusout', (e) => { if (e.target === anchor && !anchor.matches(':hover')) hide(); });
+    document.addEventListener('focusout', (e) => { if (e.target === anchor && (anchor.classList.contains('has-tip') || !anchor.matches(':hover'))) hide(); });
     // a click (or a tap) on the "i" shows the note too, and does nothing else
     document.addEventListener('click', (e) => {
       const a = e.target.closest('.info');

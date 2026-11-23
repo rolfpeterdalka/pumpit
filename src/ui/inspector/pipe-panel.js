@@ -1,5 +1,5 @@
-// Inspector panel of a pipe: quick results, identification, the junctions of its ends, geometry, friction, fittings
-// and closed state.
+// Inspector panel of a pipe, in two tabs (inspector.js): Properties, with what it still lacks, identification, the
+// junctions of its ends, geometry, friction, fittings and closed state; Results, with its quick results.
 (function (root) {
   const PumpIt = root.PumpIt;
   const D = PumpIt.data, M = PumpIt.model, UI = PumpIt.ui, I = UI.inspector;
@@ -17,13 +17,15 @@
     const rev = el('button', { class: 'btn small', type: 'button' }, tx('reverse'));
     rev.addEventListener('click', () => app.reversePipe(id));
     h.querySelector('.meta').appendChild(rev);
-    I.missingBox(host, key);
-    quickResults(host, id);
+    const pane = I.tabs(host);
+    const props = pane.props;
+    I.missingBox(props, key);
+    quickResults(pane.results, id);
 
     const s0 = section(t('inspector.identification'));
     s0.appendChild(text(key, 'name', t('inspector.name')));
-    host.appendChild(s0);
-    host.appendChild(connections(id, p));
+    props.appendChild(s0);
+    props.appendChild(connections(id, p));
 
     const s1 = section(tx('geometry'));
     s1.appendChild(qty(key, 'length', tx('length'), 'length'));
@@ -40,7 +42,7 @@
     s1.appendChild(num(key, 'nParallel', tx('nParallel'), { int: true }));
     const gm = I.pipeGeom(p);
     if (gm) s1.appendChild(readout(tx('hydraulicDiameter'), F.fmt(gm.Dh * 1000, 5) + ' mm'));
-    host.appendChild(s1);
+    props.appendChild(s1);
 
     const s2 = section(tx('friction'));
     s2.appendChild(sel(key, 'friction.model', tx('model'), ['roughness', 'relRoughness', 'smooth', 'explicitF', 'hw', 'frictionless'].map((m) => [m, tx('models.' + m)])));
@@ -61,13 +63,14 @@
     if (fm === 'relRoughness') s2.appendChild(num(key, 'friction.rel', 'ε/D'));
     if (fm === 'explicitF') s2.appendChild(num(key, 'friction.f', tx('darcyF')));
     if (fm === 'hw') s2.appendChild(num(key, 'friction.C', tx('hwC'), { info: tx('hwHint') }));
-    host.appendChild(s2);
+    props.appendChild(s2);
 
-    host.appendChild(UI.fittingsEditor.build(key, p, gm));
+    props.appendChild(UI.fittingsEditor.build(key, p, gm));
 
     const s4 = section(tx('special'));
     s4.appendChild(chk(key, 'closed', tx('closed')));
-    host.appendChild(s4);
+    props.appendChild(s4);
+    return pane;
   };
 
   // The junctions of the two ends (docs/pipe-ends.md): choosing another one moves that end there, and the loose

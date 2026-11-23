@@ -153,9 +153,9 @@
       const val = v && typeof v === 'object' ? v : { value: null, unit: U.list(cat)[0] };
       const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off' });
       inp.value = F.inputStr(val.value);
-      const us = el('select', { class: 'unit', id: id + '-u', 'aria-label': t('inspector.fields.unitOf', { label }) }, UI.forms.unitOptions(cat, val.unit));
+      const us = el('select', { class: 'unit has-tip', id: id + '-u', 'aria-label': t('inspector.fields.unitOf', { label }), 'aria-describedby': UI.forms.unitTip() }, UI.forms.unitOptions(cat, val.unit));
       inp.addEventListener('change', () => { const n = F.parseNum(inp.value); onChange({ value: Number.isFinite(n) ? n : null, unit: us.value }); });
-      us.addEventListener('change', () => onChange({ value: val.value, unit: us.value }));
+      us.addEventListener('change', () => { const n = F.parseNum(inp.value); onChange({ value: Number.isFinite(n) ? n : null, unit: us.value }); });
       return field(label, inp, { after: us });
     };
     const pipeOptions = pipes.map((p) => [p.id, 'P' + p.id + (p.name ? ' ' + p.name : '')]);
