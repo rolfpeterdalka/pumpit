@@ -111,7 +111,8 @@
     render();
   }
   // The part of the drawing area (px from its top left) that no control covers: below the view switch and the view
-  // cube, above the results on the drawing, the zoom and the legend, inside the arrows of the palette and the panel.
+  // cube, above the foot of the drawing (the legend, the results on the drawing and the zoom, in one row or two),
+  // inside the arrows of the palette and the panel.
   const ROOM_GAP = 10;
   function usefulArea(r) {
     const room = { x0: 0, y0: 0, x1: r.width, y1: r.height };
@@ -395,6 +396,14 @@
     app.showInfo(hit, e.clientX, e.clientY);
   }
 
+  // The model changed under the drawing (another model, undo, redo): the pipe being drawn, the end or the junctions
+  // being dragged and the route of a 3D view lose their start, so they are dropped; the tool stays.
+  function dropDraft() {
+    state.pending = null;
+    state.drag = null;
+    if (UI.edit3d) UI.edit3d.reset();
+  }
+
   // Esc: drops the end being dragged or the pipe being drawn, then the current tool
   function cancel() {
     if (in3d() && UI.edit3d.cancel()) return true;
@@ -416,5 +425,5 @@
     else UI.drawing.render(svg, view, state);
   }
 
-  PumpIt.ui.canvas = { init, render, fit, fitSchematic, zoomBy, setTool, cancel, show, shiftInto, get tool() { return state.tool; }, view, GRID };
+  PumpIt.ui.canvas = { init, render, fit, fitSchematic, zoomBy, setTool, cancel, dropDraft, show, shiftInto, get tool() { return state.tool; }, view, GRID };
 })(typeof window !== 'undefined' ? window : globalThis);

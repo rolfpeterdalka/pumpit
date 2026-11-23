@@ -21,6 +21,10 @@ PumpIt.i18n.add('pt-BR', {
       convert: 'Converter valor…',
       convertOf: 'Converter o valor de {label}…',
       info: 'Mais informações',
+      cellRow: 'Linha {n}',
+      cellEmpty: '{where}: a célula está vazia, e o valor anterior continua valendo.',
+      cellInvalid: '{where}: “{text}” não é um número, e o valor anterior continua valendo.',
+      cellRestore: 'Esc restaura {value}.',
     },
     toggle: { hide: 'Recolher o painel de propriedades', show: 'Mostrar o painel de propriedades' },
     convert: {

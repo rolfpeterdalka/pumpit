@@ -82,6 +82,7 @@ PumpIt.i18n.add('pt-BR', {
       started: 'Download iniciado: {name}',
       defaultName: 'modelo',
       notAModel: 'O arquivo não é um modelo deste aplicativo.',
+      isProfile: 'Este arquivo é um perfil de colunas de resultados, e não um modelo. Ele entra por {path}.',
       converted: 'Tipos de junção convertidos: {notes}.',
       opened: 'Aberto: {name}',
       cannotOpen: 'Não foi possível abrir: {message}',
@@ -167,6 +168,10 @@ PumpIt.i18n.add('pt-BR', {
       system: 'Sistema',
       solution: 'Controle da solução',
       table: 'tabela',
+      yes: 'sim', no: 'não',
+      points: '{n} pontos', value: 'Valor', point: 'Ponto',
+      at: '{y} a {x}', added: 'Ponto incluído a {x}', removed: 'Ponto removido a {x}',
+      units: 'Unidades', showPoints: 'Ver pontos alterados ({n})',
     },
   },
 });

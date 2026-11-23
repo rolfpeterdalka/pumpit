@@ -11,6 +11,37 @@
     return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
   }
 
+  // the sample of a series in the legend: a short piece of its line, with its colour, width and dashes, and its marker
+  // when it has one, so that a series can be told apart by its line alone (in grey, or for whoever does not see colour)
+  function swatch(s) {
+    const w = s.width || 2.4;
+    const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : '';
+    const mark = s.marker ? `<circle cx="15" cy="6" r="3.2" style="fill:${s.color}"/>` : '';
+    return `<svg class="swatch" viewBox="0 0 30 12" width="30" height="12" aria-hidden="true"><line x1="1" x2="29" y1="6" y2="6" style="stroke:${s.color}" stroke-width="${w}"${dash}/>${mark}</svg>`;
+  }
+
+  // the values of the series of a chart in a table that opens under it (a <details>, by keyboard as well): one row per
+  // point, in the order drawn, with the name of its series, x and y in the units of the chart. Points at the same x
+  // stay apart (a step at a junction); a point repeated exactly is shown once.
+  // o = { summary, xHead, yHead, series, open (shown open), id (of the <details>) }
+  function valuesTable(o) {
+    const rows = [];
+    for (const s of o.series) {
+      if (!s.name) continue;
+      let last = null;
+      for (const p of s.pts) {
+        if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) continue;
+        if (last && last[0] === p[0] && last[1] === p[1]) continue;
+        last = p;
+        rows.push(`<tr><td class="txt">${F.esc(s.name)}</td><td class="num">${F.fmt(p[0], 5)}</td><td class="num">${F.fmt(p[1], 5)}</td></tr>`);
+      }
+    }
+    if (!rows.length) return '';
+    const head = `<tr><th class="txt">${F.esc(t('charts.values.series'))}</th><th>${F.esc(o.xHead)}</th><th>${F.esc(o.yHead)}</th></tr>`;
+    return `<details class="chart-values"${o.id ? ` id="${o.id}"` : ''}${o.open ? ' open' : ''}><summary>${F.esc(o.summary)}</summary>`
+      + `<div class="table-scroll"><table class="grid"><thead>${head}</thead><tbody>${rows.join('')}</tbody></table></div></details>`;
+  }
+
   // generic line chart: o = { title, xLabel, yLabel, xMin, yMin, series: [{ name, pts, color, dash, width, marker }], points,
   // xTick (optional: the text of a tick of the x axis, from its value) }
   function lineChart(o) {
@@ -45,9 +76,9 @@
       g += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="6" style="fill:var(--panel);stroke:${p.color}" stroke-width="2.6"/>`;
       if (p.label) g += `<text x="${X(p.x) + 10}" y="${Y(p.y) - 10}" style="fill:var(--ink);font-weight:500">${F.esc(p.label)}</text>`;
     }
-    const legend = o.series.filter((s) => s.name).map((s) => `<span><i style="background:${s.color}"></i>${F.esc(s.name)}</span>`).join('');
+    const legend = o.series.filter((s) => s.name).map((s) => `<span>${swatch(s)}${F.esc(s.name)}</span>`).join('');
     return `<svg class="chart" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${F.esc(o.title || t('charts.chart'))}">${g}</svg><div class="chart-legend">${legend}</div>`;
   }
 
-  PumpIt.ui.lineChart = { niceStep, lineChart };
+  PumpIt.ui.lineChart = { niceStep, lineChart, swatch, valuesTable };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -38,6 +38,9 @@
     app.version++;
     app.results = {};
     app.timeRuns = {};
+    // the texts left in cells of the model before (num-cell.js) mean nothing in this one, nor the pipe being drawn
+    UI.numCell.clearDrafts();
+    UI.canvas.dropDraft();
     // a damaged file whose model fails to calculate or to draw is refused, and the model before stays; a model is saved
     // only once it works, so the page never opens again on a broken one
     try {
@@ -55,6 +58,24 @@
     if (fit) requestAnimationFrame(() => { UI.scene3d.ensureVisible(); UI.canvas.fitSchematic(); });
     if (notes && notes.length) toast(t('app.files.converted', { notes: notes.join('; ') }));
   };
+
+  // Another model in place of the one in the editor, as one step of the history: the model before goes to the undo
+  // stack and the redo stack empties only once the new model is accepted. A refused model throws, with the model, the
+  // undo and the redo stacks as they were.
+  app.replaceModel = (m, opts) => {
+    const before = JSON.stringify(app.model);
+    app.loadModel(m, opts);
+    app.pushUndo(before);
+  };
+
+  // The profile of the result columns (results/column-setup.js) is a JSON file too: opened as a model, it is pointed
+  // to where it belongs. Returns true when obj is one (the message is shown).
+  function profileRefused(obj) {
+    if (!UI.columnSetup || !UI.columnSetup.isProfile(obj)) return false;
+    const plain = (s) => s.replace(/…$/, '');
+    toast(t('app.files.isProfile', { path: [t('app.tabs.out'), t('results.columnsButton'), t('results.setup.import')].map(plain).join(' → ') }));
+    return true;
+  }
 
   app.downloadModel = () => UI.download.saveFile(`${UI.download.safeName(app.model.title)}.pumpit.json`, new Blob([JSON.stringify(app.model, null, 1)], { type: 'application/json' }));
 
@@ -76,9 +97,8 @@
         let res;
         try { res = imp.read(text, Object.assign({ name: f.name }, opts)); }
         catch (err) { toast(t('app.importReport.cannotRead', { message: err.message })); return; }
-        app.pushUndo();
-        try { app.loadModel(res.model); }
-        catch (err) { app.undoStack.pop(); toast(t('app.importReport.cannotRead', { message: err.message })); return; }
+        try { app.replaceModel(res.model); }
+        catch (err) { toast(t('app.importReport.cannotRead', { message: err.message })); return; }
         UI.importReport.show(f.name, res, app.results[app.model.scenarios.current] || null, imp);
       };
       let list = [];
@@ -97,9 +117,9 @@
     rd.onload = () => {
       let model;
       try { model = JSON.parse(rd.result); } catch (err) { toast(t('app.files.cannotOpen', { message: err.message })); return; }
-      app.pushUndo();
-      try { app.loadModel(model); toast(t('app.files.opened', { name: f.name })); }
-      catch (err) { app.undoStack.pop(); toast(t('app.files.cannotOpen', { message: err.message })); }
+      if (profileRefused(model)) return;
+      try { app.replaceModel(model); toast(t('app.files.opened', { name: f.name })); }
+      catch (err) { toast(t('app.files.cannotOpen', { message: err.message })); }
     };
     rd.readAsText(f);
   }
@@ -120,5 +140,5 @@
     });
   }
 
-  PumpIt.ui.files = { normalize, bind, openFile };
+  PumpIt.ui.files = { normalize, bind, openFile, profileRefused };
 })(window);

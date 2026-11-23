@@ -224,6 +224,7 @@ PumpIt.i18n.add('es', {
 <h4>Campos</h4>
 <ul>
 <li>Escriba el valor y confirme con <kbd>Enter</kbd> o saliendo del campo. La coma o el punto sirven como separador decimal.</li>
+<li>En una tabla de puntos (una curva, una tabla en el tiempo, los accesorios de una tubería), una celda dejada vacía o con un texto que no es un número queda marcada en rojo, con un mensaje bajo la tabla que indica la fila, la magnitud y la unidad: el modelo mantiene el valor anterior, y no se calcula nada, hasta que llega un número. <kbd>Esc</kbd> en la celda devuelve el valor anterior.</li>
 <li>Junto a cada magnitud hay una lista de unidades. <b>Cambiar la unidad no convierte el número</b>: el valor pasa a leerse en la nueva unidad. Elija primero la unidad y escriba el valor en ella. Para convertir un valor ya escrito, use el botón de dos flechas junto a la unidad ([[t:inspector.fields.convert]]).</li>
 <li>En un escenario hijo, un punto de color junto a la etiqueta indica un valor cambiado en este escenario. Haga clic en el punto para volver a heredar el valor del padre.</li>
 <li>El recuadro rojo <b>Indefinido</b> lista lo que le falta al objeto para entrar en el cálculo.</li>
@@ -661,7 +662,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <li>una bomba: su velocidad en la curva (0 la detiene, como dice [[t:time.data.stopMode]]), su caudal, su consigna o, en un compresor, su relación de compresión;</li>
 <li>una válvula o una válvula de salida: su K, Cv o Kv, o su apertura; una válvula de control: su consigna; una boquilla: su área efectiva.</li>
 </ul>
-<p>La tabla da valores en función del tiempo, escritos o pegados de una hoja de cálculo con [[t:time.points.paste]]. Los valores son absolutos o [[t:time.data.bases.relative]]; entre los puntos, recta o escalones; repetida, una tabla hace un perfil diario, por ejemplo. Con un gas, un caudal es másico o en volumen normal (Nm³), y en el modelo adiabático una presión impuesta, un caudal que entra y un reservorio infinito también pueden dar la temperatura de su gas en el tiempo ([[t:time.data.secondT]]), una segunda columna de la tabla.</p>
+<p>La tabla da valores en función del tiempo, escritos o pegados de una hoja de cálculo con [[t:time.points.paste]]. Cada línea pegada se comprueba antes de que la tabla cambie: un valor que falta o un texto que no es un número se señala por su fila y su columna, y la tabla queda como estaba. Los valores son absolutos o [[t:time.data.bases.relative]]; entre los puntos, recta o escalones; repetida, una tabla hace un perfil diario, por ejemplo. Con un gas, un caudal es másico o en volumen normal (Nm³), y en el modelo adiabático una presión impuesta, un caudal que entra y un reservorio infinito también pueden dar la temperatura de su gas en el tiempo ([[t:time.data.secondT]]), una segunda columna de la tabla.</p>
 <h4>Cuándo vale una tabla</h4>
 <ul>
 <li>[[t:time.data.starts.time]]: desde el segundo paso.</li>

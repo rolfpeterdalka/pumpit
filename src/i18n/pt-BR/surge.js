@@ -110,6 +110,7 @@ PumpIt.i18n.add('pt-BR', {
       on: 'Calcular o golpe de aríete',
       onHint: 'Ligado, o golpe de aríete corre depois do regime permanente a cada mudança, e a simulação no tempo é desligada (as duas não correm juntas). Desligado, os seus dados ficam no modelo e não são usados.',
       off: 'Desligado: o modelo calcula só o regime permanente. Ligue quando uma mudança rápida puder causar um golpe de aríete.',
+      offTime: 'Desligado: este cenário faz a simulação no tempo. Ligar o golpe de aríete desliga a simulação no tempo; os dados dos dois ficam no modelo.',
       duration: 'Duração',
       durationHint: 'Por quanto tempo o transiente é acompanhado a partir de 0 s, o regime permanente. Cubra pelo menos algumas vezes 2·L/a do tubo mais longo.',
       dtMode: 'Passo de tempo',

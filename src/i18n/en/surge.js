@@ -110,6 +110,7 @@ PumpIt.i18n.add('en', {
       on: 'Calculate the water hammer',
       onHint: 'On, the water hammer runs after the steady state at every change, and the time simulation goes off (the two do not run together). Off, its data stay in the model and are not used.',
       off: 'Off: the model calculates the steady state only. Turn it on when a fast change may cause a water hammer.',
+      offTime: 'Off: this scenario runs the time simulation. Turning the water hammer on turns the time simulation off; the data of both stay in the model.',
       duration: 'Duration',
       durationHint: 'How long the transient is followed from 0 s, the steady state. Cover at least a few times 2·L/a of the longest pipe.',
       dtMode: 'Time step',

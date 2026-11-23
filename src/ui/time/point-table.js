@@ -13,6 +13,7 @@
   const UI = PumpIt.ui;
   const F = UI.format;
   const { el } = UI.dom;
+  const NC = UI.numCell;
   const { t } = PumpIt.i18n;
   const tx = (key, params) => t('time.points.' + key, params);
 
@@ -38,12 +39,22 @@
     hr.appendChild(el('th'));
     const thead = el('thead'); thead.appendChild(hr); table.appendChild(thead);
     const tb = el('tbody');
+    // a text that is not a number stays in its cell, with its message under the table, and the table keeps its point
+    const errs = NC.errors();
+    const unitOf = (axis) => {
+      const cat = o[axis].cat;
+      if (cat === '%') return '%';
+      if (cat === 'none') return '';
+      return F.unit(axis === 'x' ? xUnit : axis === 'y' ? yUnit : y2Unit);
+    };
     xs.forEach((_, i) => {
       const tr = el('tr');
       const cell = (arr, axis, aria) => {
-        const inp = el('input', { type: 'text', inputmode: 'decimal', id: `${o.id}-${axis}-${i}`, 'aria-label': aria });
-        inp.value = F.inputStr(arr[i]);
-        inp.addEventListener('change', () => { const n = F.parseNum(inp.value); arr[i] = Number.isFinite(n) ? n : 0; save(); });
+        const inp = NC.input({
+          id: `${o.id}-${axis}-${i}`, aria, value: arr[i], errs,
+          where: NC.where(NC.row(i + 1), o[axis].label, unitOf(axis)),
+          onCommit: (n) => { arr[i] = n; save(); },
+        });
         const td = el('td'); td.appendChild(inp); return td;
       };
       const x = el('button', { class: 'row-btn', type: 'button', 'aria-label': tx('remove', { n: i + 1 }) }, '×');
@@ -55,7 +66,7 @@
       tb.appendChild(tr);
     });
     table.appendChild(tb);
-    wrap.appendChild(table);
+    wrap.append(table, errs);
     const row = el('div', { class: 'btn-row' });
     const add = el('button', { class: 'btn small', type: 'button' }, F.esc(tx('add')));
     add.addEventListener('click', () => {
@@ -82,29 +93,73 @@
     return wrap;
   }
 
-  // a box where two (or three) columns copied from a spreadsheet are pasted: one point per line, the numbers split by a
-  // tab, a semicolon or spaces (a comma too, when the numbers use a point)
+  // The columns of a text copied from a spreadsheet: one point per line. The separator is the same for the whole text: a
+  // tab when there is one (a spreadsheet copies its cells so, and an empty cell stays empty in its column), else a
+  // semicolon, else spaces (or a comma, when no line has its n numbers between spaces and the numbers use a point).
+  // Blank lines are skipped, wherever they are. Every line is checked before anything is taken: a missing value, a
+  // text that is not a number or a value beyond the n columns refuses the whole text, and tells where, by the number of
+  // its line in the text (from 1) and its column (from 0).
+  //   → { cols } | { none: true } | { error: { line, col, kind: 'missing' | 'invalid' | 'columns', text, has } }
+  function parsePaste(text, n) {
+    const lines = String(text).split(/\r?\n/).map((s, i) => ({ s, line: i + 1 })).filter((x) => x.s.trim());
+    if (!lines.length) return { none: true };
+    const tab = lines.some((x) => x.s.includes('\t'));
+    const semi = !tab && lines.some((x) => x.s.includes(';'));
+    const comma = !tab && !semi && lines.some((x) => x.s.includes(','))
+      && lines.every((x) => x.s.trim().split(/\s+/).length < n);
+    const split = (s) => (tab ? s.split('\t') : semi ? s.split(';') : comma ? s.split(',') : s.trim().split(/\s+/)).map((c) => c.trim());
+    const cols = Array.from({ length: n }, () => []);
+    for (const { s, line } of lines) {
+      const cells = split(s);
+      // empty cells after the last column (a row copied wider than the table) say nothing
+      while (cells.length > n && cells[cells.length - 1] === '') cells.pop();
+      if (cells.length > n) return { error: { line, col: n, kind: 'columns', has: cells.length } };
+      for (let c = 0; c < n; c++) {
+        const v = cells[c];
+        if (v === undefined || v === '') return { error: { line, col: c, kind: 'missing' } };
+        const x = F.parseNum(v);
+        if (!Number.isFinite(x)) return { error: { line, col: c, kind: 'invalid', text: v } };
+        cols[c].push(x);
+      }
+    }
+    return { cols };
+  }
+
+  // the message of a refused paste, with the names of the columns
+  function pasteMessage(err, labels) {
+    if (err.kind === 'columns') return tx('pasteColumns', { line: err.line, has: err.has, n: labels.length });
+    const where = UI.numCell.where(t('inspector.fields.cellRow', { n: err.line }), labels[err.col]);
+    return err.kind === 'missing' ? tx('pasteMissing', { where }) : tx('pasteInvalid', { where, text: err.text });
+  }
+
+  // a box where two (or three) columns copied from a spreadsheet are pasted: the table is replaced only when every line
+  // is right (parsePaste); otherwise the text stays in the box, with a message that says where it is wrong
   function pasteBox(o, done) {
     const n = o.y2 ? 3 : 2;
+    const labels = [o.x.label, o.y.label].concat(n === 3 ? [o.y2.label] : []);
     const area = el('textarea', { id: 'pt-paste', rows: '8', style: 'width:100%' });
+    const msg = el('p', { id: 'pt-paste-err', class: 'cell-err', role: 'alert', hidden: true });
     const body = el('div');
     const hint = n === 3 ? tx('pasteHint3', { x: o.x.label, y: o.y.label, z: o.y2.label }) : tx('pasteHint', { x: o.x.label, y: o.y.label });
-    body.append(el('p', { class: 'muted small', style: 'margin:0 0 6px' }, F.esc(hint)), area);
+    body.append(el('p', { class: 'muted small', style: 'margin:0 0 6px' }, F.esc(hint)), area, msg);
+    const refuse = (text) => {
+      msg.textContent = text + ' ' + tx('pasteKept');
+      msg.hidden = false;
+      area.setAttribute('aria-invalid', 'true');
+      area.setAttribute('aria-describedby', 'pt-paste-err');
+      area.focus();
+      return false;
+    };
+    area.addEventListener('input', () => { msg.hidden = true; area.removeAttribute('aria-invalid'); area.removeAttribute('aria-describedby'); });
     UI.dialogs.modal({
       title: tx('pasteTitle'), body,
       actions: [{ label: t('app.dialog.cancel') }, {
         label: t('app.dialog.ok'), primary: true,
         onClick() {
-          const cols = Array.from({ length: n }, () => []);
-          for (const line of area.value.split(/\r?\n/)) {
-            if (!line.trim()) continue;
-            const parts = line.trim().split(/\t|;|\s+/).filter(Boolean);
-            const all = parts.length >= n ? parts : line.split(',');
-            const nums = all.slice(0, n).map((x) => F.parseNum(x));
-            if (nums.length === n && nums.every(Number.isFinite)) nums.forEach((v, i) => cols[i].push(v));
-          }
-          if (!cols[0].length) { UI.dialogs.toast(tx('pasteNone')); return false; }
-          done(cols);
+          const r = parsePaste(area.value, n);
+          if (r.none) return refuse(tx('pasteNone'));
+          if (r.error) return refuse(pasteMessage(r.error, labels));
+          done(r.cols);
         },
       }],
     });
@@ -141,5 +196,5 @@
     </svg>`);
   }
 
-  UI.pointTable = { build };
+  UI.pointTable = { build, parsePaste, pasteMessage };
 })(window);

@@ -83,6 +83,8 @@
 
   // ------------------------------------------------------------ profile file
   const profile = () => ({ format: PROFILE, version: 1, outputs: app.prefs.outputs || {}, templates: allTemplates() });
+  // a file of the column profile, opened as a model by mistake (files.js)
+  const isProfile = (obj) => !!obj && typeof obj === 'object' && obj.format === PROFILE;
   // a profile file: its columns take the place of the saved ones and its templates join those of the profile. Returns
   // the number of templates read, or -1 when the object is not a profile.
   function importProfile(obj) {
@@ -120,6 +122,6 @@
 
   PumpIt.ui.columnSetup = {
     defaultUnit, unitOf, clean, defaults, list, columns, setUnit, snapshot, saveAll,
-    templates, saveTemplate, deleteTemplate, templateTables, profile, importProfile, migrate,
+    templates, saveTemplate, deleteTemplate, templateTables, profile, isProfile, importProfile, migrate,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

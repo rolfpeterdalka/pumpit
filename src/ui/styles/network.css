@@ -60,17 +60,23 @@
 /* top of the drawing: the view switch with the menu of the 3D view (view3d.css), clear of the view cube at the top
    right when it shows */
 .canvas-top { position: absolute; left: 12px; top: 10px; right: 12px; display: flex; align-items: flex-start; pointer-events: none; }
-.canvas-tools {
-  position: absolute; right: 12px; bottom: 12px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; justify-content: flex-end;
+/* foot of the drawing: the legend on the left and the tools on the right in one row; when the drawing is too narrow
+   for both, the legend goes up to a row of its own and the tools stay at the bottom right. Only its blocks take the
+   pointer, the gap between them belongs to the drawing. */
+.canvas-foot {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: flex-end;
+  justify-content: space-between; gap: 10px; pointer-events: none;
 }
+.canvas-foot > * { pointer-events: auto; }
+.canvas-tools { margin-left: auto; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 .overlay-pick { display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .zoom { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
 .full-toggle svg { display: block; }
 .full-toggle .leave, .full .full-toggle .enter { display: none; }
 .full .full-toggle .leave { display: block; }
 .legend {
-  position: absolute; left: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-  padding: 7px 10px; font-size: 12px; min-width: 190px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 12px; min-width: 190px;
+  max-width: 100%;
 }
 .legend .ramp { height: 8px; border-radius: 4px; margin: 5px 0 3px; }
 .legend .ends { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); }

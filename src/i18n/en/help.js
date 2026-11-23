@@ -224,6 +224,7 @@ PumpIt.i18n.add('en', {
 <h4>Fields</h4>
 <ul>
 <li>Type the value and confirm with <kbd>Enter</kbd> or by leaving the field. A comma or a point works as the decimal separator.</li>
+<li>In a table of points (a curve, a table over time, the fittings of a pipe), a cell left empty or with a text that is not a number is marked in red, with a message under the table that tells the row, the quantity and the unit: the model keeps the value before, and nothing is calculated, until a number comes. <kbd>Esc</kbd> in the cell brings the value before back.</li>
 <li>Next to each quantity there is a list of units. <b>Changing the unit does not convert the number</b>: the value is read in the new unit. Pick the unit first and type the value in it. To convert a value already typed, use the button with two arrows next to the unit ([[t:inspector.fields.convert]]).</li>
 <li>In a child scenario, a coloured dot next to the label marks a value changed in this scenario. Click the dot to inherit the parent's value again.</li>
 <li>The red <b>Undefined</b> box lists what the object still needs to enter the calculation.</li>
@@ -661,7 +662,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li>a pump: its speed on the curve (0 stops it, as [[t:time.data.stopMode]] says), its flow, its set point or, for a compressor, its pressure ratio;</li>
 <li>a valve or an exit valve: its K, Cv or Kv, or its opening; a control valve: its set point; a nozzle: its effective area.</li>
 </ul>
-<p>The table gives values against time, typed or pasted from a spreadsheet with [[t:time.points.paste]]. The values are absolute or [[t:time.data.bases.relative]]; between points, a straight line or steps; repeated, a table makes a daily profile, for example. With a gas, a flow is a mass flow or a normal volume flow (Nm³), and in the adiabatic model an imposed pressure, a flow that enters and an infinite reservoir may also give the temperature of their gas over time ([[t:time.data.secondT]]), a second column of the table.</p>
+<p>The table gives values against time, typed or pasted from a spreadsheet with [[t:time.points.paste]]. Every line pasted is checked before the table changes: a missing value or a text that is not a number is pointed out by its line and column, and the table stays as it was. The values are absolute or [[t:time.data.bases.relative]]; between points, a straight line or steps; repeated, a table makes a daily profile, for example. With a gas, a flow is a mass flow or a normal volume flow (Nm³), and in the adiabatic model an imposed pressure, a flow that enters and an infinite reservoir may also give the temperature of their gas over time ([[t:time.data.secondT]]), a second column of the table.</p>
 <h4>When a table applies</h4>
 <ul>
 <li>[[t:time.data.starts.time]]: from the second step on.</li>

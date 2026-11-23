@@ -19,8 +19,19 @@
     const k = 'sol';
     const tc = app.eff().solution.time;
     const s = sec(tx('title'), { info: tx('hint') });
-    s.appendChild(chk(k, 'time.on', tx('on')));
-    if (!tc.on) return s;
+    // on: the water hammer goes off in the same edit (the two analyses are exclusive, decision W-19), as the water
+    // hammer turns this off; off, the scenario keeps only the steady state. The other fields stay as they were.
+    const surgeOn = () => !!(PumpIt.surge && PumpIt.surge.inputs.controlOf(app.eff()).on);
+    const onBox = UI.dom.el('input', { type: 'checkbox', id: UI.forms.idOf(k, 'time.on') });
+    onBox.checked = !!tc.on;
+    onBox.addEventListener('change', () => {
+      const pairs = [['time.on', onBox.checked]];
+      if (onBox.checked && surgeOn()) pairs.push(['surge.on', false]);
+      app.setVals(k, pairs);
+    });
+    s.appendChild(UI.forms.wrap(k, 'time.on', tx('on'), onBox, { check: true, info: tx('onHint') }));
+    // which calculation the scenario does when this one is off
+    if (!tc.on) { s.appendChild(hint(F.esc(tx(surgeOn() ? 'offSurge' : 'off')))); return s; }
     s.appendChild(qty(k, 'time.start', tx('start'), 'time'));
     s.appendChild(qty(k, 'time.stop', tx('stop'), 'time'));
     s.appendChild(qty(k, 'time.step', tx('step'), 'time', { info: tx('stepHint') }));

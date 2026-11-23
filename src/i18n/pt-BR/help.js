@@ -224,6 +224,7 @@ PumpIt.i18n.add('pt-BR', {
 <h4>Campos</h4>
 <ul>
 <li>Digite o valor e confirme com <kbd>Enter</kbd> ou saindo do campo. Vírgula ou ponto servem como separador decimal.</li>
+<li>Numa tabela de pontos (uma curva, uma tabela no tempo, os acessórios de um tubo), uma célula deixada vazia ou com um texto que não é número fica marcada em vermelho, com uma mensagem sob a tabela que diz a linha, a grandeza e a unidade: o modelo mantém o valor anterior, e nada é calculado, até chegar um número. <kbd>Esc</kbd> na célula traz de volta o valor anterior.</li>
 <li>Ao lado de cada grandeza há uma lista de unidades. <b>Trocar a unidade não converte o número</b>: o valor passa a ser lido na nova unidade. Escolha a unidade primeiro e digite o valor nela. Para converter um valor já digitado, use o botão de duas setas ao lado da unidade ([[t:inspector.fields.convert]]).</li>
 <li>Num cenário filho, um ponto colorido ao lado do rótulo indica um valor alterado neste cenário. Clique no ponto para voltar a herdar o valor do pai.</li>
 <li>A caixa vermelha <b>Indefinido</b> lista o que falta para o objeto entrar no cálculo.</li>
@@ -421,16 +422,16 @@ PumpIt.i18n.add('pt-BR', {
 <h4>Estado e modo</h4>
 <ul>
 <li>[[t:junctions.pump.form.state]]: [[t:junctions.pump.form.on]], [[t:junctions.pump.form.offClosed]] (vazão zero) ou [[t:junctions.pump.form.offOpen]] (nem ganho nem perda).</li>
-<li>[[t:junctions.pump.form.modes.curve]]: a bomba trabalha sobre a curva, na velocidade informada (em % da nominal).</li>
+<li>[[t:junctions.pump.form.modes.curve]]: a bomba trabalha sobre a curva, na rotação informada (em % da nominal).</li>
 <li>[[t:junctions.pump.form.modes.fixedFlow]]: a bomba entrega a vazão informada e o cálculo mostra a altura necessária. Não usa curva — é o modo para escolher uma bomba.</li>
-<li>[[t:junctions.pump.form.modes.controlFlow]], [[t:junctions.pump.form.modes.controlDischarge]] e [[t:junctions.pump.form.modes.controlSuction]]: a velocidade se ajusta para manter a vazão ou a pressão estática de ajuste, e o resultado mostra a velocidade necessária.</li>
+<li>[[t:junctions.pump.form.modes.controlFlow]], [[t:junctions.pump.form.modes.controlDischarge]] e [[t:junctions.pump.form.modes.controlSuction]]: a rotação se ajusta para manter a vazão ou a pressão estática de ajuste, e o resultado mostra a rotação necessária.</li>
 <li>[[t:junctions.pump.form.nPumps]]: bombas idênticas lado a lado; cada uma leva a vazão total dividida por N.</li>
 <li>[[t:junctions.pump.form.noReverse]] (na curva): uma retenção na bomba, que fecha quando a vazão voltaria.</li>
 </ul>
 <h4>Curvas</h4>
 <p>Informe pontos da [[t:junctions.pump.curves.head]] e, se quiser, da eficiência e do NPSH requerido. Em cada tabela escolha as unidades e o [[t:inspector.curve.fitType]] (polinômio de ordem 0 a 4 ou interpolação linear); o gráfico ao lado mostra os pontos e a curva ajustada, e o cálculo sempre usa a curva ajustada. Sem curva de eficiência, a potência no eixo é igual à hidráulica.</p>
 <h4>Resultados</h4>
-<p>Altura manométrica, ganho de pressão, velocidade, potências hidráulica e no eixo, eficiência e NPSH disponível e requerido. Os avisos alertam para refluxo, operação além do fim da curva, NPSH insuficiente e curvas mal ajustadas. O gráfico [[t:charts.tabs.pump]] mostra o ponto de operação. As equações estão em [[go:tech.pumps|Bombas]].</p>`,
+<p>Altura manométrica, ganho de pressão, rotação, potências hidráulica e no eixo, eficiência e NPSH disponível e requerido. Os avisos alertam para refluxo, operação além do fim da curva, NPSH insuficiente e curvas mal ajustadas. O gráfico [[t:charts.tabs.pump]] mostra o ponto de operação. As equações estão em [[go:tech.pumps|Bombas]].</p>`,
           },
           valve: {
             title: 'Válvula',
@@ -661,7 +662,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>uma bomba: a rotação na curva (0 a para, como diz [[t:time.data.stopMode]]), a vazão, o ajuste ou, num compressor, a razão de compressão;</li>
 <li>uma válvula ou válvula de saída: o K, o Cv ou o Kv, ou a abertura; uma válvula de controle: o ajuste; um bocal: a área efetiva.</li>
 </ul>
-<p>A tabela dá valores em função do tempo, digitados ou colados de uma planilha com [[t:time.points.paste]]. Os valores são absolutos ou [[t:time.data.bases.relative]]; entre os pontos, reta ou degraus; repetida, uma tabela faz um perfil diário, por exemplo. Com um gás, uma vazão é mássica ou em volume normal (Nm³), e no modelo adiabático uma pressão imposta, uma vazão que entra e um reservatório infinito também podem dar a temperatura do seu gás no tempo ([[t:time.data.secondT]]), uma segunda coluna da tabela.</p>
+<p>A tabela dá valores em função do tempo, digitados ou colados de uma planilha com [[t:time.points.paste]]. Cada linha colada é conferida antes de a tabela mudar: um valor ausente ou um texto que não é número é apontado pela linha e pela coluna, e a tabela fica como estava. Os valores são absolutos ou [[t:time.data.bases.relative]]; entre os pontos, reta ou degraus; repetida, uma tabela faz um perfil diário, por exemplo. Com um gás, uma vazão é mássica ou em volume normal (Nm³), e no modelo adiabático uma pressão imposta, uma vazão que entra e um reservatório infinito também podem dar a temperatura do seu gás no tempo ([[t:time.data.secondT]]), uma segunda coluna da tabela.</p>
 <h4>Quando uma tabela vale</h4>
 <ul>
 <li>[[t:time.data.starts.time]]: a partir do segundo passo.</li>
@@ -725,7 +726,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>[[t:results.tabs.general]]: situação do cálculo, iterações, fluido e ambiente; [[t:results.boundaries.title]], com o que entra e sai da rede em cada contorno; e os avisos.</li>
 <li>[[t:results.tabs.pipes]]: por padrão, para líquidos e gases, diâmetro nominal, schedule, cotas, vazão, velocidade, pressões de estagnação na entrada e na saída e K dos acessórios.</li>
 <li>[[t:results.tabs.junctions]]: por padrão, pressões de estagnação e estáticas, ΔP0, K efetivo, vazão através, HGL e cota.</li>
-<li>[[t:results.tabs.pumps]]: por padrão, vazão, altura, ΔP, velocidade, eficiência, potências e NPSH.</li>
+<li>[[t:results.tabs.pumps]]: por padrão, vazão, altura, ΔP, rotação, eficiência, potências e NPSH.</li>
 <li>[[t:results.tabs.valves]]: por padrão, estado, vazão, ΔP0, pressão estática na entrada, Cv e K efetivos.</li>
 <li>[[t:results.tabs.warnings]]: a lista completa de avisos.</li>
 </ul>
@@ -792,7 +793,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
             title: 'Bomba × sistema',
             body: `<p>Escolha a bomba na lista. O gráfico mostra:</p>
 <ul>
-<li>a <b>curva da bomba</b> na velocidade atual, já com as bombas em paralelo, se houver;</li>
+<li>a <b>curva da bomba</b> na rotação atual, já com as bombas em paralelo, se houver;</li>
 <li>a <b>curva do sistema</b>: a altura que o restante da rede exige para cada vazão. Ela é obtida rodando o solver várias vezes com vazão fixa na bomba, com o resto do modelo como está no cenário atual;</li>
 <li>o <b>ponto de operação</b>, quando o modelo está calculado.</li>
 </ul>
@@ -1026,19 +1027,19 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
             body: `<h4>Curva</h4>
 <p>Os pontos informados são ajustados por mínimos quadrados (polinômio de ordem 0 a 4) ou ligados por interpolação linear, com extrapolação linear nas pontas. O cálculo sempre usa a curva ajustada:</p>
 [[eq:polyfit]]
-<p>A curva informada vale para 100% da rotação e para uma bomba. Para a velocidade relativa <i>s</i> e N bombas iguais em paralelo, valem as leis de afinidade:</p>
+<p>A curva informada vale para 100% da rotação e para uma bomba. Para a rotação relativa <i>s</i> e N bombas iguais em paralelo, valem as leis de afinidade:</p>
 [[eq:pumpCurve]]
 <p>Na rede, a bomba é uma ligação cuja "perda" é o ganho de carga, com sinal negativo:</p>
 [[eq:pumpLink]]
 <h4>Modos</h4>
-<p>Na vazão fixa, a equação da ligação passa a ser ṁ = valor, e a altura necessária sai do cálculo. No controle de vazão é igual, com a vazão de ajuste; nos controles de pressão, a pressão estática na descarga (ou na sucção) é fixada. Nos modos de controle, a velocidade necessária é achada por bisseção:</p>
+<p>Na vazão fixa, a equação da ligação passa a ser ṁ = valor, e a altura necessária sai do cálculo. No controle de vazão é igual, com a vazão de ajuste; nos controles de pressão, a pressão estática na descarga (ou na sucção) é fixada. Nos modos de controle, a rotação necessária é achada por bisseção:</p>
 [[eq:pumpSpeed]]
 <h4>Potência e NPSH</h4>
 [[eq:pumpPower]]
 <p>A eficiência η vem da curva de eficiência, lida na vazão equivalente por bomba a 100% (Q/(N·s)); sem ela, η = 1. O NPSH disponível usa a pressão de estagnação absoluta na sucção:</p>
 [[eq:npsh]]
 <h4>Curva do sistema</h4>
-<p>O gráfico Bomba × sistema roda o solver com a bomba em vazão fixa, de zero a 125% da vazão máxima da curva (escalada pela velocidade e pelo número de bombas), e registra a altura exigida em cada ponto.</p>`,
+<p>O gráfico Bomba × sistema roda o solver com a bomba em vazão fixa, de zero a 125% da vazão máxima da curva (escalada pela rotação e pelo número de bombas), e registra a altura exigida em cada ponto.</p>`,
           },
           valves: {
             title: 'Válvulas, orifícios e bocais',
@@ -1116,7 +1117,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li><b>Maior e menor pressão estática</b> de um tubo: as das pontas, porque a pressão de um líquido varia em linha reta entre elas; para um gás, também os pontos do seu perfil.</li>
 <li><b>Rugosidade relativa</b> ε/D, nos modelos com rugosidade; nenhuma para Hazen-Williams, f dado ou sem atrito.</li>
 <li><b>Junções</b>: o ΔP estático entre os dois tubos de um componente e a sua perda de carga ΔP<sub>0</sub>/(ρg); a vazão líquida para a rede numa fronteira, com o sinal de [[t:results.boundaries.title]].</li>
-<li><b>Bombas</b>: as pressões de sucção e de descarga da junção da bomba; a margem de NPSH, NPSH<sub>D</sub> − NPSH<sub>R</sub>, e a razão NPSH<sub>D</sub>/NPSH<sub>R</sub>. O <b>ponto de melhor eficiência</b> (BEP) é a vazão do pico da curva de eficiência, entre o primeiro e o último ponto, levada ao ponto de operação pelas leis de afinidade: Q<sub>BEP</sub> = N·n·Q<sub>pico</sub>, com N bombas na velocidade n. Uma curva cujo ponto mais alto é uma das pontas não dá BEP.</li>
+<li><b>Bombas</b>: as pressões de sucção e de descarga da junção da bomba; a margem de NPSH, NPSH<sub>D</sub> − NPSH<sub>R</sub>, e a razão NPSH<sub>D</sub>/NPSH<sub>R</sub>. O <b>ponto de melhor eficiência</b> (BEP) é a vazão do pico da curva de eficiência, entre o primeiro e o último ponto, levada ao ponto de operação pelas leis de afinidade: Q<sub>BEP</sub> = N·n·Q<sub>pico</sub>, com N bombas na rotação n. Uma curva cujo ponto mais alto é uma das pontas não dá BEP.</li>
 <li><b>Válvulas</b>: K<sub>v</sub> = 0,8645·C<sub>v</sub> (C<sub>v</sub> em gpm com ΔP em psi e água a 60 °F; K<sub>v</sub> em m³/h com ΔP em bar).</li>
 </ul>`,
           },

@@ -41,7 +41,8 @@
       app.setVals(k, pairs);
     });
     s.appendChild(wrap(k, 'surge.on', tx('on'), onBox, { check: true, info: tx('onHint') }));
-    if (!c.on) { s.appendChild(hint(F.esc(tx('off')))); return box; }
+    // off: which calculation the scenario does instead (the time simulation, or the steady state only)
+    if (!c.on) { s.appendChild(hint(F.esc(tx(eff.solution.time && eff.solution.time.on ? 'offTime' : 'off')))); return box; }
     // what the control still needs
     const item = app.validation().items.find((i) => i.key === 'surge');
     if (item && !item.ok) s.appendChild(el('div', { class: 'missing' }, t('inspector.missing', { items: F.esc(item.detail) })));

@@ -4,6 +4,7 @@
   const D = PumpIt.data, H = PumpIt.hyd, UI = PumpIt.ui;
   const F = UI.format;
   const { el, section, readout } = UI.forms;
+  const NC = UI.numCell;
   const app = PumpIt.app;
   const { t } = PumpIt.i18n;
   const tx = (key, params) => t('inspector.fittings.' + key, params);
@@ -17,14 +18,19 @@
       const table = el('table', { class: 'mini-table' });
       table.innerHTML = `<thead><tr><th>${tx('qty')}</th><th>${tx('item')}</th><th>${tx('value')}</th><th></th></tr></thead>`;
       const tb = el('tbody');
+      // a text that is not a number stays in its cell, with its message under the table, and the fitting keeps its value
+      const errs = NC.errors();
       list.forEach((it, i) => {
         const tr = el('tr');
-        const qn = el('input', { type: 'text', inputmode: 'decimal', id: `fit-q-${key}-${i}`, 'aria-label': tx('qtyAria'), style: 'width:44px' });
-        qn.value = F.inputStr(it.qty);
-        qn.addEventListener('change', () => { const n = F.parseNum(qn.value); it.qty = Number.isFinite(n) ? n : 0; save(); });
-        const vn = el('input', { type: 'text', inputmode: 'decimal', id: `fit-v-${key}-${i}`, 'aria-label': tx('value'), style: 'width:64px' });
-        vn.value = F.inputStr(it.value);
-        vn.addEventListener('change', () => { const n = F.parseNum(vn.value); it.value = Number.isFinite(n) ? n : 0; save(); });
+        const at = `${NC.row(i + 1)} · ${D.fittingName(it)}`;
+        const qn = NC.input({
+          id: `fit-q-${key}-${i}`, aria: tx('qtyAria'), value: it.qty, errs, attrs: { style: 'width:44px' },
+          where: NC.where(at, tx('qtyAria')), onCommit: (n) => { it.qty = n; save(); },
+        });
+        const vn = NC.input({
+          id: `fit-v-${key}-${i}`, aria: tx('value'), value: it.value, errs, attrs: { style: 'width:64px' },
+          where: NC.where(at, it.model === 'KfT' ? 'K/fT' : 'K'), onCommit: (n) => { it.value = n; save(); },
+        });
         const x = el('button', { class: 'row-btn', type: 'button', 'aria-label': tx('remove') }, '×');
         x.addEventListener('click', () => { list.splice(i, 1); save(); });
         const td1 = el('td'); td1.appendChild(qn);
@@ -35,7 +41,7 @@
         tb.appendChild(tr);
       });
       table.appendChild(tb);
-      s.appendChild(table);
+      s.append(table, errs);
     }
     const add = el('select', { id: 'fit-add-' + key, 'aria-label': tx('addAria') },
       `<option value="">${tx('add')}</option><option value="custom">${F.esc(t('core.data.fittings.custom'))}</option>` +

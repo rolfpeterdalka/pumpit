@@ -11,6 +11,23 @@
 
   const idOf = (objKey, path) => ('f-' + objKey + '-' + path).replace(/[^a-zA-Z0-9_-]/g, '_');
 
+  // The fields built while describe() runs, by 'objKey|path': their label and what reads their value (the category of a
+  // quantity, the options of a list, a check box, the suffix of a number, the axes of a curve). The table of the
+  // differences of a scenario (src/ui/topbar/scenarios.js) names and writes its values as the inspector does.
+  let rec = null;
+  function remember(objKey, path, meta) {
+    if (!rec || !objKey) return;
+    const k = objKey + '|' + path;
+    rec[k] = Object.assign(rec[k] || {}, meta);
+  }
+  // build: draws a panel (off the page); returns what its fields were
+  function describe(build) {
+    const prev = rec;
+    const got = (rec = {});
+    try { build(); } catch (e) { /* a panel that fails off the page still gives the fields built before */ } finally { rec = prev; }
+    return got;
+  }
+
   // a note on a field or a section: an "i" in a circle that shows the text (HTML from the catalogs) while the pointer
   // rests on it or it has the focus (the bubble: src/ui/common/tips.js)
   const INFO_ICON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/><path d="M8 7.3v4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -40,6 +57,7 @@
   // label + control; an overridden attribute gets a dot that restores the inherited value; opts.info: a note, whose
   // "i" stands next to the label (outside it, so the label alone stays the name of the control)
   function wrap(objKey, path, label, ctl, opts = {}) {
+    if (!(rec && rec[objKey + '|' + path] && rec[objKey + '|' + path].label)) remember(objKey, path, { label });
     const f = el('div', { class: 'field' + (opts.check ? ' check' : '') + (opts.wide ? ' wide' : '') });
     const lab = el('label', { for: ctl.id || null });
     lab.textContent = label;
@@ -74,6 +92,7 @@
 
   // quantity with a unit
   function qty(objKey, path, label, cat, opts = {}) {
+    remember(objKey, path, { cat });
     const v = app.getVal(objKey, path) || { value: NaN, unit: U.list(cat)[0] };
     const id = idOf(objKey, path);
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
@@ -125,6 +144,7 @@
 
   // plain number
   function num(objKey, path, label, opts = {}) {
+    remember(objKey, path, { suffix: opts.suffix });
     const v = app.getVal(objKey, path);
     const id = idOf(objKey, path);
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
@@ -140,6 +160,7 @@
 
   // list of options: [[value, label], ...]
   function sel(objKey, path, label, options, opts = {}) {
+    remember(objKey, path, { options });
     const v = app.getVal(objKey, path);
     const id = idOf(objKey, path);
     const s = el('select', { id, disabled: opts.disabled },
@@ -154,6 +175,7 @@
 
   // a choice among a few options shown side by side, as buttons (regime, thermal model): [[value, label], ...]
   function seg(objKey, path, label, options, opts = {}) {
+    remember(objKey, path, { options });
     const v = app.getVal(objKey, path);
     const id = idOf(objKey, path);
     const g = el('div', { class: 'seg', role: 'radiogroup', id, 'aria-label': label });
@@ -167,6 +189,7 @@
   }
 
   function chk(objKey, path, label, opts = {}) {
+    remember(objKey, path, { check: true });
     const v = !!app.getVal(objKey, path);
     const id = idOf(objKey, path);
     const c = el('input', { type: 'checkbox', id });
@@ -193,5 +216,5 @@
   // a line of text that stays in sight: a state (an isolated pipe, the fitted curve) or an error; notes go in info()
   function hint(t) { return el('p', { class: 'hint' }, t); }
 
-  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, unitCtl, unitTip, idOf, wrap };
+  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, unitCtl, unitTip, idOf, wrap, remember, describe };
 })(typeof window !== 'undefined' ? window : globalThis);

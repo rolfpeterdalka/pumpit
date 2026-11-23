@@ -9,8 +9,9 @@
   const { t } = PumpIt.i18n;
 
   // ------------------------------------------------------------ undo / redo
-  app.pushUndo = () => {
-    app.undoStack.push(JSON.stringify(app.model));
+  // snap: the model before as JSON, when the caller took it before changing the model (app.replaceModel)
+  app.pushUndo = (snap = JSON.stringify(app.model)) => {
+    app.undoStack.push(snap);
     if (app.undoStack.length > 80) app.undoStack.shift();
     app.redoStack = [];
   };
@@ -19,6 +20,8 @@
     const view = app.model.view3;
     app.model = JSON.parse(json);
     PumpIt.ui.scene3d.carryView(view, app.model);
+    // a pipe being drawn starts at a junction of the model before, which may be gone
+    PumpIt.ui.canvas.dropDraft();
     app.pruneSelection();
     app.changed();
   }
@@ -74,8 +77,11 @@
   // a new pipe copies its data from the reference pipe, as the user sees it in the current scenario: the selected
   // pipe, or else the last one created. The drawn length never counts (R-13 of the 3D views). opts.bends3 and
   // opts.snap3: its route when it was drawn in a 3D view.
+  // Both ends must be junctions of the model: a pipe is never created towards an id that is not there (a loose end
+  // comes only from letting an end go, connections.js), and a refused pipe leaves the history as it was.
   app.addPipe = (up, down, opts = {}) => {
-    if (up === down) return null;
+    const has = (id) => app.model.junctions.some((j) => j.id === id);
+    if (up === down || !has(up) || !has(down)) return null;
     app.pushUndo();
     const id = app.model.nextId.p++;
     const last = app.model.pipes[app.model.pipes.length - 1];

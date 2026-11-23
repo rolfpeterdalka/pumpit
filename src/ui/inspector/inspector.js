@@ -198,5 +198,17 @@
     return { A: A * red * red * (p.nParallel || 1), Dh: Dh * red };
   }
 
-  PumpIt.ui.inspector = { init, render, panels, addSection, head, tabs, showTab, tabOf, missingBox, out, pipeGeom, follow, isCollapsed, setCollapsed };
+  // the fields of the panel of an object in the current scenario ('j:2', 'p:1', or 'sys' and 'sol' for the system
+  // window), drawn off the page: UI.forms.describe
+  function fieldsOf(key) {
+    return UI.forms.describe(() => {
+      const box = el('div');
+      if (key === 'sys' || key === 'sol') { UI.systemForm.build(box); return; }
+      const kind = key[0] === 'p' ? 'pipe' : 'junction', id = Number(key.slice(2));
+      const panes = panels[kind](box, id);
+      extras[kind].forEach((fn) => fn(panes && panes.props ? panes.props : box, id));
+    });
+  }
+
+  PumpIt.ui.inspector = { init, render, panels, addSection, fieldsOf, head, tabs, showTab, tabOf, missingBox, out, pipeGeom, follow, isCollapsed, setCollapsed };
 })(typeof window !== 'undefined' ? window : globalThis);

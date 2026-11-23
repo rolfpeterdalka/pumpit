@@ -5,6 +5,7 @@
   const M = PumpIt.model, H = PumpIt.hyd, UI = PumpIt.ui;
   const F = UI.format;
   const Fm = UI.forms;
+  const NC = UI.numCell;
   const { el, section, hint } = Fm;
   const app = PumpIt.app;
   const { t } = PumpIt.i18n;
@@ -12,6 +13,7 @@
 
   // o = { xCat, yCat ('head' | 'dp' | 'pct'), yName, min }
   function build(key, path, title, o) {
+    Fm.remember(key, path, { label: title, curve: { xCat: o.xCat, yCat: o.yCat, yName: o.yName } });
     const s = section(title);
     const c0 = app.getVal(key, path) || { x: [], y: [], xUnit: 'm³/h', yUnit: o.yCat === 'head' ? 'm' : o.yCat === 'dp' ? 'bar' : '', fit: '2' };
     const c = M.clone(c0);
@@ -32,12 +34,18 @@
     hr.append(th1, th2, el('th'));
     thead.appendChild(hr); table.appendChild(thead);
     const tb = el('tbody');
+    // a text that is not a number stays in its cell, with its message under the table, and the curve keeps its point
+    const errs = NC.errors();
+    const unitOf = (u) => (u ? F.unit(u) : o.yCat === 'pct' ? '%' : '');
     c.x.forEach((xv, i) => {
       const tr = el('tr');
       const mk = (arr, aria, sfx) => {
-        const inp = el('input', { type: 'text', inputmode: 'decimal', id: `cv-${key}-${path}-${sfx}-${i}`, 'aria-label': aria });
-        inp.value = F.inputStr(arr[i]);
-        inp.addEventListener('change', () => { const n = F.parseNum(inp.value); arr[i] = Number.isFinite(n) ? n : 0; save(); });
+        const x = sfx === 'x';
+        const inp = NC.input({
+          id: `cv-${key}-${path}-${sfx}-${i}`, aria, value: arr[i], errs,
+          where: NC.where(NC.row(i + 1), x ? tx('flow') : o.yName, x ? F.unit(c.xUnit) : unitOf(c.yUnit)),
+          onCommit: (n) => { arr[i] = n; save(); },
+        });
         const td = el('td'); td.appendChild(inp); return td;
       };
       const x = el('button', { class: 'row-btn', type: 'button', 'aria-label': tx('removePoint') }, '×');
@@ -47,7 +55,7 @@
       tb.appendChild(tr);
     });
     table.appendChild(tb);
-    s.appendChild(table);
+    s.append(table, errs);
     const row = el('div', { class: 'btn-row' });
     const add = el('button', { class: 'btn small', type: 'button' }, tx('addPoint'));
     add.addEventListener('click', () => {

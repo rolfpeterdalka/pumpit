@@ -270,6 +270,15 @@ PumpIt.i18n.add('en', {
     export: {
       noResults: 'No results to export. Complete the checklist.',
       fileSuffix: 'results',
+      // the last sheet of the workbook: where the tables of objects come from
+      context: {
+        sheet: 'Context', item: 'Item', value: 'Value', unit: 'Unit',
+        model: 'Model', scenario: 'Scenario', analysis: 'Analysis',
+        analyses: { steady: 'Steady state', time: 'Time simulation', surge: 'Water hammer' },
+        time: 'Time of the time cursor', clock: 'Time of the time cursor (clock)', step: 'Recorded step of the time cursor (from 0)',
+        tables: 'Tables of objects', tablesAtCursor: 'Results at the time cursor; the series sheets cover every recorded step',
+        tablesSteady: 'Results of the steady state',
+      },
     },
   },
 });

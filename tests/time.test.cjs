@@ -1148,5 +1148,33 @@ console.log('\nThe rules of coherence of the reference (F4, D.3)');
   check('T5 and T8 keep to the rules', !/time data/.test(items(t5({}), 2)));
 }
 
+console.log('\nThe model of a recorded step (the pump chart at the time cursor)');
+{
+  // the review case: the pump example, its speed going from 100 % at 0 h to 90 % at 1 h in steps of 10 min
+  const m = PumpIt.examples.get('pump').build();
+  M.normalizeTime(m);
+  const eff = M.effective(m, 'base');
+  eff.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(10, 'min') });
+  eff.junctions.find((j) => j.id === 2).time = timeData('speed', 'time', [], [table([0, 1], [100, 90], 'h', '%')]);
+  const r = TM.run(eff);
+  const last = r.times.length - 1;
+  const speedAt = (i) => r.modelAt(i).junctions.find((j) => j.id === 2).speed;
+  check('the speed of the pump in the model of each step', r.ok && speedAt(0) === 100 && near(speedAt(3), 95, 1e-9) && near(speedAt(last), 90, 1e-9), [0, 3, last].map(speedAt).join(' '));
+  const mi = r.modelAt(last);
+  mi.junctions.find((j) => j.id === 2).speed = 10;
+  check('each call gives a copy of its own', near(speedAt(last), 90, 1e-9));
+  // the curves drawn from the model of the last step pass through the point of that step, which is the point of the
+  // steady scenario "Rotação 90%" of the example
+  const pt = r.snapshotAt(last).pumps[2];
+  const ref = PumpIt.solver.run(M.effective(m, 's1')).pumps[2];
+  check('the point of the last step is that of the steady scenario at 90 %', rel(pt.Q, ref.Q) < 1e-6 && rel(pt.dH, ref.dH) < 1e-6, `${(pt.Q * 3600).toFixed(2)} m³/h ${pt.dH.toFixed(2)} m`);
+  const crv = PumpIt.solver.systemCurve(r.modelAt(last), 2, 20);
+  const interp = (pts, x) => { for (let i = 1; i < pts.length; i++) if (pts[i][0] >= x) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0); } return NaN; };
+  check('the pump curve of that step passes through its point', rel(interp(crv.pump, pt.Q), pt.dH) < 0.01, interp(crv.pump, pt.Q).toFixed(3));
+  check('so does the system curve', rel(interp(crv.sys, pt.Q), pt.dH) < 0.01, interp(crv.sys, pt.Q).toFixed(3));
+  const c0 = PumpIt.solver.systemCurve(r.modelAt(0), 2, 20), p0 = r.snapshotAt(0).pumps[2];
+  check('and at 0 h the curve of 100 % passes through the first point', rel(interp(c0.pump, p0.Q), p0.dH) < 0.01 && !near(interp(c0.pump, pt.Q), interp(crv.pump, pt.Q), 0.5));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

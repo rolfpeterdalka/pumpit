@@ -21,6 +21,10 @@ PumpIt.i18n.add('en', {
       convert: 'Convert value…',
       convertOf: 'Convert the value of {label}…',
       info: 'More information',
+      cellRow: 'Row {n}',
+      cellEmpty: '{where}: the cell is empty, and the value before stays.',
+      cellInvalid: '{where}: “{text}” is not a number, and the value before stays.',
+      cellRestore: 'Esc brings back {value}.',
     },
     toggle: { hide: 'Collapse the properties panel', show: 'Show the properties panel' },
     convert: {

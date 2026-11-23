@@ -69,6 +69,13 @@
   // the time and the step of the cursor
   app.cursorTime = () => { const run = app.timeRun(); return run ? run.times[app.cursorIndex()] : NaN; };
 
+  // the model of the step of the cursor when there is a run (its tables over time applied, its tank levels), else the
+  // effective model of the scenario: what the results shown were solved from
+  app.cursorModel = () => {
+    const run = app.timeRun();
+    return (run && run.modelAt && run.modelAt(app.cursorIndex())) || app.eff();
+  };
+
   // the results shown: those of the step of the cursor when there is a run, else the steady state
   app.steadyResults = () => app.results[current()] || null;
   app.currentResults = () => {

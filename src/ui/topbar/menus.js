@@ -17,7 +17,7 @@
 
   // menu items, by their data-act attribute; each receives the item clicked
   const ACTIONS = {
-    new: () => confirmBox(t('app.newModel.title'), t('app.newModel.text'), t('app.newModel.ok'), () => { app.pushUndo(); app.loadModel(M.newModel()); }),
+    new: () => confirmBox(t('app.newModel.title'), t('app.newModel.text'), t('app.newModel.ok'), () => app.replaceModel(M.newModel())),
     open: () => $('#file-input').click(),
     save: () => app.downloadModel(),
     'copy-json': () => copyText(JSON.stringify(app.model), t('app.files.modelCopied')),
@@ -28,8 +28,8 @@
       modal({ title: t('app.pasteModel.title'), body: ta, actions: [{ label: t('app.dialog.cancel') }, { label: t('app.pasteModel.ok'), primary: true, onClick: () => {
         let model;
         try { model = JSON.parse(ta.value); } catch (e) { toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
-        app.pushUndo();
-        try { app.loadModel(model); toast(t('app.pasteModel.opened')); } catch (e) { app.undoStack.pop(); toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
+        if (UI.files.profileRefused(model)) return false;
+        try { app.replaceModel(model); toast(t('app.pasteModel.opened')); } catch (e) { toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
       } }] });
     },
     'export-xlsx': () => app.exportResultsXlsx(),
@@ -62,8 +62,7 @@
   function openExample(id) {
     const ex = PumpIt.examples.get(id);
     if (!ex) return;
-    app.pushUndo();
-    app.loadModel(ex.build());
+    app.replaceModel(ex.build());
     toast(t('app.exampleLoaded', { name: ex.name }));
   }
 

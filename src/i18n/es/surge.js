@@ -110,6 +110,7 @@ PumpIt.i18n.add('es', {
       on: 'Calcular el golpe de ariete',
       onHint: 'Activado, el golpe de ariete corre después del régimen permanente en cada cambio, y la simulación en el tiempo se desactiva (las dos no corren juntas). Desactivado, sus datos se quedan en el modelo y no se usan.',
       off: 'Desactivado: el modelo calcula solo el régimen permanente. Actívelo cuando un cambio rápido pueda causar un golpe de ariete.',
+      offTime: 'Desactivado: este escenario hace la simulación en el tiempo. Activar el golpe de ariete desactiva la simulación en el tiempo; los datos de ambos se quedan en el modelo.',
       duration: 'Duración',
       durationHint: 'Cuánto tiempo se sigue el transitorio desde 0 s, el régimen permanente. Cubra por lo menos algunas veces 2·L/a del tubo más largo.',
       dtMode: 'Paso de tiempo',

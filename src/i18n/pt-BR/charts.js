@@ -6,6 +6,7 @@ PumpIt.i18n.add('pt-BR', {
     tabs: { pump: 'Bomba × sistema', profile: 'Perfil', time: 'No tempo' },
     noData: 'Sem dados para o gráfico.',
     chart: 'Gráfico',
+    values: { profile: 'Ver valores do perfil', series: 'Série' },
     pump: {
       gasMode: 'No modo compressível a curva do sistema não é traçada: ela compara a altura de uma bomba com um sistema de líquido.',
       noPumps: 'O modelo não tem bombas.',
@@ -47,6 +48,7 @@ PumpIt.i18n.add('pt-BR', {
       yPressure: 'Pressão ({u})',
       notesGas: 'Caminho: {path} · {length} {u}. A pressão de um gás cai cada vez mais depressa ao longo do tubo, à medida que ele se expande e acelera; as curvas seguem os pontos calculados dentro de cada tubo.',
       notes: 'Caminho: {path} · {length} {u}. HGL e EGL usam pressão absoluta; degraus verticais são junções com perda ou ganho.',
+      notesPressure: 'Caminho: {path} · {length} {u}. Degraus verticais são junções com perda ou ganho; onde a pressão estática chega à pressão de vapor, o líquido ferve.',
     },
     time: {
       noRun: 'Ligue a simulação no tempo nas propriedades do sistema; quando ela rodar, as séries aparecem aqui.',

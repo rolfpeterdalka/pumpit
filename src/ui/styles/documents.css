@@ -64,7 +64,15 @@ table.grid tbody tr:has(.obj-id:focus-visible) td { background: var(--accent-sof
 .chart .axis { stroke: var(--ink-3); stroke-width: 1; }
 .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); padding: 6px 4px 0; }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.chart-legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+/* the sample of a series: a piece of its line with its dashes and marker (line-chart.js), at its own size (not that
+   of the charts in .chart-box) */
+.chart-legend .swatch { display: block; flex: none; width: 30px; height: 12px; min-width: 0; overflow: visible; }
+/* the values of a chart, under it (line-chart.js valuesTable) */
+.chart-values { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 6px; }
+.chart-values > summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); padding: 4px; border-radius: 4px; width: fit-content; }
+.chart-values > summary:hover { color: var(--ink); }
+.chart-values > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chart-values .table-scroll { max-height: 320px; overflow-y: auto; margin-top: 4px; }
 
 /* the column window of the result tables (column-window.js), in the frame of the system window: the outputs a table
    can show on the left, the columns it shows on the right, the profile row and the footer */
@@ -107,3 +115,17 @@ table.grid tbody tr:has(.obj-id:focus-visible) td { background: var(--accent-sof
   .cw-mid { flex-direction: row; justify-content: center; }
   .cw-list { height: 30vh; }
 }
+
+/* the differences of a scenario (src/ui/topbar/scenarios.js): the points of a curve that changed, in a row that opens
+   under the curve */
+.diff-detail > td { padding-top: 0; border-bottom: 1px solid var(--line); }
+.diff-detail summary { cursor: pointer; width: fit-content; padding: 3px 4px; border-radius: 4px; font-size: 12.5px; color: var(--ink-2); }
+.diff-detail summary:hover { color: var(--ink); }
+.diff-detail summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+table.grid.diff-points { margin: 4px 0 8px; font-size: 12.5px; }
+table.grid.diff-points th { position: static; }
+/* its window is wider than a dialog, the names wrap and the values stay on one line; a long list scrolls inside it */
+.modal:has(table.diffs) { width: min(780px, 100%); }
+.table-scroll:has(> table.diffs) { max-height: min(62vh, 560px); overflow: auto; }
+table.grid.diffs td.txt { white-space: normal; min-width: 6em; }
+table.grid.diffs th { z-index: 1; }

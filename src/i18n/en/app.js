@@ -82,6 +82,7 @@ PumpIt.i18n.add('en', {
       started: 'Download started: {name}',
       defaultName: 'model',
       notAModel: 'The file is not a model of this application.',
+      isProfile: 'This file is a profile of result columns, not a model. Bring it in with {path}.',
       converted: 'Junction types converted: {notes}.',
       opened: 'Opened: {name}',
       cannotOpen: 'Could not open: {message}',
@@ -167,6 +168,10 @@ PumpIt.i18n.add('en', {
       system: 'System',
       solution: 'Solution control',
       table: 'table',
+      yes: 'yes', no: 'no',
+      points: '{n} points', value: 'Value', point: 'Point',
+      at: '{y} at {x}', added: 'Point added at {x}', removed: 'Point removed at {x}',
+      units: 'Units', showPoints: 'See the points that changed ({n})',
     },
   },
 });

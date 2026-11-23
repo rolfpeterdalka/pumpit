@@ -643,14 +643,22 @@
       snapshotAt(i) {
         if (cache.has(i)) return cache.get(i);
         const s = R.snaps[i];
-        if (!s) return null;
-        const view = { trig: new Map(s.trig), closed: new Set(s.closed), press: s.press, vessels: s.vessels };
-        const model = TM.inputs.stepModel(P, view, s.sub ? s.k + 0.5 : s.k, s.t, s.levels, null);
+        const model = run.modelAt(i);
+        if (!model) return null;
         const sol = PumpIt.solver.run(model, { states: s.states, dropUnsupplied: true });
         sol.time = { k: s.k, sub: s.sub, t: s.t, tanks: s.tanks };
         cache.set(i, sol);
         if (cache.size > 8) cache.delete(cache.keys().next().value);
         return sol;
+      },
+      // the model of the recorded step i as it was solved: its tables over time at that time, the levels of its tanks
+      // and its closed pipes (a new copy at each call, null for a step without a snapshot). The pump chart draws its
+      // curves from it (src/ui/charts/pump-chart.js).
+      modelAt(i) {
+        const s = R.snaps[i];
+        if (!s) return null;
+        const view = { trig: new Map(s.trig), closed: new Set(s.closed), press: s.press, vessels: s.vessels };
+        return TM.inputs.stepModel(P, view, s.sub ? s.k + 0.5 : s.k, s.t, s.levels, null);
       },
     };
     return run;

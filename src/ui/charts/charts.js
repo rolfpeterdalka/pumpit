@@ -26,7 +26,10 @@
     tabs.appendChild(b);
   }
 
+  // the notes under a chart start empty at every drawing: a chart that stops early (no network, no results, a curve that
+  // failed) never leaves those of another model or another choice
   function render(kind, box, ctl, notes) {
+    notes.textContent = '';
     (CHARTS[kind] || CHARTS.pump)()(box, ctl, notes);
   }
 

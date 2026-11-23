@@ -5,6 +5,7 @@
   const M = PumpIt.model, U = PumpIt.units, UI = PumpIt.ui;
   const F = UI.format;
   const { el, section, hint, wrap, idOf } = UI.forms;
+  const NC = UI.numCell;
   const app = PumpIt.app;
   const { t } = PumpIt.i18n;
   const tx = (key, params) => t('inspector.pipeLosses.' + key, params);
@@ -22,6 +23,8 @@
     const table = el('table', { class: 'mini-table' });
     table.innerHTML = `<thead><tr><th>${tx('pipe')}</th><th title="${tx('kOutTitle')}">${tx('kOut')}</th><th title="${tx('kInTitle')}">${tx('kIn')}</th>${conn ? `<th>${F.esc(conn.head)}</th>` : ''}</tr></thead>`;
     const tb = el('tbody');
+    // a text that is not a number stays in its cell, with its message under the table, and the loss keeps its value
+    const errs = NC.errors();
     for (const p of pipes) {
       const cur = (j.pipeK && j.pipeK[p.id]) || {};
       const path = 'pipeK.' + p.id;
@@ -29,17 +32,18 @@
       const tr = el('tr');
       const td0 = el('td', {}, `<span class="num">P${p.id}</span>`);
       const mk = (field, aria) => {
-        const i = el('input', { type: 'text', inputmode: 'decimal', id: `pk-${j.id}-${p.id}-${field}`, 'aria-label': aria });
-        i.value = F.inputStr(cur[field] ?? 0);
-        i.addEventListener('change', () => { const n = F.parseNum(i.value); write({ [field]: Number.isFinite(n) ? n : 0 }); });
+        const i = NC.input({
+          id: `pk-${j.id}-${p.id}-${field}`, aria, value: cur[field] ?? 0, errs,
+          where: NC.where('P' + p.id, tx(field)), onCommit: (n) => write({ [field]: n }),
+        });
         const td = el('td'); td.appendChild(i); return td;
       };
       tr.append(td0, mk('kOut', tx('kOutAria', { id: p.id })), mk('kIn', tx('kInAria', { id: p.id })));
-      if (conn) tr.appendChild(conn.cell(p, cur, write));
+      if (conn) tr.appendChild(conn.cell(p, cur, write, errs));
       tb.appendChild(tr);
     }
     table.appendChild(tb);
-    s.appendChild(table);
+    s.append(table, errs);
     return s;
   }
 
@@ -79,16 +83,20 @@
 
     return {
       head: `${tx(depth ? 'depth' : 'elevation')} (${F.unit(u)})`,
-      cell(p, cur, write) {
+      // an empty cell is the bottom; a text that is not a number is refused like in the other cells
+      cell(p, cur, write, errs) {
         const v = cur[field];
-        const i = el('input', { type: 'text', inputmode: 'decimal', id: `pk-${j.id}-${p.id}-${field}`, 'aria-label': tx(depth ? 'depthAria' : 'elevationAria', { id: p.id }), placeholder: tx('bottom') });
-        i.value = fin(v) ? F.inputStr(v.unit === u ? v.value : inUnit(toM(v), u)) : '';
+        const i = NC.input({
+          id: `pk-${j.id}-${p.id}-${field}`, aria: tx(depth ? 'depthAria' : 'elevationAria', { id: p.id }), attrs: { placeholder: tx('bottom') },
+          value: fin(v) ? (v.unit === u ? v.value : inUnit(toM(v), u)) : null, empty: null, errs,
+          where: NC.where('P' + p.id, tx(depth ? 'depth' : 'elevation'), F.unit(u)),
+          onCommit: (n) => write({ [field]: n === null ? null : { value: n, unit: u } }),
+        });
         // the other reference in the tooltip: the elevation of a depth, the depth of an elevation (six digits, as the
         // drawing of the reservoir shows it)
         const z = zOf(cur);
         const shown = (m) => `${F.inputStr(+U.fromSI(m, u, 'length').toPrecision(6))} ${F.unit(u)}`;
         if (Number.isFinite(z) && Number.isFinite(zL)) i.title = depth ? tx('atElevation', { z: shown(z) }) : tx('atDepth', { d: shown(zL - z) });
-        i.addEventListener('change', () => { const n = F.parseNum(i.value); write({ [field]: Number.isFinite(n) ? { value: n, unit: u } : null }); });
         const td = el('td'); td.appendChild(i); return td;
       },
     };

@@ -270,6 +270,14 @@ PumpIt.i18n.add('es', {
     export: {
       noResults: 'Sin resultados para exportar. Complete la lista de verificación.',
       fileSuffix: 'resultados',
+      context: {
+        sheet: 'Contexto', item: 'Elemento', value: 'Valor', unit: 'Unidad',
+        model: 'Modelo', scenario: 'Escenario', analysis: 'Análisis',
+        analyses: { steady: 'Régimen permanente', time: 'Simulación en el tiempo', surge: 'Golpe de ariete' },
+        time: 'Instante del cursor de tiempo', clock: 'Instante del cursor de tiempo (reloj)', step: 'Paso grabado del cursor de tiempo (desde 0)',
+        tables: 'Tablas de objetos', tablesAtCursor: 'Resultados en el cursor de tiempo; las hojas de series cubren todos los pasos grabados',
+        tablesSteady: 'Resultados del régimen permanente',
+      },
     },
   },
 });

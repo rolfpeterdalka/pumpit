@@ -83,7 +83,7 @@ PumpIt.i18n.add('pt-BR', {
         dH: 'Altura manométrica',
         dP: 'ΔP',
         dPs: 'ΔP estática',
-        speed: 'Velocidade (%)',
+        speed: 'Rotação (%)',
         etaPct: 'Eficiência (%)',
         Pideal: 'Potência hidráulica',
         Pshaft: 'Potência no eixo',
@@ -144,7 +144,7 @@ PumpIt.i18n.add('pt-BR', {
         id: 'Compressor', name: 'Nome', stateTxt: 'Estado', m: 'Vazão mássica', Q: 'Vazão na sucção', QN: 'Vazão normal',
         P0in: 'P0 na sucção', P0out: 'P0 na descarga', Pin: 'P estática na sucção', Pout: 'P estática na descarga',
         ratio: 'Razão de compressão', dP: 'ΔP0', dPs: 'ΔP estática', dHs: 'Altura isentrópica',
-        speed: 'Velocidade (%)', etaPct: 'Eficiência politrópica (%)', Pgas: 'Potência no gás', QBEP: 'Vazão no BEP', bepPct: 'Vazão (% do BEP)',
+        speed: 'Rotação (%)', etaPct: 'Eficiência politrópica (%)', Pgas: 'Potência no gás', QBEP: 'Vazão no BEP', bepPct: 'Vazão (% do BEP)',
         T0in: 'T0 na sucção', T0out: 'T0 na descarga',
       },
       valves: {
@@ -161,7 +161,7 @@ PumpIt.i18n.add('pt-BR', {
       loss: 'Quedas de pressão e perdas',
       rise: 'Aumento de pressão',
       lines: 'Linhas de carga',
-      perf: 'Velocidade, eficiência e potência',
+      perf: 'Rotação, eficiência e potência',
       bep: 'Ponto de melhor eficiência',
       npsh: 'NPSH',
       compressible: 'Escoamento compressível',
@@ -270,6 +270,14 @@ PumpIt.i18n.add('pt-BR', {
     export: {
       noResults: 'Sem resultados para exportar. Complete a lista de verificação.',
       fileSuffix: 'resultados',
+      context: {
+        sheet: 'Contexto', item: 'Item', value: 'Valor', unit: 'Unidade',
+        model: 'Modelo', scenario: 'Cenário', analysis: 'Análise',
+        analyses: { steady: 'Regime permanente', time: 'Simulação no tempo', surge: 'Golpe de aríete' },
+        time: 'Instante do cursor de tempo', clock: 'Instante do cursor de tempo (relógio)', step: 'Passo gravado do cursor de tempo (a partir de 0)',
+        tables: 'Tabelas de objetos', tablesAtCursor: 'Resultados no cursor de tempo; as folhas de séries cobrem todos os passos gravados',
+        tablesSteady: 'Resultados do regime permanente',
+      },
     },
   },
 });

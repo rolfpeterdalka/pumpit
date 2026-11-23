@@ -3,10 +3,15 @@
   const PumpIt = root.PumpIt;
   const U = PumpIt.units, UI = PumpIt.ui;
   const F = UI.format;
-  const { lineChart } = UI.lineChart;
+  const { lineChart, valuesTable } = UI.lineChart;
   const app = PumpIt.app;
   const { t } = PumpIt.i18n;
   const tx = (key, params) => t('charts.profile.' + key, params);
+
+  // whether the table of the values of the profile is open: it stays so while the chart is drawn again (a new unit, a
+  // new path, a step of the time cursor)
+  let valuesOpen = false;
+  if (typeof document !== 'undefined') document.addEventListener('toggle', (e) => { if (e.target.id === 'pf-values') valuesOpen = e.target.open; }, true);
 
   // shortest chain of pipes between two junctions (breadth-first, any direction)
   function findPath(eff, a, b) {
@@ -91,8 +96,12 @@
       ? [{ name: tx('hgl'), pts: ser.a, color: 'var(--accent)' }, { name: tx('egl'), pts: ser.b, color: '#c0612b', dash: '6 4' }, { name: tx('pipeElevation'), pts: ser.z, color: 'var(--ink-3)', width: 1.8 }]
       : [{ name: tx('static'), pts: ser.a, color: 'var(--accent)' }, { name: tx('stagnation'), pts: ser.b, color: '#c0612b', dash: '6 4' }];
     if (!isHead && Number.isFinite(res.fluid.pv)) series.push({ name: tx('vapor'), pts: [[0, cv(res.fluid.pv)], [U.fromSI(s, lu, 'length'), cv(res.fluid.pv)]], color: 'var(--crit)', dash: '2 4', width: 1.6 });
-    box.innerHTML = lineChart({ title: tx('title'), xLabel: tx('xLabel', { u: F.unit(lu) }), yLabel: tx(isHead ? 'yHead' : 'yPressure', { u: F.unit(u) }), series });
-    notes.innerHTML = tx(gas ? 'notesGas' : 'notes', { path: path.map(({ pipe }) => 'P' + pipe.id).join(' → '), length: F.fmt(U.fromSI(s, lu, 'length'), 5), u: F.unit(lu) });
+    const xLabel = tx('xLabel', { u: F.unit(lu) }), yLabel = tx(isHead ? 'yHead' : 'yPressure', { u: F.unit(u) });
+    // the chart and, under it, its points in a table that opens by keyboard (kept open or shut across redrawings)
+    box.innerHTML = lineChart({ title: tx('title'), xLabel, yLabel, series })
+      + valuesTable({ id: 'pf-values', summary: t('charts.values.profile'), xHead: xLabel, yHead: yLabel, series, open: valuesOpen });
+    // the note of the quantity shown: the grade lines and their absolute pressure, or the pressures and the vapour line
+    notes.innerHTML = tx(gas ? 'notesGas' : isHead ? 'notes' : 'notesPressure', { path: path.map(({ pipe }) => 'P' + pipe.id).join(' → '), length: F.fmt(U.fromSI(s, lu, 'length'), 5), u: F.unit(lu) });
   }
 
   PumpIt.ui.profileChart = { render: profileChart, findPath };

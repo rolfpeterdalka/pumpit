@@ -6,6 +6,7 @@ PumpIt.i18n.add('es', {
     tabs: { pump: 'Bomba × sistema', profile: 'Perfil', time: 'En el tiempo' },
     noData: 'Sin datos para el gráfico.',
     chart: 'Gráfico',
+    values: { profile: 'Ver valores del perfil', series: 'Serie' },
     pump: {
       gasMode: 'En el modo compresible no se traza la curva del sistema: compara la altura de una bomba con un sistema de líquido.',
       noPumps: 'El modelo no tiene bombas.',
@@ -47,6 +48,7 @@ PumpIt.i18n.add('es', {
       yPressure: 'Presión ({u})',
       notesGas: 'Camino: {path} · {length} {u}. La presión de un gas cae cada vez más rápido a lo largo de la tubería, a medida que se expande y acelera; las curvas siguen los puntos calculados dentro de cada tubería.',
       notes: 'Camino: {path} · {length} {u}. HGL y EGL usan presión absoluta; los escalones verticales son uniones con pérdida o ganancia.',
+      notesPressure: 'Camino: {path} · {length} {u}. Los escalones verticales son uniones con pérdida o ganancia; donde la presión estática llega a la presión de vapor, el líquido hierve.',
     },
     time: {
       noRun: 'Active la simulación en el tiempo en las propiedades del sistema; cuando se ejecute, sus series aparecen aquí.',

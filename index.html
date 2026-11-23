@@ -215,33 +215,37 @@
         </div>
         <!-- the view cube of the 3D view (D-35): drawn and handled by src/ui/view3d/cube.js -->
         <div class="view-cube" id="view-cube" tabindex="0" role="group" aria-label="View cube" data-i18n-aria-label="network.view3.cube.aria" hidden></div>
-        <div class="canvas-tools">
-          <label class="overlay-pick"><span class="eyebrow" data-i18n="network.overlay.label">Results on the drawing</span>
-            <select id="overlay-select">
-              <option value="none" data-i18n="network.overlay.none">None</option>
-              <option value="Q" data-i18n="network.overlay.Q">Volumetric flow</option>
-              <option value="m" data-i18n="network.overlay.m">Mass flow</option>
-              <option value="V" data-i18n="network.overlay.V">Velocity</option>
-              <option value="M" data-i18n="network.overlay.M">Mach number</option>
-              <option value="dP0" data-i18n="network.overlay.dP0">Pressure drop</option>
-              <option value="P" data-i18n="network.overlay.P">Static pressure</option>
-              <option value="HGL" data-i18n="network.overlay.HGL">Hydraulic grade line (HGL)</option>
-            </select>
-          </label>
-          <div class="zoom">
-            <button class="btn ghost icon" id="zoom-out" aria-label="Zoom out" data-i18n-aria-label="network.zoom.out">−</button>
-            <button class="btn ghost icon" id="zoom-fit" aria-label="Fit to screen" title="Fit to screen" data-i18n-aria-label="network.zoom.fit" data-i18n-title="network.zoom.fit">
-              <svg viewBox="0 0 16 16" width="14" height="14"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-            </button>
-            <button class="btn ghost icon" id="zoom-in" aria-label="Zoom in" data-i18n-aria-label="network.zoom.in">+</button>
-            <!-- full screen and back; title and label set by src/ui/network/full-screen.js -->
-            <button class="btn ghost icon full-toggle" id="full-screen" type="button" aria-pressed="false" aria-label="Full screen">
-              <svg class="enter" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5L9.2 6.8M6.5 13.5h-4v-4M2.5 13.5l4.3-4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <svg class="leave" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.5 6.5h-4v-4M9.5 6.5l4.3-4.3M2.5 9.5h4v4M6.5 9.5l-4.3 4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+        <!-- the foot of the drawing: the colour legend on the left, the results on the drawing and the zoom on the right;
+             they share one row and wrap to two when the drawing is narrow (network.css) -->
+        <div class="canvas-foot">
+          <div class="legend" id="legend" hidden></div>
+          <div class="canvas-tools">
+            <label class="overlay-pick"><span class="eyebrow" data-i18n="network.overlay.label">Results on the drawing</span>
+              <select id="overlay-select">
+                <option value="none" data-i18n="network.overlay.none">None</option>
+                <option value="Q" data-i18n="network.overlay.Q">Volumetric flow</option>
+                <option value="m" data-i18n="network.overlay.m">Mass flow</option>
+                <option value="V" data-i18n="network.overlay.V">Velocity</option>
+                <option value="M" data-i18n="network.overlay.M">Mach number</option>
+                <option value="dP0" data-i18n="network.overlay.dP0">Pressure drop</option>
+                <option value="P" data-i18n="network.overlay.P">Static pressure</option>
+                <option value="HGL" data-i18n="network.overlay.HGL">Hydraulic grade line (HGL)</option>
+              </select>
+            </label>
+            <div class="zoom">
+              <button class="btn ghost icon" id="zoom-out" aria-label="Zoom out" data-i18n-aria-label="network.zoom.out">−</button>
+              <button class="btn ghost icon" id="zoom-fit" aria-label="Fit to screen" title="Fit to screen" data-i18n-aria-label="network.zoom.fit" data-i18n-title="network.zoom.fit">
+                <svg viewBox="0 0 16 16" width="14" height="14"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              </button>
+              <button class="btn ghost icon" id="zoom-in" aria-label="Zoom in" data-i18n-aria-label="network.zoom.in">+</button>
+              <!-- full screen and back; title and label set by src/ui/network/full-screen.js -->
+              <button class="btn ghost icon full-toggle" id="full-screen" type="button" aria-pressed="false" aria-label="Full screen">
+                <svg class="enter" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5L9.2 6.8M6.5 13.5h-4v-4M2.5 13.5l4.3-4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="leave" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.5 6.5h-4v-4M9.5 6.5l4.3-4.3M2.5 9.5h4v4M6.5 9.5l-4.3 4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="legend" id="legend" hidden></div>
         <!-- collapses the properties panel and brings it back; title and label set by src/ui/inspector/inspector.js -->
         <button type="button" class="panel-toggle" id="panel-toggle" aria-controls="inspector" aria-expanded="true" aria-label="Collapse the properties panel">
           <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -461,6 +465,7 @@
 <script src="src/ui/common/dialogs.js" charset="utf-8"></script>
 <script src="src/ui/common/tips.js" charset="utf-8"></script>
 <script src="src/ui/common/focus-keep.js" charset="utf-8"></script>
+<script src="src/ui/common/num-cell.js" charset="utf-8"></script>
 <script src="src/ui/common/download.js" charset="utf-8"></script>
 <script src="src/ui/common/xlsx.js" charset="utf-8"></script>
 <!-- Junction types: interface side (symbol, form, summaries, result rows), one file per type -->

@@ -62,13 +62,39 @@
   // the sheets of every table with something in it
   const sheets = (res, eff) => Cat.TABLES.map((tb) => sheet(tb, res, eff)).filter((s) => s.rows.length);
 
+  // The sheet that says where the tables of objects come from: the model, the scenario, the analysis and, with a run of
+  // the time simulation, the time and the recorded step of the time cursor, which gave their values (the series sheets
+  // cover every recorded step). at = { time, step } of the cursor, or null for the steady state.
+  function contextSheet({ title, scenario, analysis, at, clock }) {
+    const ex = (k, p) => t('results.export.context.' + k, p);
+    const rows = [[ex('model'), title || '', ''], [ex('scenario'), scenario || '', ''], [ex('analysis'), ex('analyses.' + analysis), '']];
+    if (at) {
+      rows.push([ex('time'), at.time, 's'], [ex('clock'), clock || '', ''], [ex('step'), at.step, '']);
+      rows.push([ex('tables'), ex('tablesAtCursor'), '']);
+    } else rows.push([ex('tables'), ex('tablesSteady'), '']);
+    return {
+      name: ex('sheet'),
+      columns: [{ header: ex('item'), width: 34, format: 'text' }, { header: ex('value'), width: 44, format: 'General' }, { header: ex('unit'), width: 8, format: 'text' }],
+      rows,
+    };
+  }
+  // the time of the cursor in a file name: seconds, without trailing zeros ("t 3600 s", "t 0.5 s")
+  const timeSuffix = (sec) => `t ${String(+sec.toPrecision(10))} s`;
+
   app.exportResultsXlsx = () => {
     const res = app.okResults();
     if (!res) { app.toast(t('results.export.noResults')); return; }
-    const blob = UI.xlsx.workbook({ sheets: sheets(res, app.eff()).concat(UI.timeResults.sheets(), UI.surgeResults ? UI.surgeResults.sheets() : []) });
+    // the tables of objects come from the same results as the screen: those of the step of the time cursor with a run
+    const run = app.timeRun();
+    const at = run ? { time: app.cursorTime(), step: app.cursorIndex() } : null;
+    const surgeSheets = UI.surgeResults ? UI.surgeResults.sheets() : [];
+    const analysis = run ? 'time' : surgeSheets.length ? 'surge' : 'steady';
+    const ctx = contextSheet({ title: app.model.title, scenario: app.scenario().name, analysis, at, clock: at && UI.timeFormat ? UI.timeFormat.clock(at.time) : '' });
+    const blob = UI.xlsx.workbook({ sheets: sheets(res, app.eff()).concat(UI.timeResults.sheets(), surgeSheets, [ctx]) });
     const { saveFile, safeName } = UI.download;
-    saveFile(`${safeName(app.model.title)} - ${safeName(app.scenario().name)} - ${t('results.export.fileSuffix')}.xlsx`, blob);
+    const when = at && Number.isFinite(at.time) ? ` - ${safeName(timeSuffix(at.time))}` : '';
+    saveFile(`${safeName(app.model.title)} - ${safeName(app.scenario().name)} - ${t('results.export.fileSuffix')}${when}.xlsx`, blob);
   };
 
-  PumpIt.ui.resultExport = { tableTSV, pasteText, sheet, sheets, autoFormat };
+  PumpIt.ui.resultExport = { tableTSV, pasteText, sheet, sheets, autoFormat, contextSheet, timeSuffix };
 })(typeof window !== 'undefined' ? window : globalThis);
