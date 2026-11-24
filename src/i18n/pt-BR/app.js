@@ -13,7 +13,7 @@ PumpIt.i18n.add('pt-BR', {
     menu: {
       file: 'Arquivo',
       new: 'Novo modelo',
-      open: 'Abrir arquivo (.json, .fth, .aro)…',
+      open: 'Abrir arquivo (.json, .fth, .aro, .imp)…',
       save: 'Baixar .json',
       copyJson: 'Copiar modelo (JSON)',
       pasteJson: 'Colar modelo (JSON)…',

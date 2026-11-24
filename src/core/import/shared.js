@@ -69,8 +69,8 @@
     const m = /^\s*(?:\S+\s+)?(\S+)\s+VERSION\s+(\d+)\s+INPUT\s+FILE\b/i.exec(String(text).split(/\r?\n/, 1)[0] || '');
     return m ? { version: Number(m[2]), program: wordHash(m[1]) } : null;
   }
-  // the programs of the family: a liquid model (.fth) and a gas model (.aro)
-  const PROGRAMS = { liquid: 0x9ed89e44, gas: 0x0eb41726 };
+  // the programs of the family: a liquid model (.fth), a gas model (.aro) and a transient model of a liquid (.imp, I-01)
+  const PROGRAMS = { liquid: 0x9ed89e44, gas: 0x0eb41726, transient: 0x1cd8c174 };
 
   // numbers: an empty field and the markers -9999 and -999999 mean "not given"; -9E+29 is an empty result
   function num(s) {
@@ -358,18 +358,21 @@
     return [...head, String(list.length), ...list, ...common, ...block];
   }
   // the records of a scenario: those of the base scenario, then the deletions, new records and changes of each child of
-  // the chain, in order
-  function scenarioRecords(S, chain, note, counted) {
+  // the chain, in order. merge.junction(parent, child, counted, note) and merge.pipe(parent, child, note) may replace the
+  // merges of the records (the .imp format merges the blocks of its kinds item by item, I-09, and the transient block of
+  // its pipes, I-10)
+  function scenarioRecords(S, chain, note, counted, merge = {}) {
+    const mergeJ = merge.junction || mergeJunction, mergeP = merge.pipe || mergePipe;
     const P = new Map(), J = new Map();
     chain.forEach((n, k) => {
       const ps = scenarioSection(S, 'PIPES', n), js = scenarioSection(S, 'JUNCTIONS', n);
       for (const l of ps || []) { const m = DELETED_PIPE.exec(l); if (m) P.delete(m[1].trim()); }
       for (const l of js || []) { const m = DELETED_JUNCTION.exec(l); if (m) J.delete(m[1].trim()); }
-      for (const r of records(ps)) P.set(r[0], k === 0 || !P.has(r[0]) ? r : mergePipe(P.get(r[0]), r));
+      for (const r of records(ps)) P.set(r[0], k === 0 || !P.has(r[0]) ? r : mergeP(P.get(r[0]), r, note));
       for (const r of records(js)) {
         const prev = J.get(r[1]);
         if (k > 0 && prev && n0(r[5]) > 0 && n0(r[5]) !== junctionLayout(prev).np) note('assumed', 'scenarioPipes', 'J' + r[1]);
-        J.set(r[1], k === 0 || !prev ? r : mergeJunction(prev, r, counted));
+        J.set(r[1], k === 0 || !prev ? r : mergeJ(prev, r, counted, note));
       }
     });
     return { P, J };
@@ -392,8 +395,9 @@
   }
 
   // pump or compressor (F-25, A-21): configurations (impeller or speed) from t+13, each with its largest flow and the
-  // coefficients of head, NPSHR and efficiency; the one in use at t+11; after them, the relative speed (1 = 100 %)
-  function pumpConfigs(r, tb) {
+  // coefficients of head, NPSHR and efficiency, and `tail` fields after them (13 in .fth and .aro files, 15 in .imp
+  // files, I-03); the one in use at t+11; after them, the relative speed (1 = 100 %)
+  function pumpConfigs(r, tb, tail = 13) {
     const n = Math.max(0, n0(r[tb + 12]));
     const list = [];
     let c = tb + 13;
@@ -407,7 +411,7 @@
       const nE = Math.max(0, n0(r[p]));
       const E = r.slice(p + 1, p + 1 + nE).map(num);
       list.push({ name: unesc(r[c]), qmax: num(r[c + 4]), H, N, E });
-      c = p + 14 + nE;
+      c = p + 1 + nE + tail;
     }
     const sel = n0(r[tb + 11]), speed = num(r[c]);
     return { list, sel: sel >= 1 && sel <= list.length ? sel : 1, speed: speed > 0 ? speed : 1, post: c };
@@ -528,8 +532,12 @@
   // analysis, the time control and the blocks of the time data of the junctions, the same in both formats (D.1; F-34 to
   // F-39 of docs/fth-import.md, A-29 to A-35 of docs/aro-import.md)
 
-  // the units of time are written out in full; a year is taken as 365 days
-  const TIME = { seconds: ['s', 1], second: ['s', 1], sec: ['s', 1], minutes: ['min', 1], minute: ['min', 1], min: ['min', 1], hours: ['h', 1], hour: ['h', 1], hr: ['h', 1], days: ['d', 1], day: ['d', 1], weeks: ['d', 7], years: ['d', 365], year: ['d', 365] };
+  // the units of time are written out in full; a year is taken as 365 days. The milliseconds are those of the .imp format
+  // (section 17 of its description)
+  const TIME = {
+    milliseconds: ['ms', 1], millisecond: ['ms', 1], seconds: ['s', 1], second: ['s', 1], sec: ['s', 1], minutes: ['min', 1], minute: ['min', 1], min: ['min', 1],
+    hours: ['h', 1], hour: ['h', 1], hr: ['h', 1], days: ['d', 1], day: ['d', 1], weeks: ['d', 7], years: ['d', 365], year: ['d', 365],
+  };
   // AnalysisType 2 in the settings (in capitals in a child scenario) is a run over time; [TRANSIENT CONTROL] gives its
   // control, a child scenario the keys it changes. gas: the vessels of a gas take the implicit method of the reference
   // (item 6 of D.10), with the tolerance, the relaxation and the iterations of the file
@@ -692,12 +700,12 @@
 
     // the objects of the events, once every junction of the model m is read: the level of a reservoir that is not a
     // finite tank, the opening of a valve, whose characteristic the user gives, and a pipe or a junction that is not in
-    // the model
-    function checkObjects(m) {
+    // the model. field: the time data checked, those of the time simulation (j.time) or of the water hammer (j.surge)
+    function checkObjects(m, field = 'time') {
       const label = (k) => (k[0] === 'p' ? 'P' : 'J') + k.slice(2);
       for (const j of m.junctions) {
         const obj = 'J' + j.id;
-        for (const c of (j.time && j.time.when) || []) {
+        for (const c of (j[field] && j[field].when) || []) {
           const o = c.obj && M.getObj(m, c.obj);
           if (c.q === 'tankLevel') { if (!o || !PumpIt.time.tanks.isFinite(o)) note('assumed', 'timeNotTank', obj, { id: label(c.obj) }); }
           else if (c.obj && !o) note('missing', 'timeObject', obj, { id: label(c.obj) });
@@ -725,8 +733,8 @@
     unesc, readSections, findKey, sectionOf, scenarioKey, scenarioSection, records, keyValues, kv, valUnit, addOns,
     wordHash, header, PROGRAMS, num, n0, str, isInt,
     key, LENGTH, AREA, VOLUME, PRESSURE, DP, FLOW, VISCOSITY, TEMPERATURE, inTable, quantities,
-    hasNetwork, listScenarios, scenarios, targetScenario, chainOf, mergeList, overlay, pipeLayout, mergePipe,
-    junctionLayout, mergeJunction, scenarioRecords, fluidLines, goalSeek, pumpConfigs, shutoffRange,
+    hasNetwork, listScenarios, scenarios, targetScenario, chainOf, put, mergeList, overlay, pipeLayout, mergePipe,
+    junctionLayout, mergePerPipe, PER_PIPE, mergeJunction, scenarioRecords, fluidLines, goalSeek, pumpConfigs, shutoffRange,
     makeNotes, LEVELS, sortNotes, noteText, stopIsolated, place, compare, TIME, timeControl, timeData,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

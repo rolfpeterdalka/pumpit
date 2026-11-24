@@ -4,6 +4,7 @@
 # third-party model files, used only as a validation answer key
 *.fth
 *.aro
+*.imp
 
 # the single-file build (npm run build)
 dist/
