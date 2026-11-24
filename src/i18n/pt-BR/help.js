@@ -866,7 +866,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
             body: `<table>
 <tr><th>Comando em [[t:app.menu.file]]</th><th>O que faz</th></tr>
 <tr><td>[[t:app.menu.new]]</td><td>Começa um modelo vazio (dá para desfazer).</td></tr>
-<tr><td>[[t:app.menu.open]]</td><td>Abre um modelo salvo em .json, ou importa um modelo nos formatos .fth ou .aro (abaixo). Arrastar o arquivo para a janela faz o mesmo.</td></tr>
+<tr><td>[[t:app.menu.open]]</td><td>Abre um modelo salvo em .json, ou importa um modelo nos formatos .fth, .aro ou .imp (abaixo). Arrastar o arquivo para a janela faz o mesmo.</td></tr>
 <tr><td>[[t:app.menu.save]]</td><td>Baixa o modelo como <code>título.pumpit.json</code>, com todos os cenários e o desenho.</td></tr>
 <tr><td>[[t:app.menu.copyJson]] e [[t:app.menu.pasteJson]]</td><td>Copia o modelo como texto, ou abre um modelo colado como texto — útil para mandar por mensagem.</td></tr>
 <tr><td>[[t:app.menu.exportXlsx]]</td><td>Gera um arquivo .xlsx com uma planilha para cada tabela de resultados, nas colunas e unidades escolhidas.</td></tr>
@@ -889,7 +889,9 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>reservatórios, pressões e vazões impostas com a temperatura do gás, válvulas, válvulas de saída, válvulas de controle de vazão e de pressão, e compressores de vazão fixa ou por curva, convertida na altura × vazão de sucção do Pump It;</li>
 <li>vazões em massa, em volume nas condições locais ou nas normais; volumes padrão viram normais pelas condições padrão do arquivo.</li>
 </ul>
-<p>Vem o mesmo relatório, que compara o primeiro cálculo com os resultados gravados e lista o que precisa de você, o que foi assumido e o que ficou de fora (troca de calor, módulos adicionais).</p>`,
+<p>Vem o mesmo relatório, que compara o primeiro cálculo com os resultados gravados e lista o que precisa de você, o que foi assumido e o que ficou de fora (troca de calor, módulos adicionais).</p>
+<h4>Modelos no formato .imp</h4>
+<p>[[t:app.menu.open]] também lê arquivos <code>.imp</code>, o mesmo tipo de formato de texto para modelos de transientes hidráulicos de um líquido. A rede e o regime permanente entram como num arquivo .fth, com o cenário que você escolher, e também as válvulas de retenção, os componentes genéricos dados por Cv ou Kv, os bocais dados pelo coeficiente de descarga e pela área dos furos e as bombas com todas as configurações. Os dados de golpe de aríete também entram: o controle da corrida e o passo de tempo, o módulo de compressibilidade do líquido, as velocidades de onda dos tubos, os dados no tempo das junções, as pontas sem reflexão, as válvulas de retenção, as válvulas de controle que continuam controlando e a parada e a partida das bombas; o golpe de aríete fica ligado quando o arquivo define uma corrida. Vem o mesmo relatório, e o que não tem equivalente ganha uma nota. Também entram os dispositivos de proteção (tanques de alívio, acumuladores de gás, válvulas de alívio e ventosas), as válvulas de retenção dinâmicas, os dados de quatro quadrantes das bombas dados pelo usuário e os conjuntos de forças. As curvas da biblioteca do programa, que o arquivo não guarda, ficam para você informar: uma nota avisa isso.</p>`,
           },
           language: {
             title: 'Idioma e números',

@@ -866,7 +866,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
             body: `<table>
 <tr><th>Command in [[t:app.menu.file]]</th><th>What it does</th></tr>
 <tr><td>[[t:app.menu.new]]</td><td>Starts an empty model (it can be undone).</td></tr>
-<tr><td>[[t:app.menu.open]]</td><td>Opens a model saved as .json, or imports a model in the .fth or .aro formats (below). Dragging the file onto the window does the same.</td></tr>
+<tr><td>[[t:app.menu.open]]</td><td>Opens a model saved as .json, or imports a model in the .fth, .aro or .imp formats (below). Dragging the file onto the window does the same.</td></tr>
 <tr><td>[[t:app.menu.save]]</td><td>Downloads the model as <code>title.pumpit.json</code>, with all its scenarios and its drawing.</td></tr>
 <tr><td>[[t:app.menu.copyJson]] and [[t:app.menu.pasteJson]]</td><td>Copies the model as text, or opens a model pasted as text — handy for sending it in a message.</td></tr>
 <tr><td>[[t:app.menu.exportXlsx]]</td><td>Creates one .xlsx file with a sheet for each results table, in the columns and units chosen.</td></tr>
@@ -889,7 +889,9 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li>reservoirs, imposed pressures and flows with the temperature of their gas, valves, exit valves, control valves of flow and of pressure, and compressors with a fixed flow or a curve, turned into the head against the suction flow of Pump It;</li>
 <li>flows in mass, in volume at the local conditions or at normal ones; standard volumes become normal ones through the standard conditions of the file.</li>
 </ul>
-<p>The same report follows, comparing the first calculation with the stored results and listing what needs your input, what was assumed and what was left out (heat transfer, add-on modules).</p>`,
+<p>The same report follows, comparing the first calculation with the stored results and listing what needs your input, what was assumed and what was left out (heat transfer, add-on modules).</p>
+<h4>Models in the .imp format</h4>
+<p>[[t:app.menu.open]] also reads <code>.imp</code> files, the same kind of text format for models of hydraulic transients of a liquid. The network and its steady state come in as from a .fth file, with the scenario you choose, and also check valves, generic components given by a Cv or a Kv, nozzles given by the discharge coefficient and the area of their holes, and pumps with all their configurations. The data of the water hammer come in too: the control of the run and its time step, the bulk modulus of the liquid, the wave speeds of the pipes, the time data of the junctions, ends without reflection, check valves, control valves that keep controlling and the trip and start of pumps; the water hammer is on when the file sets a run. The same report follows, and what has no counterpart gets a note. The protection devices (surge tanks, gas accumulators, relief valves and air valves), the dynamic check valves, the four-quadrant data of pumps given by the user and the force sets come in too. The curves of the library of the program, which the file does not hold, are left for you to enter: a note says so.</p>`,
           },
           language: {
             title: 'Language and numbers',
