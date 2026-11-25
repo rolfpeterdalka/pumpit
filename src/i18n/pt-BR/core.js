@@ -110,6 +110,10 @@ PumpIt.i18n.add('pt-BR', {
         nParallel: 'número de tubos em paralelo',
         idReduction: 'redução de diâmetro',
         fittingQty: 'acessórios: quantidade zero ou maior',
+        fittingValue: 'acessório {n}{name}: {coef} vale {value}; um coeficiente de perda é um número zero ou maior',
+        fittingSum: 'acessórios: os valores de K somam {sum}; a soma é zero ou maior',
+        frictionMissing: 'modelo de atrito',
+        frictionUnknown: 'modelo de atrito "{model}" não é um dos da lista',
       },
       junction: {
         pipesExact: 'exige {n} tubo(s); tem {has}',
@@ -126,6 +130,7 @@ PumpIt.i18n.add('pt-BR', {
         density: 'densidade',
         viscosity: 'viscosidade',
         reynolds: 'números de Reynolds da transição: os dois acima de zero, o laminar abaixo do turbulento',
+        patm: 'pressão atmosférica: um número, acima de zero em valor absoluto',
       },
       gas: {
         temperature: 'temperatura do gás',
@@ -135,7 +140,6 @@ PumpIt.i18n.add('pt-BR', {
         viscosity: 'viscosidade do gás',
         machLimit: 'limite de Mach',
         velocityLimit: 'limite de velocidade',
-        patm: 'pressão atmosférica acima de zero',
       },
       time: {
         start: 'início em 0 ou depois',
@@ -314,7 +318,10 @@ PumpIt.i18n.add('pt-BR', {
       badFluid: 'Propriedades do fluido inválidas.',
       zeroGravity: 'Gravidade zero: saídas em altura (HGL, EGL, ΔH) não têm sentido.',
       badGeometry: 'Tubo P{id}: geometria inválida.',
-      badFittings: 'Tubo P{id}: acessório com quantidade negativa.',
+      badFittings: 'Tubo P{id}: o acessório {n} tem quantidade ou coeficiente que não é um número zero ou maior.',
+      badFittingSum: 'Tubo P{id}: os acessórios somam K = {sum}; a soma é zero ou maior.',
+      badFriction: 'Tubo P{id}: o modelo de atrito "{model}" não é um dos da lista.',
+      badPatm: 'A pressão atmosférica deve ser um número, acima de zero em valor absoluto.',
       needsTwoPipes: 'Junção J{id}: exige 2 tubos.',
       notDirectional: 'Junção J{id} ({label}): um tubo deve chegar e outro sair dela.',
       pipeNotConnected: 'Tubo P{id}: precisa estar ligado a duas junções.',

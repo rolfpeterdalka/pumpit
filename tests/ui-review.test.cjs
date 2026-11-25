@@ -1537,5 +1537,83 @@ console.log('\nUX script d5fa5e9, item 3: the tools of a closed group in a narro
     `${hide && hide[1].trim()} (${hide && weight(hide[1])}) · ${show && show[1].trim()} (${show && weight(show[1])})`);
 }
 
+// Review of 6043c80, bugs 2 and 4: a fitting coefficient below zero, or not a number, is refused where it is typed and
+// marked where it is loaded; an unknown friction model in a file opens with the pipe pending and its field named
+console.log('\nReview of 6043c80: the cells of the fittings and a friction model of a file');
+{
+  const cr6 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P = cr6.PumpIt, UI = P.ui, M = P.model;
+  P.i18n.setLanguage('pt-BR');
+  UI.dialogs = { toast() {}, modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection() {} };
+  const run = (file) => vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), cr6, { filename: file });
+  run('src/ui/app/state.js');
+  const app = P.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/inspector/pending.js');
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null });
+  // the editor of the fittings, with what it writes kept and its readouts readable
+  const commits = [];
+  app.setVal = (key, p, v) => commits.push(v);
+  const forms = UI.forms;
+  UI.forms = Object.assign({}, forms, { section: () => new Node('div'), readout: (label, v) => { const n = new Node('div'); n.textContent = label + ' ' + v; return n; } });
+  run('src/ui/inspector/fittings-editor.js');
+  const find = (n, id) => { if (n.id === id) return n; for (const c of n.children || []) { const r = find(c, id); if (r) return r; } return null; };
+  const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+  const pipeWith = (fittings) => { const m = P.examples.get('pump').build(); m.pipes[0].fittings = fittings; return M.getObj(M.effective(m, 'base'), 'p:1'); };
+  for (const model of ['K', 'KfT']) {
+    commits.length = 0;
+    const box = UI.fittingsEditor.build('p:1', pipeWith([{ model, qty: 1, value: 1, id: 'custom' }]), { Dh: 0.15405 });
+    const cell = find(box, 'fit-v-p:1-0');
+    cell.value = '-10'; cell.fire('change');
+    const err = find(box, 'fit-v-p:1-0-err');
+    ok(`6043c80-2 −10 typed in the ${model} cell is refused: nothing written, the cell marked, the rule told`,
+      commits.length === 0 && cell.getAttribute('aria-invalid') === 'true' && err && err.textContent.includes('“-10” não é aceito (um coeficiente de perda é zero ou mais)'), err && err.textContent);
+    cell.value = '10'; cell.fire('change');
+    ok(`6043c80-2 ... and 10 in the ${model} cell is written`, commits.length === 1 && commits[0][0].value === 10 && !cell.hasAttribute('aria-invalid'));
+  }
+  {
+    // a model saved with −10 (and one with a text): the cell shows the value, marked, and the sum is not given
+    const box = UI.fittingsEditor.build('p:1', pipeWith([{ model: 'K', qty: 1, value: -10 }, { model: 'KfT', qty: 1, value: 'abc' }]), { Dh: 0.15405 });
+    const c0 = find(box, 'fit-v-p:1-0'), c1 = find(box, 'fit-v-p:1-1'), e0 = find(box, 'fit-v-p:1-0-err'), e1 = find(box, 'fit-v-p:1-1-err');
+    const sum = all(box).find((n) => String(n.textContent).startsWith('ΣK'));
+    ok('6043c80-2 a loaded −10 shows as it is, marked, with its message', c0.value === '-10' && c0.getAttribute('aria-invalid') === 'true' && e0 && e0.textContent.startsWith('Linha 1 · K: o valor do modelo, -10, não é aceito (um coeficiente de perda é zero ou mais)'), e0 && e0.textContent);
+    ok('6043c80-2 a loaded text shows as it is, marked as not a number', c1.value === 'abc' && c1.getAttribute('aria-invalid') === 'true' && e1 && e1.textContent.includes('não é um número'), e1 && e1.textContent);
+    ok('6043c80-2 ... and ΣK is not given', sum && sum.textContent.endsWith('—'), sum && sum.textContent);
+    c0.fire('keydown', { key: 'Escape' });
+    ok('6043c80-2 Esc keeps the loaded value marked', c0.getAttribute('aria-invalid') === 'true');
+    // a fitting saved without a quantity counts one, as the core reads it: its cell is not marked
+    const b2 = UI.fittingsEditor.build('p:1', pipeWith([{ model: 'K', value: 2, id: 'custom' }]), { Dh: 0.15405 });
+    ok('6043c80-2 a fitting saved without a quantity is not marked (it counts one)', !find(b2, 'fit-q-p:1-0').hasAttribute('aria-invalid') && !find(b2, 'fit-v-p:1-0').hasAttribute('aria-invalid'));
+  }
+  {
+    // the calibrated tee of the .fth importer (F-23) keeps its negative K, and takes a negative one typed
+    commits.length = 0;
+    const box = UI.fittingsEditor.build('p:1', pipeWith([{ model: 'K', qty: 1, value: 2, id: 'imported' }, { model: 'K', qty: 1, value: -1.5, id: 'imported-tee' }]), { Dh: 0.15405 });
+    const c1 = find(box, 'fit-v-p:1-1');
+    const marked = c1.hasAttribute('aria-invalid');
+    c1.value = '-1'; c1.fire('change');
+    ok('6043c80-2 a calibrated tee keeps −1.5 unmarked and takes −1', !marked && commits.length === 1 && commits[0][1].value === -1);
+  }
+  UI.forms = forms;
+  // a JSON file with an unknown friction model, and one whose fitting is −10, opened in the editor
+  const text = (set) => { const m = P.examples.get('pump').build(); set(m); return JSON.stringify(m); };
+  app.loadModel(JSON.parse(text((m) => { m.pipes[1].friction.model = 'typo'; })), { fit: false });
+  const v = app.validation(), items = UI.pending.of('p:2');
+  ok('6043c80-4 a file with the friction model "typo" opens with P2 pending and the model kept', app.model.pipes[1].friction.model === 'typo' && !v.ok && v.undef.size === 1 && v.undef.has('p:2'),
+    [...v.undef].map(([k, x]) => k + ': ' + x.join('; ')).join(' | '));
+  ok('6043c80-4 ... its message names the model and points to the friction field', items.length === 1 && items[0].text.includes('"typo"') && items[0].path === 'friction.model', JSON.stringify(items));
+  app.loadModel(JSON.parse(text((m) => { delete m.pipes[0].friction; })), { fit: false });
+  const nf = UI.pending.of('p:1');
+  ok('6043c80-4 a file without the friction of P1 opens (it was refused as not a model) with P1 pending at its friction field', !app.validation().ok && nf.length === 1 && nf[0].path === 'friction.model', JSON.stringify(nf));
+  app.loadModel(JSON.parse(text((m) => { m.pipes[0].fittings = [{ model: 'K', qty: 1, value: 0.5 }, { model: 'K', qty: 1, value: -10 }]; })), { fit: false });
+  const nk = UI.pending.of('p:1');
+  ok('6043c80-2 a file with −10 in fitting 2 opens with P1 pending at the cell of that fitting', !app.validation().ok && nk.length === 1 && nk[0].path === '#fit-v-p:1-1', JSON.stringify(nk));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

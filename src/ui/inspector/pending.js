@@ -14,8 +14,23 @@
   const PIPE = {
     length: 'length', diameter: 'geometry.d', annulus: 'geometry.dOuter', annulusInner: 'geometry.dInner', rectangle: 'geometry.width',
     noncircular: 'geometry.area', roughness: 'friction.eps', relRoughness: 'friction.rel', frictionFactor: 'friction.f',
-    hwC: 'friction.C', nParallel: 'nParallel', idReduction: 'idReduction',
+    hwC: 'friction.C', nParallel: 'nParallel', idReduction: 'idReduction', frictionMissing: 'friction.model',
   };
+  // pipe messages with parameters (their text is not the one of the catalog): the friction model, and a fitting, whose
+  // value cell is the field (fittings-editor.js)
+  const PIPE_PARAM = { frictionUnknown: () => 'friction.model', fittingValue: (p, key) => '#fit-v-' + key + '-' + (Number(p.n) - 1) };
+  // the parameters of a text made from a template of the current language, or null when it is not one
+  function fromTemplate(tpl, text) {
+    if (!tpl) return null;
+    const names = [];
+    const re = new RegExp('^' + tpl.split(/(\{\w+\})/).map((part) => {
+      const m = /^\{(\w+)\}$/.exec(part);
+      if (m) { names.push(m[1]); return m[1] === 'n' ? '(\\d+)' : '([\\s\\S]*?)'; } // {n}: a row number
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('') + '$');
+    const hit = re.exec(text);
+    return hit ? Object.fromEntries(names.map((n, i) => [n, hit[i + 1]])) : null;
+  }
   const PIPE_CONNECT = ['connect', 'sameEnds'];
   // junction messages whose last key part is not the field: a connection, or another field
   const JUNCTION = { direction: null, staticOnePipe: null, holes: 'dHole', ratioGasOnly: 'mode' };
@@ -40,7 +55,11 @@
     return null;
   }
 
-  function pipePath(text) {
+  function pipePath(text, key) {
+    for (const [name, path] of Object.entries(PIPE_PARAM)) {
+      const p = fromTemplate(i18n.lookup('core.checklist.pipe.' + name), text);
+      if (p) return path(p, key);
+    }
     const k = i18n.keyOfText('core.checklist.pipe.', text);
     if (!k) return null;
     return PIPE_CONNECT.includes(last(k)) ? CONNECT : PIPE[last(k)] || null;
@@ -52,12 +71,13 @@
     const o = app.effObj(key);
     if (!o) return [];
     return miss.map((text) => {
-      const p = key[0] === 'p' ? pipePath(text) : junctionPath(o, text);
+      const p = key[0] === 'p' ? pipePath(text, key) : junctionPath(o, text);
       return { text, path: typeof p === 'string' ? p : null, connect: p === CONNECT };
     });
   }
 
-  const control = (key, path) => document.getElementById(UI.forms.idOf(key, path));
+  // the control of a field ('#id': a cell of a table, by its own id)
+  const control = (key, path) => document.getElementById(path[0] === '#' ? path.slice(1) : UI.forms.idOf(key, path));
 
   // marks the controls of the inspector the pending items ask for (aria-invalid and the class of their field)
   function mark(host, key) {

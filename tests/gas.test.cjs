@@ -548,7 +548,7 @@ if (PumpIt) {
     const thin = ex();
     thin.system.patm = q(0, 'bar(a)');
     const vs = M.validate(M.effective(thin, 'base'));
-    ok('T29 an atmospheric pressure of zero stays pending for a gas', !vs.ok && vs.items.find((i) => i.key === 'sys').detail.includes(tr('core.checklist.gas.patm')));
+    ok('T29 an atmospheric pressure of zero stays pending for a gas', !vs.ok && vs.items.find((i) => i.key === 'sys').detail.includes(tr('core.checklist.fluid.patm')));
   }
 }
 
@@ -593,8 +593,9 @@ if (PumpIt) {
   ok('6c4f0fa-3 adiabatic: the same speed, efficiency, power and discharge temperatures after 100 % and after 70 %',
     near(c.p.speed, d.p.speed, 1e-9) && near(c.p.eta, d.p.eta, 1e-9) && near(c.p.Pgas, d.p.Pgas, 1e-9) && near(c.p.T0out, d.p.T0out, 1e-12) && near(c.r.pipes[2].Tout, d.r.pipes[2].Tout, 1e-12),
     `${c.p.speed} ${d.p.speed}`);
-  ok('6c4f0fa-3 adiabatic: as at the fixed speed, 79.121 %, 11.140 W, T0 out 293.5643 K and 293.5628 K at the end of P2',
-    near(c.p.eta * 100, 79.121, 1e-5) && near(c.p.Pgas, 11.140, 1e-4) && Math.abs(c.p.T0out - 293.5643) < 1e-4 && Math.abs(c.r.pipes[2].Tout - 293.5628) < 1e-4
+  // T0 out: the reservoir J1 sits 3 m above the suction, so the gas reaches it at 293.15 + g·3/cp = 293.1793 K (G-39)
+  ok('6c4f0fa-3 adiabatic: as at the fixed speed, 79.121 %, 11.140 W, T0 out 293.5936 K and 293.5824 K at the end of P2',
+    near(c.p.eta * 100, 79.121, 1e-5) && near(c.p.Pgas, 11.140, 1e-4) && Math.abs(c.p.T0out - 293.5936) < 1e-4 && Math.abs(c.r.pipes[2].Tout - 293.5824) < 1e-4
     && near(e.p.eta, c.p.eta, 1e-6) && near(e.p.Pgas, c.p.Pgas, 1e-6) && Math.abs(e.r.pipes[2].Tout - c.r.pipes[2].Tout) < 1e-6, `${c.p.eta * 100} ${c.p.Pgas} ${c.p.T0out} ${c.r.pipes[2].Tout}`);
   const hi = pump('isothermal', 'curve', 100, { x: [0, 40, 80, 120], y: [0, 85, 98, 99], xUnit: 'm³/h', fit: '2' });
   const wh = hi.r.warnings.filter((w) => w.obj === 'j:2' && w.text.includes('outside 0 to 100%'));
@@ -651,11 +652,14 @@ if (PumpIt) {
     ok(`ab3e0d1-1 ${mode}: a horizontal pipe keeps its pressure`, near(h.r.Pout, h.r.Pin, 1e-9), `${h.r.Pin.toFixed(3)} → ${h.r.Pout.toFixed(3)} Pa`);
     ok(`ab3e0d1-1 ${mode}: the pressure falls on the rise and grows on the descent`, up.r.Pout < h.r.Pout - 1e4 && dn.r.Pout > h.r.Pout + 1e4,
       `rise ${up.r.Pout.toFixed(2)}, level ${h.r.Pout.toFixed(2)}, descent ${dn.r.Pout.toFixed(2)} Pa`);
-    // an independent isothermal column of gas at rest: P2/P1 = exp(−g·Δz/(Z·R·T)), with the absolute T and the specific R
-    const fl = PumpIt.fluids.evaluateGas(h.e.system), g = 9.80665 * (h.e.system.gravity || 1), R = 8314.462618 / fl.MW;
+    // an independent column of gas at low flow, with the absolute T and the specific R: isothermal, P2/P1 =
+    // exp(−g·Δz/(Z·R·T)); adiabatic, the gas cools by g·Δz/cp as it rises (G-39), so the column is isentropic,
+    // P2/P1 = (1 − g·Δz/(cp·T))^(cp/(Z·R))
+    const fl = PumpIt.fluids.evaluateGas(h.e.system), g = 9.80665 * (h.e.system.gravity || 1), R = 8314.462618 / fl.MW, cp = fl.k * R / (fl.k - 1);
     for (const z of [500, -500]) {
       const lo = run(z, none, 1e-6, mode);
-      const col = Math.exp(-g * (z - lo.zs) / (fl.Z * R * fl.T));
+      const dz = z - lo.zs;
+      const col = mode === 'isothermal' ? Math.exp(-g * dz / (fl.Z * R * fl.T)) : Math.pow(1 - g * dz / (cp * fl.T), cp / (fl.Z * R));
       ok(`ab3e0d1-1 ${mode}: at low flow P2/P1 = the gas column (z ${z} m)`, lo.ok && near(lo.r.Pout / lo.r.Pin, col, 1e-7), lo.ok ? `${(lo.r.Pout / lo.r.Pin).toFixed(10)} × ${col.toFixed(10)}` : (lo.s.errors || []).join('; '));
     }
     // continuity as the friction tends to zero, on the rise and on the descent
@@ -684,6 +688,86 @@ if (PumpIt) {
     const e = M.effective(m, 'base'), r = M.validate(e).ok ? PumpIt.solver.run(e) : { ok: false, errors: ['incomplete model'] };
     ok(`ab3e0d1-1 ${mode}: a fixed-ratio compressor after a pipe of no loss keeps P0 out = 2·P0 in`, r.ok && r.pumps[2].m > 0 && near(r.junctions[2].P0out / r.junctions[2].P0in, 2, 1e-9),
       r.ok ? `r = ${(r.junctions[2].P0out / r.junctions[2].P0in).toFixed(10)}, ṁ ${r.pumps[2].m.toFixed(4)} kg/s` : r.errors.join('; '));
+  }
+}
+
+console.log('\nReview of 6043c80, bug 1: the potential energy in the energy balance of the adiabatic model');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  const g = 9.80665, cp = 1.4 * (8314.462618 / 28.9647) / 0.4;
+  // the case of the report: the source of example D as a stagnation pressure, 1000 m of pipe and a demand of 0.1 kg/s
+  // at the elevation z; series: two pipes of 500 m through a branch at z/2; rev: the pipe (or pipe 1 or 2 of the series)
+  // drawn against the flow
+  const build = (mode, z, o = {}) => {
+    const m = PumpIt.examples.get('air').build();
+    m.system.gasMode = mode;
+    m.system.fluidGas = Object.assign(M.newGasFluid(), { gas: 'custom', MW: 28.9647, k: 1.4, Z: 1, T: q(300, 'K') });
+    const src = Object.assign(m.junctions[2], { id: 1, ptype: 'stagnation', elevation: q(0, 'm') });
+    const sink = Object.assign(M.newJunction('flow', 2, 0, 0), { elevation: q(z, 'm'), Q: q(0.1, 'kg/s'), dir: 'out' });
+    const fr = () => (o.darcy ? { model: 'roughness', eps: q(0.046, 'mm') } : { model: 'frictionless' });
+    if (!o.series) {
+      m.junctions = [src, sink];
+      m.pipes = m.pipes.slice(0, 1);
+      Object.assign(m.pipes[0], o.rev ? { up: 2, down: 1 } : { up: 1, down: 2 }, { length: q(1000, 'm'), friction: fr() });
+    } else {
+      m.junctions = [src, sink, Object.assign(M.newJunction('branch', 3, 0, 0), { elevation: q(z / 2, 'm') })];
+      m.pipes = m.pipes.slice(0, 2);
+      Object.assign(m.pipes[0], o.rev === 1 ? { up: 3, down: 1 } : { up: 1, down: 3 }, { length: q(500, 'm'), friction: fr() });
+      Object.assign(m.pipes[1], o.rev === 2 ? { up: 2, down: 3 } : { up: 3, down: 2 }, { length: q(500, 'm'), friction: fr() });
+    }
+    const e = M.effective(m, 'base'), s = M.validate(e).ok ? PumpIt.solver.run(e) : { ok: false, errors: ['incomplete model'] };
+    return s.ok && s.converged ? s : Object.assign(s, { ok: false, errors: s.errors || ['not converged'] });
+  };
+  // the stagnation temperature where the gas leaves pipe id, whatever its reference direction
+  const leaves = (s, id) => (s.pipes[id].m >= 0 ? s.pipes[id].T0out : s.pipes[id].T0in);
+  const enters = (s, id) => (s.pipes[id].m >= 0 ? s.pipes[id].T0in : s.pipes[id].T0out);
+  for (const darcy of [false, true]) {
+    const how = darcy ? 'Darcy' : 'no friction';
+    for (const z of [0, 1000, -1000]) {
+      const want = 300 - g * z / cp, s = build('adiabatic', z, { darcy });
+      ok(`6043c80-1 ${how}, z ${z} m: cp·(T0 out − T0 in) + g·Δz = 0 (${want.toFixed(2)} K), also at the demand`,
+        s.ok && Math.abs(leaves(s, 1) - want) < 0.02 && Math.abs(s.junctions[2].T0 - want) < 0.02 && Math.abs(enters(s, 1) - 300) < 1e-9,
+        s.ok ? `${enters(s, 1)} → ${leaves(s, 1)} K, J2 ${s.junctions[2].T0} K` : s.errors.join('; '));
+    }
+    for (const z of [1000, -1000]) {
+      const want = 300 - g * z / cp, mid = 300 - g * z / 2 / cp;
+      for (const rev of [0, 1, 2]) {
+        const s = build('adiabatic', z, { darcy, series: true, rev });
+        ok(`6043c80-1 ${how}, z ${z} m in two pipes of 500 m${rev ? `, P${rev} reversed` : ''}: T0 continuous at the middle node, the same at the end`,
+          s.ok && Math.abs(leaves(s, 1) - mid) < 0.02 && Math.abs(s.junctions[3].T0 - leaves(s, 1)) < 1e-6 && Math.abs(enters(s, 2) - s.junctions[3].T0) < 1e-6
+            && Math.abs(leaves(s, 2) - want) < 0.02 && Math.abs(s.junctions[2].T0 - want) < 0.02,
+          s.ok ? `P1 ${leaves(s, 1).toFixed(4)}, J3 ${s.junctions[3].T0.toFixed(4)}, P2 ${enters(s, 2).toFixed(4)} → ${leaves(s, 2).toFixed(4)} K` : s.errors.join('; '));
+      }
+      const r = build('adiabatic', z, { darcy, rev: true });
+      ok(`6043c80-1 ${how}, z ${z} m, the pipe drawn against the flow: the same T0 at the demand`,
+        r.ok && r.pipes[1].m < 0 && Math.abs(r.pipes[1].T0in - want) < 0.02 && Math.abs(r.pipes[1].T0out - 300) < 1e-9 && Math.abs(r.junctions[2].T0 - want) < 0.02,
+        r.ok ? `${r.pipes[1].T0out} → ${r.pipes[1].T0in} K` : r.errors.join('; '));
+    }
+  }
+  // the isothermal model imposes the static temperature: it stays the gas temperature at both ends, at any elevation
+  for (const z of [1000, -1000]) {
+    const s = build('isothermal', z);
+    ok(`6043c80-1 isothermal, z ${z} m: the static temperature stays 300 K at both ends`, s.ok && s.pipes[1].Tin === 300 && s.pipes[1].Tout === 300,
+      s.ok ? `${s.pipes[1].Tin} → ${s.pipes[1].Tout} K` : s.errors.join('; '));
+  }
+  // the next equipment gets the enthalpy that leaves the pipe: a compressor 200 m above its source sucks gas cooled by
+  // g·200/cp, and heats it from there
+  {
+    const m = M.newModel();
+    Object.assign(m.system, { regime: 'compressible', gasMode: 'adiabatic' });
+    m.system.fluidGas = Object.assign(M.newGasFluid(), { gas: 'custom', MW: 28.9647, k: 1.4, Z: 1, T: q(300, 'K') });
+    const J = (type, id, props) => m.junctions.push(Object.assign(M.newJunction(type, id, 0, 0), props));
+    J('pressure', 1, { P: q(2, 'bar(a)'), ptype: 'stagnation', elevation: q(0, 'm') });
+    J('pump', 2, { mode: 'ratio', ratio: 1.5, state: 'on', elevation: q(200, 'm') });
+    J('pressure', 3, { P: q(2.5, 'bar(a)'), ptype: 'static', elevation: q(200, 'm') });
+    for (const [id, a, b, L] of [[1, 1, 2, 400], [2, 2, 3, 300]]) {
+      const p = Object.assign(M.newPipe(id, a, b), { material: { kind: 'user', nps: '4', sch: '40' }, length: q(L, 'm'), friction: { model: 'roughness', eps: q(0.046, 'mm') } });
+      m.pipes.push(p);
+    }
+    const e = M.effective(m, 'base'), s = M.validate(e).ok ? PumpIt.solver.run(e) : { ok: false, errors: ['incomplete model'] };
+    const want = 300 - g * 200 / cp;
+    ok('6043c80-1 a compressor 200 m above its source takes the gas at 300 − g·200/cp', s.ok && s.pumps[2].m > 0 && Math.abs(s.pumps[2].T0in - want) < 0.02 && s.pumps[2].T0out > s.pumps[2].T0in,
+      s.ok ? `T0 in ${s.pumps[2].T0in} K (want ${want.toFixed(4)}), out ${s.pumps[2].T0out} K, ṁ ${s.pumps[2].m}` : s.errors.join('; '));
   }
 }
 

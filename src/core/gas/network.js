@@ -21,7 +21,8 @@
     const sys = eff.system;
     const fl = PumpIt.fluids.evaluateGas(sys); // a clear message when the gas data is invalid
     warnings.push(...fl.warnings);
-    const patm = U.toSI(sys.patm.value, sys.patm.unit, 'pressure');
+    const patm = M.patmOf(sys);
+    if (!(patm > 0)) throw new Error(t('core.solver.badPatm')); // R-13: the gas is calculated in absolute pressure
     const g = U.G0 * sys.gravity;
     const mode = sys.gasMode === 'adiabatic' ? 'adiabatic' : 'isothermal';
     const cx = PumpIt.gas.flow.context(fl, mode, g);

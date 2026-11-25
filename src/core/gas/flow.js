@@ -111,7 +111,8 @@
 
   // ------------------------------------------------------------------ the march (§9.6, §9.7)
   // The finite volumes of gas.js marchPipe (the same balances and averages per step), with an analytic Jacobian per
-  // step, the gravity of the model, and finer steps as the gas accelerates towards the sonic point (decision G-11):
+  // step, the gravity of the model (in the momentum and, unlike the reference, in the energy balance: cp·T₀ + g·z is kept
+  // along an adiabatic pipe, G-39), and finer steps as the gas accelerates towards the sonic point (decision G-11):
   // a step changes M by at most 0.005 and by at most 5 % of what is left to the limit, and a step that has no subsonic
   // solution is cut by four. A pipe chokes when M reaches the limit before its end. keep: also return the profile.
   function march(cx, P1, T1, G, L, D, f, dz, nSeg = 100, keep = false) {
@@ -135,7 +136,7 @@
         if (iso) sP = F1 / a11;
         else {
           const dVdT = Vn / Tn, drdT = -rhoN / Tn;
-          const F2 = cp * (Tn - To) + (Vn * Vn - Vo * Vo) / 2;
+          const F2 = cp * (Tn - To) + (Vn * Vn - Vo * Vo) / 2 + gz;
           const a12 = G * dVdT + cf * (0.5 * drdT * Va * Va + ra * Va * dVdT) + 0.5 * drdT * gz;
           const a21 = Vn * dVdP, a22 = cp + Vn * dVdT;
           const det = a11 * a22 - a12 * a21;
@@ -312,14 +313,16 @@
 
   // a pipe whose flow m (a → b positive) is an unknown: the state at b, marched from a whatever the direction. Against
   // the flow the losses change sign (the march runs from the outlet back to the inlet); the gas is at the T0 of the node
-  // it comes from, blended across a band of tiny flows so that the relation stays continuous through zero
+  // it comes from, which against the flow reaches end a with T0_b + g·Δz/cp (G-39), blended across a band of tiny flows
+  // so that the relation stays continuous through zero
   function pipeOut(cx, d, na, nb, m, keep = false) {
     const fwd = m >= 0, i = fwd ? 0 : 1, A = d.A[i] * d.N, D = d.D[i], G = abs(m) / A;
-    let T0 = fwd ? na.T0 : nb.T0;
-    if (!cx.iso && na.T0 !== nb.T0) {
+    const T0r = cx.iso ? nb.T0 : nb.T0 + cx.g * d.dz / cx.cp;
+    let T0 = fwd ? na.T0 : T0r;
+    if (!cx.iso && na.T0 !== T0r) {
       const band = 1e-9 * A * na.P / sqrt(cx.ZR * na.T0);
       const w = m >= band ? 1 : m <= -band ? 0 : (m + band) / (2 * band);
-      T0 = w * na.T0 + (1 - w) * nb.T0;
+      T0 = w * na.T0 + (1 - w) * T0r;
     }
     const Re = G * D / cx.mu;
     // no flow, no loss (the factors of a laminar flow are not defined at zero)

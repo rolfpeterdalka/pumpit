@@ -39,15 +39,29 @@
     }
     if (g.kind === 'rectangular' && !(pos(g.width) && pos(g.height))) need('rectangle');
     if (g.kind === 'noncircular' && !(pos(g.area) && pos(g.perim))) need('noncircular');
-    const f = p.friction;
+    // the friction model: one of the list (a missing or unknown one would calculate as a pipe without friction)
+    const f = p.friction && typeof p.friction === 'object' ? p.friction : {};
+    if (!M.frictionKnown(p.friction)) {
+      if (f.model === undefined || f.model === null || f.model === '') need('frictionMissing');
+      else miss.push(t('core.checklist.pipe.frictionUnknown', { model: String(f.model) }));
+    }
     if (f.model === 'roughness' && !(fin(f.eps) && f.eps.value >= 0)) need('roughness');
     if (f.model === 'relRoughness' && !(f.rel >= 0)) need('relRoughness');
     if (f.model === 'explicitF' && !(f.f > 0)) need('frictionFactor');
     if (f.model === 'hw' && !(f.C > 0)) need('hwC');
     if (!(Number.isInteger(p.nParallel) && p.nParallel >= 1)) need('nParallel');
     if (!(p.idReduction >= 0 && p.idReduction < 100)) need('idReduction');
-    // the quantity of a fitting: zero or more (none given counts one)
-    if ((p.fittings || []).some((it) => !((it.qty ?? 1) >= 0))) need('fittingQty');
+    // the fittings: a quantity of zero or more (none given counts one) and a coefficient of zero or more, each named
+    const fi = M.fittingIssues(p);
+    if (fi.some((x) => x.what === 'qty')) need('fittingQty');
+    for (const x of fi) {
+      if (x.what === 'value') {
+        let name = '';
+        try { name = PumpIt.data.fittingName(x.it) || ''; } catch (e) { /* a damaged item: its row is enough */ }
+        const v = x.it.value;
+        miss.push(t('core.checklist.pipe.fittingValue', { n: x.n, name: name ? ` (${name})` : '', coef: x.it.model === 'KfT' ? 'K/fT' : 'K', value: v === undefined || v === null || v === '' ? '—' : typeof v === 'string' ? `"${v}"` : String(v) }));
+      } else if (x.what === 'sum') miss.push(t('core.checklist.pipe.fittingSum', { sum: +x.sum.toPrecision(6) }));
+    }
     if (surgeOn(m)) for (const k of PumpIt.surge.inputs.checkPipe(m, p)) miss.push(t('surge.checklist.pipe.' + k));
     return miss;
   }
@@ -119,7 +133,7 @@
   }
 
   // the gas of the compressible mode (§8.5): temperature above absolute zero and Z > 0; a custom gas also MW > 0,
-  // k > 1 and μ > 0. The atmospheric pressure above zero (R-13) and the design limits of the warnings too.
+  // k > 1 and μ > 0. The design limits of the warnings too.
   function checkGas(sys) {
     const g = sys.fluidGas || {};
     const miss = [];
@@ -131,8 +145,6 @@
       if (!(g.k > 1)) miss.push(t('core.checklist.gas.kRatio'));
       if (!pos(g.mu)) miss.push(t('core.checklist.gas.viscosity'));
     }
-    const pa = sys.patm;
-    if (!(fin(pa) && PumpIt.units.has('pressure', pa.unit) && PumpIt.units.toSI(pa.value, pa.unit, 'pressure') > 0)) miss.push(t('core.checklist.gas.patm'));
     if (!(sys.machLimit > 0)) miss.push(t('core.checklist.gas.machLimit'));
     if (!pos(sys.gasVelLimit)) miss.push(t('core.checklist.gas.velocityLimit'));
     return miss;
@@ -146,11 +158,17 @@
     if (!unitMiss(sys).length && !reynoldsOk(sys)) out.push(t('core.checklist.fluid.reynolds'));
     return out;
   }
+  // the fluid of the regime, and in both regimes the atmospheric pressure: a number in a unit of pressure, above zero
+  // once absolute (R-13 for a gas; for a liquid it gives the absolute pressures of the NPSH and of the vapour pressure)
   function checkFluidOnly(sys) {
-    const f = sys.fluid;
     const um = unitMiss(sys);
     if (um.length) return um;
-    if (sys.regime === 'compressible') return checkGas(sys);
+    const miss = sys.regime === 'compressible' ? checkGas(sys) : checkLiquid(sys);
+    if (!(M.patmOf(sys) > 0)) miss.push(t('core.checklist.fluid.patm'));
+    return miss;
+  }
+  function checkLiquid(sys) {
+    const f = sys.fluid;
     if (PumpIt.fluids.LIBRARY[f.kind]) return fin(f.T) ? [] : [t('core.checklist.fluid.temperature')]; // library fluid: by temperature
     const miss = [];
     if (!pos(f.rho)) miss.push(t('core.checklist.fluid.density'));

@@ -1173,7 +1173,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
             title: 'Gás, temperatura e modelo térmico',
             body: `<p>No regime compressível, a janela do sistema mostra a seção [[t:inspector.system.gas]]:</p>
 <ul>
-<li>[[t:inspector.system.gasMode]]: <b>[[t:inspector.system.gasModes.isothermal]]</b> mantém a temperatura constante em toda a rede (linhas longas que trocam calor com o ambiente); <b>[[t:inspector.system.gasModes.adiabatic]]</b> não troca calor: a temperatura de estagnação se conserva em cada tubo e o gás esfria ao acelerar (linhas curtas ou isoladas).</li>
+<li>[[t:inspector.system.gasMode]]: <b>[[t:inspector.system.gasModes.isothermal]]</b> mantém a temperatura constante em toda a rede (linhas longas que trocam calor com o ambiente); <b>[[t:inspector.system.gasModes.adiabatic]]</b> não troca calor: em cada tubo a temperatura de estagnação só muda com a cota, cerca de 1 °C a cada 100 m de subida para o ar (o gás esfria ao subir e esquenta ao descer), e o gás esfria ao acelerar (linhas curtas ou isoladas).</li>
 <li>[[t:inspector.system.gasKind]]: ar, nitrogênio, oxigênio, metano, gás natural (aproximado), CO₂ e hidrogênio, com massa molar e k de valores públicos e viscosidade pela lei de Sutherland; ou [[t:inspector.system.customGas]], com massa molar, k e viscosidade informados. Ao passar de um gás da biblioteca para o personalizado, os valores dele viram o ponto de partida.</li>
 <li>[[t:inspector.system.Z]]: 1 para gás ideal; para um gás real, o valor nas condições de operação, constante no modelo.</li>
 <li>Temperatura: no isotérmico, a do gás em toda a rede; no adiabático, a temperatura de estagnação das fontes. Cada fonte pode ter a sua, como em [[go:gas.components]].</li>

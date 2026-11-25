@@ -216,6 +216,44 @@
     return m;
   }
 
+  // friction models of a pipe (the choices of the pipe panel, the same since the first version): a file with any other
+  // one, or none, is reported by the checklist and refused by the calculation, never taken as a pipe without friction
+  const FRICTION_MODELS = ['roughness', 'relRoughness', 'smooth', 'explicitF', 'hw', 'frictionless'];
+  const frictionKnown = (fr) => !!fr && typeof fr === 'object' && FRICTION_MODELS.includes(fr.model);
+
+  // what is wrong with the fittings of a pipe: [{ what: 'qty' | 'value' | 'sum', n (its row, from 1), it, sum }]. A
+  // quantity is a finite number of zero or more (none given counts one); a coefficient (K, or the multiple of fT) a
+  // finite number of zero or more: a negative one would give energy to a passive pipe, an empty one would be no loss.
+  // The one exception is the K the .fth importer gives a path of a calibrated tee that gains pressure (F-23, a K item of
+  // id 'imported-tee'): negative, within the K of the other fittings, so the fittings of the pipe never add up to less
+  // than zero. fT: the Crane fT of the pipe; without it the multiples of fT are left out of that sum, which then errs on
+  // the side of refusing
+  function fittingIssues(p, fT = NaN) {
+    const out = [];
+    let sum = 0, gain = false;
+    (Array.isArray(p.fittings) ? p.fittings : []).forEach((it, i) => {
+      if (!it || typeof it !== 'object') { out.push({ what: 'value', n: i + 1, it: {} }); return; }
+      const qty = it.qty ?? 1;
+      const qtyOk = Number.isFinite(qty) && qty >= 0;
+      if (!qtyOk) out.push({ what: 'qty', n: i + 1, it });
+      const v = it.value, tee = it.id === 'imported-tee' && it.model === 'K';
+      if (!Number.isFinite(v) || (v < 0 && !tee)) { out.push({ what: 'value', n: i + 1, it }); return; }
+      if (v < 0) gain = true;
+      if (qtyOk) sum += qty * (it.model === 'KfT' ? (Number.isFinite(fT) ? v * fT : 0) : v);
+    });
+    if (gain && !out.length && sum < 0) out.push({ what: 'sum', sum });
+    return out;
+  }
+
+  // the atmospheric pressure of a system in Pa (absolute), or NaN when it is missing or not a pressure, or not above
+  // zero once converted. A gauge unit is relative to the standard atmosphere (101.325 kPa), as before
+  function patmOf(sys) {
+    const pa = sys && sys.patm;
+    if (!pa || typeof pa !== 'object' || !Number.isFinite(pa.value) || !PumpIt.units.has('pressure', pa.unit)) return NaN;
+    const v = PumpIt.units.toSI(pa.value, pa.unit, 'pressure');
+    return v > 0 ? v : NaN;
+  }
+
   // inlet and outlet pipes of a two-port junction, by reference direction
   function ports(m, j) {
     const ps = pipesAt(m, j.id);
@@ -230,7 +268,7 @@
     q, clone, newJunction, newPipe, pipeDefaults, newModel, newGasFluid, migrate,
     getPath, setPath, getObj, deepEqual,
     pipesAt, ports, REGIMES, GAS_MODES, LAMINAR_K, isCompressible, normalizeRegime,
-    TIME_METHODS, DATA_END, newTimeControl, normalizeTime,
+    TIME_METHODS, DATA_END, newTimeControl, normalizeTime, FRICTION_MODELS, frictionKnown, fittingIssues, patmOf,
   });
   // { type: definition } in display order, built from the junction type registry
   Object.defineProperty(PumpIt.model, 'JT', { get: () => types.table(), enumerable: true, configurable: true });

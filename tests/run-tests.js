@@ -409,5 +409,77 @@ console.log('\nReview of aca2807, case 10: the Cv of a valve drawn against the f
   check('no flow and no pressure drop: no coefficient', Number.isNaN(JS.flowCv(0, 0, 998)) && Number.isNaN(JS.flowCv(-1, 1000, 998)));
 }
 
+console.log('\nReview of 6043c80, bugs 2 to 4: inputs the calculation must refuse');
+{
+  // the checklist (its messages of the pipe or of the system) and the solver called directly
+  const look = (m, sid = 'base') => {
+    const e = M.effective(m, sid), v = M.validate(e), r = S.run(e);
+    const msgs = [...v.undef.values()].flat().concat(v.items.filter((i) => !i.ok && i.key === 'sys').map((i) => i.detail));
+    return { v, r, msgs, text: msgs.join(' | ') + ' || ' + (r.ok ? 'solved' : r.errors.join('; ')) };
+  };
+  const refused = (o, re) => !o.v.ok && !o.r.ok && o.msgs.some((x) => re.test(x)) && o.r.errors.some((x) => re.test(x) || /P\d+/.test(x));
+  // bug 2: one fitting on the suction pipe of the pump example; K 0 and K 10 are the controls of the report
+  const fit = (model, value, qty = 1) => { const m = PumpIt.examples.get('pump').build(); m.pipes[0].fittings = [{ model, qty, value }]; return m; };
+  const k0 = look(fit('K', 0)), k10 = look(fit('K', 10));
+  check('fittings: K 0 and K 10 calculate as in the report (0 and 13.10 kPa, 111.68 and 108.70 m³/h, NPSHA 12.80 and 11.48 m)',
+    k0.v.ok && k10.v.ok && k0.r.ok && k10.r.ok && Math.abs(k0.r.pipes[1].dPfit) < 1e-9 && Math.abs(k10.r.pipes[1].dPfit / 1e3 - 13.10) < 0.005
+      && Math.abs(k0.r.pipes[1].Q * 3600 - 111.68) < 0.005 && Math.abs(k10.r.pipes[1].Q * 3600 - 108.70) < 0.005
+      && Math.abs(k0.r.pumps[2].NPSHA - 12.80) < 0.005 && Math.abs(k10.r.pumps[2].NPSHA - 11.48) < 0.005,
+    `${k0.r.pumps[2].NPSHA} ${k10.r.pumps[2].NPSHA}`);
+  for (const [model, value] of [['K', -10], ['KfT', -10], ['K', null], ['K', 'abc'], ['K', '5']]) {
+    const m = fit(model, value), o = look(m);
+    check(`fittings: ${model} = ${JSON.stringify(value)} is refused by the checklist and by the solver, and stays in the model`,
+      refused(o, /fitting 1/) && m.pipes[0].fittings[0].value === value, o.text);
+  }
+  {
+    const m = PumpIt.examples.get('pump').build();
+    m.pipes[0].fittings = [{ model: 'K', qty: 1, value: 0.5 }, Object.assign({ qty: 1 }, PumpIt.data.FITTINGS.find((x) => x.model === 'KfT'), { value: -10 })];
+    const o = look(m);
+    check('fittings: the message names the pipe, the row and the fitting', o.v.undef.has('p:1') && o.msgs.some((x) => x.includes('fitting 2 (' + PumpIt.data.fittingName(m.pipes[0].fittings[1]) + '): K/fT is -10')), o.text);
+  }
+  {
+    // the calibrated tee of the .fth importer (F-23): a negative K within the K of the other fittings of the pipe
+    const tee = (K) => { const m = PumpIt.examples.get('pump').build(); m.pipes[0].fittings = [{ model: 'K', qty: 1, value: 2, id: 'imported' }, { model: 'K', qty: 1, value: K, id: 'imported-tee' }]; return look(m); };
+    const a = tee(-1.5), b = tee(-3);
+    check('fittings: a calibrated tee of -1.5 beside K 2 calculates; one of -3 is refused (the sum would be -1)', a.v.ok && a.r.ok && refused(b, /add up to -1/), b.text);
+  }
+  {
+    // a scenario that overrides the fittings: the base calculates, the child is refused
+    const m = PumpIt.examples.get('pump').build();
+    m.scenarios.list[1].overrides['p:1|fittings'] = [{ model: 'K', qty: 1, value: -10 }];
+    const base = look(m, 'base'), child = look(m, 's1');
+    check('fittings: a scenario with K -10 is refused while its base calculates', base.v.ok && base.r.ok && refused(child, /fitting 1/), child.text);
+  }
+  // bug 3: the atmospheric pressure, in both regimes
+  const atm = (value, unit, ex = 'pump') => { const m = PumpIt.examples.get(ex).build(); m.system.patm = q(value, unit); return look(m); };
+  const okAtm = atm(101.325, 'kPa(a)');
+  check('atmosphere: the example of the report (128.63 kPa(a) at the inlet of P1, NPSHA 12.66 m)', okAtm.v.ok && okAtm.r.ok && Math.abs(okAtm.r.pipes[1].Pin / 1e3 - 128.63) < 0.005 && Math.abs(okAtm.r.pumps[2].NPSHA - 12.66) < 0.005,
+    `${okAtm.r.pipes[1].Pin} ${okAtm.r.pumps[2].NPSHA}`);
+  for (const [v, u, ex] of [[null, 'kPa(a)', 'pump'], [-100, 'kPa(a)', 'pump'], [null, 'bar(g)', 'pump'], [0, 'kPa(a)', 'pump'], ['abc', 'kPa(a)', 'pump'], [null, 'kPa(a)', 'air'], [-100, 'kPa(a)', 'air']]) {
+    const o = atm(v, u, ex);
+    check(`atmosphere: ${JSON.stringify(v)} ${u} (${ex}) is refused by the checklist and by the solver, no NPSH`, refused(o, /atmospheric pressure/) && !(o.r.pumps && o.r.pumps[2]), o.text);
+  }
+  {
+    // another valid atmosphere, absolute and gauge (a gauge value is relative to the standard atmosphere)
+    const a = atm(90, 'kPa(a)'), g = atm(90 - 101.325, 'kPa(g)');
+    check('atmosphere: 90 kPa(a) and -11.325 kPa(g) give the same results', a.r.ok && g.r.ok && a.r.patm === 90000 && Math.abs(g.r.patm - 90000) < 1e-9
+      && Math.abs(a.r.pumps[2].NPSHA - g.r.pumps[2].NPSHA) < 1e-9 && a.r.pumps[2].NPSHA < okAtm.r.pumps[2].NPSHA, `${a.r.pumps[2].NPSHA} ${g.r.pumps[2].NPSHA}`);
+  }
+  // bug 4: the friction model
+  const fric = (set) => { const m = PumpIt.examples.get('pump').build(); set(m); return look(m); };
+  const rough = fric(() => {}), none = fric((m) => { for (const p of m.pipes) p.friction.model = 'frictionless'; });
+  check('friction: the controls of the report (111.36 m³/h and 2.31 kPa with roughness; 154.15 m³/h and no loss without friction)',
+    rough.r.ok && none.r.ok && Math.abs(rough.r.pipes[1].Q * 3600 - 111.36) < 0.005 && Math.abs(rough.r.pipes[1].dPfric / 1e3 - 2.31) < 0.005
+      && Math.abs(none.r.pipes[1].Q * 3600 - 154.15) < 0.005 && none.r.pipes[1].dPfric === 0, `${rough.r.pipes[1].Q * 3600} ${none.r.pipes[1].Q * 3600}`);
+  const all = fric((m) => { for (const p of m.pipes) p.friction.model = 'typo'; });
+  check('friction: "typo" on every pipe is refused, each pipe named', refused(all, /"typo"/) && all.v.undef.size === 3 && ['P1', 'P2', 'P3'].every((id) => all.r.errors.some((x) => x.includes(id))), all.text);
+  const one = fric((m) => { m.pipes[1].friction.model = 'typo'; });
+  check('friction: one unknown model among valid pipes names that pipe only', refused(one, /"typo"/) && one.v.undef.size === 1 && one.v.undef.has('p:2') && one.r.errors.length === 1 && one.r.errors[0].includes('P2'), one.text);
+  for (const [what, set] of [['no model', (m) => { delete m.pipes[0].friction.model; }], ['a null model', (m) => { m.pipes[0].friction.model = null; }], ['no friction at all', (m) => { delete m.pipes[0].friction; }]]) {
+    const o = fric(set);
+    check(`friction: ${what} is refused (not a pipe without friction), and the checklist does not fail`, refused(o, /friction model/) && o.v.undef.has('p:1'), o.text);
+  }
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

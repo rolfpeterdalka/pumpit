@@ -111,6 +111,10 @@ PumpIt.i18n.add('en', {
         nParallel: 'number of parallel pipes',
         idReduction: 'diameter reduction',
         fittingQty: 'fittings: quantity of zero or more',
+        fittingValue: 'fitting {n}{name}: {coef} is {value}; a loss coefficient is a number of zero or more',
+        fittingSum: 'fittings: their K values add up to {sum}; the sum is zero or more',
+        frictionMissing: 'friction model',
+        frictionUnknown: 'friction model "{model}" is not one of the list',
       },
       junction: {
         pipesExact: 'needs {n} pipe(s); has {has}',
@@ -127,6 +131,7 @@ PumpIt.i18n.add('en', {
         density: 'density',
         viscosity: 'viscosity',
         reynolds: 'Reynolds numbers of the transition: both above zero, the laminar one below the turbulent one',
+        patm: 'atmospheric pressure: a number, above zero once absolute',
       },
       gas: {
         temperature: 'gas temperature',
@@ -136,7 +141,6 @@ PumpIt.i18n.add('en', {
         viscosity: 'gas viscosity',
         machLimit: 'Mach limit',
         velocityLimit: 'velocity limit',
-        patm: 'atmospheric pressure above zero',
       },
       time: {
         start: 'start time of 0 or later',
@@ -315,7 +319,10 @@ PumpIt.i18n.add('en', {
       badFluid: 'Invalid fluid properties.',
       zeroGravity: 'Zero gravity: head outputs (HGL, EGL, ΔH) are meaningless.',
       badGeometry: 'Pipe P{id}: invalid geometry.',
-      badFittings: 'Pipe P{id}: a fitting with a negative quantity.',
+      badFittings: 'Pipe P{id}: fitting {n} has a quantity or a coefficient that is not a number of zero or more.',
+      badFittingSum: 'Pipe P{id}: its fittings add up to a K of {sum}; the sum is zero or more.',
+      badFriction: 'Pipe P{id}: the friction model "{model}" is not one of the list.',
+      badPatm: 'The atmospheric pressure must be a number, above zero once absolute.',
       needsTwoPipes: 'Junction J{id}: needs 2 pipes.',
       notDirectional: 'Junction J{id} ({label}): one pipe must arrive at it and the other leave it.',
       pipeNotConnected: 'Pipe P{id}: must be connected to two junctions.',

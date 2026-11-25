@@ -102,7 +102,8 @@
 
   // stagnation temperatures of the free nodes for the given flows (adiabatic model, §10.3): the mass-weighted mix of
   // what flows into each node (upwind); fixed nodes keep the temperature of their source, a node nothing flows into
-  // keeps its previous value. A link may raise the temperature of what it carries (lk.T0ratio, a compressor).
+  // keeps its previous value. A link may raise the temperature of what it carries (lk.T0ratio, a compressor), and a pipe
+  // on a slope trades it for height: cp·T₀ + g·z is kept along it (G-39).
   function mixTemperatures(prep, res, T0old) {
     const { nodes, links } = prep;
     const free = nodes.filter((n) => !n.isolated && n.kind === 'free');
@@ -120,6 +121,8 @@
       const i = col[dn];
       if (i < 0) continue;
       const w = Math.abs(m), ratio = l.T0ratio ? l.T0ratio(res, l) : 1;
+      const dzf = l.kind === 'pipe' && l.d && l.d.dz ? (m > 0 ? l.d.dz : -l.d.dz) : 0;
+      if (dzf) b[i] -= w * prep.cx.g * dzf / prep.cx.cp;
       inflow[i] += w;
       const j = col[up];
       if (j >= 0) A[i * n + j] -= w * ratio;

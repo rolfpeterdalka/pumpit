@@ -12,6 +12,8 @@
   function run(eff, opts = {}) {
     // R-10 of the 3D views: the calculation starts from a copy without the drawing fields
     eff = PumpIt.model.stripLayout(eff);
+    // the atmospheric pressure, in both regimes: an empty or impossible one gives no result (absolute pressures, NPSH)
+    if (!(PumpIt.model.patmOf(eff.system) > 0)) return { ok: false, errors: [t('core.solver.badPatm')], warnings: [] };
     // compressible mode (gas): a calculation path of its own, chosen by the regime of the model; the incompressible
     // path below does not change (appendix C of the compressible mode specification)
     if (PumpIt.model.isCompressible(eff)) {

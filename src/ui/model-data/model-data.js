@@ -17,8 +17,9 @@
   function pipeSummary(p) {
     const g = p.geometry;
     const geo = g.kind === 'circular' ? `⌀ ${q(g.d)}` : g.kind === 'annulus' ? tx('annulus', { outer: q(g.dOuter), inner: q(g.dInner) }) : g.kind === 'rectangular' ? `${q(g.width)} × ${q(g.height)}` : `A ${q(g.area)}`;
-    const f = p.friction;
-    const fr = { roughness: `ε ${q(f.eps)}`, relRoughness: `ε/D ${F.fmt(f.rel, 3)}`, smooth: tx('smooth'), explicitF: `f ${F.fmt(f.f, 4)}`, hw: `HW C ${F.fmt(f.C, 4)}`, frictionless: tx('frictionless') }[f.model];
+    const f = p.friction && typeof p.friction === 'object' ? p.friction : {};
+    const fr = PumpIt.model.FRICTION_MODELS.includes(f.model) ? { roughness: `ε ${q(f.eps)}`, relRoughness: `ε/D ${F.fmt(f.rel, 3)}`, smooth: tx('smooth'), explicitF: `f ${F.fmt(f.f, 4)}`, hw: `HW C ${F.fmt(f.C, 4)}`, frictionless: tx('frictionless') }[f.model]
+      : f.model === undefined || f.model === null || f.model === '' ? t('inspector.pipe.models.missing') : t('inspector.pipe.models.unknown', { model: String(f.model) });
     const L = UI.pipeLabels;
     return { geo, fr, mat: L.isCatalog(p.material) ? `${L.material(p.material.kind)} ${L.full(p.material)}` : tx('userMaterial') };
   }

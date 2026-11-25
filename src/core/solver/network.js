@@ -30,18 +30,25 @@
       const red = 1 - (p.idReduction || 0) / 100;
       Dh *= red; A *= red * red;
       if (!(A > 0) || !(Dh > 0)) { errors.push(t('core.solver.badGeometry', { id: p.id })); continue; }
+      // the friction model: one of the list, without friction only when chosen (a missing or unknown one is refused)
       const fr = p.friction;
+      if (!PumpIt.model.frictionKnown(fr)) {
+        const fm0 = fr && typeof fr === 'object' ? fr.model : undefined;
+        errors.push(t('core.solver.badFriction', { id: p.id, model: fm0 === undefined || fm0 === null || fm0 === '' ? '—' : String(fm0) }));
+        continue;
+      }
       let fm = 'darcy', eD = 0, fx = 0, C = 0;
       if (fr.model === 'roughness') eD = si(fr.eps, 'length') / Dh;
       else if (fr.model === 'relRoughness') eD = fr.rel;
       else if (fr.model === 'smooth') eD = 0;
       else if (fr.model === 'explicitF') { fm = 'explicit'; fx = fr.f; }
       else if (fr.model === 'hw') { fm = 'hw'; C = fr.C; }
-      else fm = 'none';
+      else if (fr.model === 'frictionless') fm = 'none';
       const fT = H.craneFT(Dh);
       let Ksum = 0;
-      // a negative quantity would turn a loss into a gain
-      if ((p.fittings || []).some((it) => !((it.qty ?? 1) >= 0))) { errors.push(t('core.solver.badFittings', { id: p.id })); continue; }
+      // a negative quantity or coefficient would turn a loss into a gain, an empty one into no loss
+      const fi = PumpIt.model.fittingIssues(p, fT);
+      if (fi.length) { errors.push(fi[0].what === 'sum' ? t('core.solver.badFittingSum', { id: p.id, sum: +fi[0].sum.toPrecision(6) }) : t('core.solver.badFittings', { id: p.id, n: fi[0].n })); continue; }
       for (const it of p.fittings || []) Ksum += (it.qty ?? 1) * (it.model === 'KfT' ? it.value * fT : it.value);
       const ju = jById.get(p.up), jd = jById.get(p.down);
       pp.set(p.id, {
@@ -70,7 +77,9 @@
     warnings.push(...fl.warnings);
     const rho = fl.rho, mu = fl.mu;
     if (!(rho > 0) || !(mu > 0)) throw new Error(t('core.solver.badFluid'));
-    const patm = U.toSI(sys.patm.value, sys.patm.unit, 'pressure');
+    // the atmospheric pressure: a number, above zero once absolute (an empty one would be zero, or the standard one)
+    const patm = PumpIt.model.patmOf(sys);
+    if (!(patm > 0)) throw new Error(t('core.solver.badPatm'));
     const g = U.G0 * sys.gravity;
     if (sys.gravity === 0) warnings.push({ level: 'caution', text: t('core.solver.zeroGravity') });
     const ctx = { rho, patm };

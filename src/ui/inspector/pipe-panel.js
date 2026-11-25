@@ -45,8 +45,11 @@
     props.appendChild(s1);
 
     const s2 = section(tx('friction'));
-    s2.appendChild(sel(key, 'friction.model', tx('model'), ['roughness', 'relRoughness', 'smooth', 'explicitF', 'hw', 'frictionless'].map((m) => [m, tx('models.' + m)])));
-    const fm = p.friction.model;
+    // a model that is not one of the list (a file) shows as itself, chosen, so that it is seen and any choice writes
+    const fm = p.friction && typeof p.friction === 'object' ? p.friction.model : undefined;
+    const fmOpts = M.FRICTION_MODELS.map((m) => [m, tx('models.' + m)]);
+    if (!M.FRICTION_MODELS.includes(fm)) fmOpts.unshift([String(fm), fm === undefined || fm === null || fm === '' ? tx('models.missing') : tx('models.unknown', { model: String(fm) })]);
+    s2.appendChild(sel(key, 'friction.model', tx('model'), fmOpts));
     if (fm === 'roughness') {
       const preset = el('select', { class: 'unit', 'aria-label': tx('typicalRoughness'), id: 'rough-preset', title: tx('typicalValues') },
         `<option value="">${tx('typical')}</option>` + D.ROUGHNESS.map((r, i) => `<option value="${i}">${F.esc(r.name)} — ${F.fmt(r.mm, 2)} mm</option>`).join(''));

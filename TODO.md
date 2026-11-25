@@ -22,3 +22,8 @@
 - [ ] Network: find a pipe or a junction by its ID or name, in the schematic and in 3D.
 - [ ] Import report: the whole list of objects of a note (it stops at 12, then "(+n)"), each one shown on the drawing at a click.
 - [ ] Keyboard: arrows, Home and End on the main, Results and Charts tabs, with their state for screen readers, as on the tabs of the properties panel.
+
+## Calculation (from the review of 6043c80)
+
+- [ ] Gas, adiabatic model: with Z ≠ 1 the stagnation temperature is not kept along a level pipe (Z 0.9, Mach 0.31: 300 K in, 300.46 K out). The march balances energy with cp = k·R/(k−1), while T₀ and the Mach number use Z·R. Make the two consistent.
+- [ ] Units: `units.toSI` turns an empty value (`null`) into zero, or into the standard atmosphere for a gauge pressure, in any field. Audit the fields that reach the calculation and report an empty one instead of taking it as zero.

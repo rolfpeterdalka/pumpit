@@ -12,6 +12,9 @@
 //            cell is an error too
 //     check (optional): a rule of the quantity, check(n) → '' when n is accepted, else why not ("a quantity is zero or
 //            more"): a number it refuses stays in the cell as a draft, as a text that is not a number does
+//     markStored (optional): the value of the model is checked too. One that is not a number, or breaks the rule (a file
+//            written by hand, or by another version), is shown as it is, marked invalid with its message, and stays
+//            in the model until a valid one is typed
 (function (root) {
   const PumpIt = root.PumpIt;
   const UI = PumpIt.ui;
@@ -50,12 +53,21 @@
     return Number.isFinite(o.value) ? `${head} ${tx('cellRestore', { value: F.inputStr(o.value) })}` : head;
   }
 
+  // why a value of the model is not accepted by the cell ('' when it is): o.markStored only
+  function storedWhy(o) {
+    if (!o.markStored) return '';
+    const v = o.value;
+    if (v === null || v === undefined || v === '') return 'empty' in o ? '' : tx('cellNotNumber');
+    if (typeof v !== 'number' || !Number.isFinite(v)) return tx('cellNotNumber');
+    return o.check ? o.check(v) : '';
+  }
+
   // the list of messages of a table, read out when one appears
   const errors = () => UI.dom.el('div', { class: 'cell-errs', 'aria-live': 'polite' });
 
   function input(o) {
     const inp = UI.dom.el('input', Object.assign({ type: 'text', inputmode: 'decimal', autocomplete: 'off', id: o.id, 'aria-label': o.aria }, o.attrs || {}));
-    const shown = () => (o.value === null || o.value === undefined ? '' : F.inputStr(o.value));
+    const shown = () => (o.value === null || o.value === undefined ? '' : typeof o.value === 'number' ? F.inputStr(o.value) : String(o.value));
     const msgId = o.id + '-err';
     const key = keyOf(o.id);
     function clear() {
@@ -74,11 +86,23 @@
       m.textContent = message(o, text, error, why);
       inp.setAttribute('aria-describedby', msgId);
     }
+    // a value of the model the cell does not accept: marked, with its message, without a draft (nothing to bring back)
+    function markStored() {
+      const why = storedWhy(o);
+      if (!why) return;
+      inp.setAttribute('aria-invalid', 'true');
+      if (!o.errs) return;
+      let m = o.errs.querySelector(`[id="${CSS.escape(msgId)}"]`);
+      if (!m) { m = UI.dom.el('p', { id: msgId, class: 'cell-err' }); o.errs.appendChild(m); }
+      const v = o.value;
+      m.textContent = tx('cellStored', { where: o.where, text: v === null || v === undefined || v === '' ? '—' : shown(), why });
+      inp.setAttribute('aria-describedby', msgId);
+    }
     inp.value = shown();
     // a draft typed before the panel was drawn again
     const d = drafts.get(key);
     if (d && same(d.base, o.value)) { const r = read(d.text, o); inp.value = d.text; refuse(d.text, r.error || 'invalid', r.why); }
-    else if (d) drafts.delete(key);
+    else { if (d) drafts.delete(key); markStored(); }
     inp.addEventListener('change', () => {
       const r = read(inp.value, o);
       if (r.error) { refuse(inp.value, r.error, r.why); return; }
@@ -93,6 +117,7 @@
       e.stopPropagation();
       inp.value = shown();
       clear();
+      markStored();
     });
     return inp;
   }

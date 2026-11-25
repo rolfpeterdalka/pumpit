@@ -22,20 +22,26 @@
       const errs = NC.errors();
       list.forEach((it, i) => {
         const tr = el('tr');
-        const at = `${NC.row(i + 1)} · ${D.fittingName(it)}`;
+        const name = D.fittingName(it) || ''; // a fitting of a file may have no name
+        const at = name ? `${NC.row(i + 1)} · ${name}` : NC.row(i + 1);
         const qn = NC.input({
           id: `fit-q-${key}-${i}`, aria: tx('qtyAria'), value: it.qty, errs, attrs: { style: 'width:44px' },
-          check: (n) => (n >= 0 ? '' : tx('qtyRule')),
+          // a quantity not given counts one (the core reads it so), and is not marked
+          check: (n) => (n >= 0 ? '' : tx('qtyRule')), markStored: it.qty !== undefined && it.qty !== null,
           where: NC.where(at, tx('qtyAria')), onCommit: (n) => { it.qty = n; save(); },
         });
+        // a coefficient of zero or more; only the calibrated tee of the .fth importer may be negative (F-23), within the
+        // K of the other fittings, which the checklist sums
+        const tee = it.id === 'imported-tee' && it.model === 'K';
         const vn = NC.input({
           id: `fit-v-${key}-${i}`, aria: tx('value'), value: it.value, errs, attrs: { style: 'width:64px' },
+          check: (n) => (n >= 0 || tee ? '' : tx('valueRule')), markStored: true,
           where: NC.where(at, it.model === 'KfT' ? 'K/fT' : 'K'), onCommit: (n) => { it.value = n; save(); },
         });
         const x = el('button', { class: 'row-btn', type: 'button', 'aria-label': tx('remove') }, '×');
         x.addEventListener('click', () => { list.splice(i, 1); save(); });
         const td1 = el('td'); td1.appendChild(qn);
-        const td2 = el('td', {}, `<span style="font-size:12.5px">${F.esc(D.fittingName(it))}</span>`);
+        const td2 = el('td', {}, `<span style="font-size:12.5px">${F.esc(name)}</span>`);
         const td3 = el('td'); td3.appendChild(vn); td3.insertAdjacentHTML('beforeend', ` <span class="muted small">${it.model === 'KfT' ? '·f<sub>T</sub>' : 'K'}</span>`);
         const td4 = el('td', { class: 'x' }); td4.appendChild(x);
         tr.append(td1, td2, td3, td4);
@@ -53,9 +59,10 @@
       save();
     });
     s.appendChild(add);
+    // ΣK only when every fitting is valid (an invalid one would make it look like a result)
     let Ksum = 0;
     for (const it of list) Ksum += (it.qty ?? 1) * (it.model === 'KfT' ? it.value * fT : it.value);
-    s.appendChild(readout(tx('sumK'), F.fmt(Ksum, 4)));
+    s.appendChild(readout(tx('sumK'), PumpIt.model.fittingIssues({ fittings: list }, fT).length ? '—' : F.fmt(Ksum, 4)));
     s.appendChild(readout(tx('craneFT'), F.fmt(fT, 3)));
     return s;
   }

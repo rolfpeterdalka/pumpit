@@ -114,7 +114,7 @@ They become generic components (an orifice, an orifice by its K). Closed, they b
 - the node takes the stagnation pressure of its only inflow (or only outflow);
 - the loss of each path becomes a K at the end of its pipe, in the per-pipe table.
 
-A path that gains pressure gets a negative K, which goes into the fittings of its pipe, within their K. The stored pressure of that end then moves to the junction side, where Pump It reports it, so that the comparison of F-31 holds. Without stored results, the tee has no losses of its own, with a note.
+A path that gains pressure gets a negative K, which goes into the fittings of its pipe, within their K. It is the only fitting whose K may be below zero: the checklist and the calculation accept it while the fittings of the pipe add up to zero or more (review of 6043c80). The stored pressure of that end then moves to the junction side, where Pump It reports it, so that the comparison of F-31 holds. Without stored results, the tee has no losses of its own, with a note.
 
 **F-24 Nozzle (16).** t+4 is the model: 1 a K factor, with Q = K·√ΔP; 3 a loss curve. The units of ΔP and flow are at t+6 and t+8 and the coefficients are counted at t+11. After them (v = t+12+nc) come the K factor (v+3) and the outlet pressure (v+5). The file applies ΔP = (Q/K)² to any fluid. Pump It refers a K factor to water (1000 kg/m³), so the K factor is multiplied by √(ρ/1000) to keep the same loss, with a note. A curve that is not a square law gives the K factor of the stored flow, or of half of its largest flow. A closed nozzle is a closed end.
 
