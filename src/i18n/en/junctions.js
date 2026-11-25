@@ -117,6 +117,7 @@ PumpIt.i18n.add('en', {
         setP: 'control pressure',
         speed: 'speed',
         nPumps: 'number of pumps',
+        npshrPoints: 'NPSH required points: as many flows as heads, each of zero or more',
       },
       error: { curve: 'Pump J{id}: {message}' },
       warn: {
@@ -131,6 +132,8 @@ PumpIt.i18n.add('en', {
         speedTooLow: 'Pump J{id}: required speed below 1% of nominal.',
         reverse: 'Reverse flow in pump J{id}: the head cannot be predicted by the curve.',
         beyondCurve: 'Pump J{id} operating beyond the end of the given curve.',
+        npshrRange: 'Pump J{id}: the fitted NPSH required curve gives {required} m at {flow} m³/h, below zero. The points typed are zero or more: review the fit (linear interpolation follows the points). The NPSH available is not compared with it.',
+        npshrFit: 'Pump J{id}: the NPSH required curve cannot be fitted ({message}). The NPSH available is not compared with it.',
         npsh: 'Pump J{id}: NPSH available ({available} m) lower than required ({required} m).',
       },
       form: {
@@ -181,6 +184,8 @@ PumpIt.i18n.add('en', {
         off: ' · off',
       },
       quick: { head: 'Head', speed: 'Speed', shaftPower: 'Shaft power', hydraulicPower: 'Hydraulic power', npsh: 'NPSH avail. / req.', ratio: 'Pressure ratio', dischargeT: 'T0 at the discharge', gasPower: 'Power to the gas' },
+      // the NPSH required of a fit below zero at the operating point, or of a curve that cannot be fitted
+      invalidFit: 'invalid fit',
       info: {
         massFlow: 'Mass flow',
         ratio: 'Pressure ratio',
@@ -294,7 +299,19 @@ PumpIt.i18n.add('en', {
 
     generic: {
       label: 'Generic component',
-      check: { curve: 'loss curve (min. 2 points)' },
+      check: {
+        curve: 'loss curve (min. 2 points)',
+        fit: 'loss curve: {message}',
+        gain: 'loss curve: the fit gives a pressure gain from {from} to {to} {unit}; review the fit (linear interpolation follows the points)',
+        falls: 'loss curve: the fit falls over part of the flow range up to {to} {unit}, and the compressible mode needs a loss that grows with the flow; review the fit (linear interpolation follows the points)',
+      },
+      error: {
+        fit: 'Component J{id}: {message}',
+        gain: 'Component J{id}: the fitted loss curve gives a pressure gain from {from} to {to} {unit}.',
+        falls: 'Component J{id}: the fitted loss curve falls over part of the flow range up to {to} {unit}; the compressible mode needs a loss that grows with the flow.',
+        beyond: 'Component J{id}: at {flow} {unit}, beyond the last point of its curve, the extrapolated loss is a pressure gain ({dp} kPa), so there is no valid result. Extend the curve to this flow or review the fit.',
+        beyondFalls: 'Component J{id}: at {flow} {unit}, beyond the last point of its curve, the extrapolated loss falls, so the flow found from it is not valid. Extend the curve to this flow or review the fit.',
+      },
       form: { model: 'Loss model', K: 'Constant K', curve: 'ΔP × flow curve', KField: 'K (upstream area)' },
       curves: { loss: 'ΔP × flow loss curve' },
       summary: { curve: 'curve ({n} points)' },

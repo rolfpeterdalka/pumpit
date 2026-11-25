@@ -39,12 +39,13 @@
     const H = PumpIt.hyd, rho = env.rho, mu = env.mu;
     if (P.fm === 'darcy') {
       const k = P.L / P.Dh / (2 * rho * A * A) / n, reD = P.Dh / (mu * A), eD = P.eD;
-      const reLam = env.reLam, reTurb = env.reTurb, fLam = 64 / reLam, fTurb = H.colebrook(reTurb, eD);
+      // phi: the laminar factor of the section, as in pipeLoss (an annulus)
+      const phi = P.phiLam || 1, reLam = env.reLam, reTurb = env.reTurb, fLam = phi * 64 / reLam, fTurb = H.colebrook(reTurb, eD);
       let x = 1 / Math.sqrt(fTurb); // 1/√f of the last call, where the next one starts
       return (m) => {
         const Re = Math.abs(m) * reD;
         let f;
-        if (Re < reLam) f = 64 / Re;
+        if (Re < reLam) f = phi * 64 / Re;
         else if (Re > reTurb) { x = colebrook(Re, eD, x); f = 1 / (x * x); }
         else { const w = (Re - reLam) / (reTurb - reLam); f = (1 - w) * fLam + w * fTurb; }
         const r = f * k;
@@ -256,5 +257,5 @@
     return { errors: [], warnings, net };
   }
 
-  PumpIt.surge = Object.assign(PumpIt.surge || {}, { network: { REFINE, brunoneK, envOf, steadyState, waves, sectionOf, stepsOf, sizeOf, build } });
+  PumpIt.surge = Object.assign(PumpIt.surge || {}, { network: { REFINE, brunoneK, envOf, steadyState, waves, sectionOf, stepsOf, sizeOf, build, frictionOf } });
 })(typeof window !== 'undefined' ? window : globalThis);

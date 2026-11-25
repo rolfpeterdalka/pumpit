@@ -92,6 +92,11 @@ PumpIt.i18n.add('en', {
       fluidName: 'Fluid',
       baseScenario: 'Base',
       unknownJunctionType: 'Unknown junction type: {type}',
+      duplicate: {
+        pipe: 'Pipe P{id} appears more than once: each pipe needs an id of its own.',
+        junction: 'Junction J{id} appears more than once: each junction needs an id of its own.',
+        scenario: 'Scenario "{id}" appears more than once: each scenario needs an id of its own.',
+      },
     },
     checklist: {
       unknownUnit: 'unknown unit: {units}',
@@ -132,6 +137,8 @@ PumpIt.i18n.add('en', {
         viscosity: 'viscosity',
         reynolds: 'Reynolds numbers of the transition: both above zero, the laminar one below the turbulent one',
         patm: 'atmospheric pressure: a number, above zero once absolute',
+        vapor: 'vapor pressure: a number in a unit of pressure, or empty',
+        vaporVacuum: 'vapor pressure: {value} {unit} is {abs} {absUnit}, below vacuum; it must be zero or more once absolute',
       },
       gas: {
         temperature: 'gas temperature',
@@ -323,6 +330,7 @@ PumpIt.i18n.add('en', {
       badFittingSum: 'Pipe P{id}: its fittings add up to a K of {sum}; the sum is zero or more.',
       badFriction: 'Pipe P{id}: the friction model "{model}" is not one of the list.',
       badPatm: 'The atmospheric pressure must be a number, above zero once absolute.',
+      badVapor: 'The vapor pressure of {value} {unit} is {abs} {absUnit}, below vacuum: it must be zero or more once absolute.',
       needsTwoPipes: 'Junction J{id}: needs 2 pipes.',
       notDirectional: 'Junction J{id} ({label}): one pipe must arrive at it and the other leave it.',
       pipeNotConnected: 'Pipe P{id}: must be connected to two junctions.',

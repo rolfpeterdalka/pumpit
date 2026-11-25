@@ -254,6 +254,15 @@
     return v > 0 ? v : NaN;
   }
 
+  // the parameters of the message of a vapour pressure below vacuum: the value given and its absolute value abs (Pa), in
+  // the absolute unit of its family (kPa(a) for a unit that has none)
+  function vaporText(pv, abs) {
+    const Un = PumpIt.units, base = String(pv.unit).replace(/\((a|g)\)$/, '');
+    const unit = Un.has('pressure', base + '(a)') ? base + '(a)' : 'kPa(a)';
+    const num = (x) => String(+x.toPrecision(4));
+    return { value: num(pv.value), unit: Un.label(pv.unit), abs: num(Un.fromSI(abs, unit, 'pressure')), absUnit: Un.label(unit) };
+  }
+
   // inlet and outlet pipes of a two-port junction, by reference direction
   function ports(m, j) {
     const ps = pipesAt(m, j.id);
@@ -268,7 +277,7 @@
     q, clone, newJunction, newPipe, pipeDefaults, newModel, newGasFluid, migrate,
     getPath, setPath, getObj, deepEqual,
     pipesAt, ports, REGIMES, GAS_MODES, LAMINAR_K, isCompressible, normalizeRegime,
-    TIME_METHODS, DATA_END, newTimeControl, normalizeTime, FRICTION_MODELS, frictionKnown, fittingIssues, patmOf,
+    TIME_METHODS, DATA_END, newTimeControl, normalizeTime, FRICTION_MODELS, frictionKnown, fittingIssues, patmOf, vaporText,
   });
   // { type: definition } in display order, built from the junction type registry
   Object.defineProperty(PumpIt.model, 'JT', { get: () => types.table(), enumerable: true, configurable: true });

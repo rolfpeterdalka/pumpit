@@ -110,5 +110,26 @@
       && scenarios.every((s) => !!s && isScenarioId(s.id) && (s.parent == null || isScenarioId(s.parent)));
   }
 
-  Object.assign(M, { PIPE_ENDS, otherEnd, LOOSE_GAP, isLoose, junctionOf, endPoint, spotNear, loosenEnd, connectEnd, swapEnds, normalizeEnds, idsWellFormed });
+  // the ids that appear more than once in a collection of a model: [{ what: 'pipe' | 'junction' | 'scenario', id }], each
+  // repeated id once, in the order of the file. The editor, the checklist and the calculation find objects by their id,
+  // so two objects with one id would be read as one (only a file edited by hand can have them)
+  function duplicateIds(m) {
+    const out = [];
+    const scan = (what, arr) => {
+      const seen = new Set(), told = new Set();
+      for (const o of Array.isArray(arr) ? arr : []) {
+        if (!o) continue;
+        if (seen.has(o.id) && !told.has(o.id)) { told.add(o.id); out.push({ what, id: o.id }); }
+        seen.add(o.id);
+      }
+    };
+    scan('pipe', m.pipes);
+    scan('junction', m.junctions);
+    scan('scenario', m.scenarios && m.scenarios.list);
+    return out;
+  }
+  // the message of a repeated id
+  const duplicateText = (d) => PumpIt.i18n.t('core.model.duplicate.' + d.what, { id: d.id });
+
+  Object.assign(M, { PIPE_ENDS, otherEnd, LOOSE_GAP, isLoose, junctionOf, endPoint, spotNear, loosenEnd, connectEnd, swapEnds, normalizeEnds, idsWellFormed, duplicateIds, duplicateText });
 })(typeof window !== 'undefined' ? window : globalThis);

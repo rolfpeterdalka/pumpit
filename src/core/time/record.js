@@ -90,8 +90,16 @@
       const r = sol.pipes[id], o = X.pipes[id] || (X.pipes[id] = {});
       ext(o, 'Pmax', r.Pin, tk, { end: 'in' }); ext(o, 'Pmax', r.Pout, tk, { end: 'out' });
       ext(o, 'Pmin', r.Pin, tk, { end: 'in' }); ext(o, 'Pmin', r.Pout, tk, { end: 'out' });
-      ext(o, 'Qmax', r.Q, tk); ext(o, 'Qmin', r.Q, tk);
-      ext(o, 'Vmax', Math.abs(r.V), tk);
+      if (r.Qout !== undefined) {
+        // a gas: the volume flow and the velocity change along the pipe, so both ends count, and the end is told (as
+        // for the pressures)
+        for (const [Q, V, end] of [[r.Q, r.Vin, 'in'], [r.Qout, r.Vout, 'out']]) {
+          ext(o, 'Qmax', Q, tk, { end }); ext(o, 'Qmin', Q, tk, { end }); ext(o, 'Vmax', Math.abs(V), tk, { end });
+        }
+      } else {
+        ext(o, 'Qmax', r.Q, tk); ext(o, 'Qmin', r.Q, tk);
+        ext(o, 'Vmax', Math.abs(r.V), tk);
+      }
     }
     for (const id in sol.junctions) {
       const r = sol.junctions[id], o = X.junctions[id] || (X.junctions[id] = {});

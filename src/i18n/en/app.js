@@ -84,6 +84,7 @@ PumpIt.i18n.add('en', {
       started: 'Download started: {name}',
       defaultName: 'model',
       notAModel: 'The file is not a model of this application.',
+      duplicateIds: 'The file was not opened: {list}',
       isProfile: 'This file is a profile of result columns, not a model. Bring it in with {path}.',
       converted: 'Junction types converted: {notes}.',
       opened: 'Opened: {name}',

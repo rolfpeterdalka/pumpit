@@ -75,8 +75,10 @@
 
     const pipeOf = (id) => pipes[id];
     const pipeV = (id) => (pipes[id] ? pipes[id].V : 0);
-    // what a junction type sees while it adds its own results
-    const shared = { prep, env, links, st, mOf, Pn, pipeOf, warn, pumps, valves };
+    // what a junction type sees while it adds its own results; refuse(text): the solution is not valid (an element whose
+    // law breaks a rule at the operating point), and the calculation gives that error instead of results
+    const refused = [];
+    const shared = { prep, env, links, st, mOf, Pn, pipeOf, warn, pumps, valves, refuse: (text) => refused.push(text) };
 
     // ---- junctions
     for (const j of eff.junctions) {
@@ -136,6 +138,7 @@
 
     const order = { critical: 0, warning: 1, caution: 2, info: 3 };
     W.sort((a, b) => order[a.level] - order[b.level]);
+    if (refused.length) return { ok: false, errors: refused, warnings: W };
     const out = {
       ok: true, converged: res.converged, iterations: meta.totalIt, passes: meta.passes, history: meta.hist,
       fluid: { name: env.fluid.name, rho, mu: env.mu, pv, T: env.fluid.T }, patm, g,

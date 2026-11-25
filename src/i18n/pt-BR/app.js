@@ -83,6 +83,7 @@ PumpIt.i18n.add('pt-BR', {
       started: 'Download iniciado: {name}',
       defaultName: 'modelo',
       notAModel: 'O arquivo não é um modelo deste aplicativo.',
+      duplicateIds: 'O arquivo não foi aberto: {list}',
       isProfile: 'Este arquivo é um perfil de colunas de resultados, e não um modelo. Ele entra por {path}.',
       converted: 'Tipos de junção convertidos: {notes}.',
       opened: 'Aberto: {name}',

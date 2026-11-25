@@ -11,6 +11,9 @@
 
   function normalize(m) {
     if (!m || !Array.isArray(m.pipes) || !Array.isArray(m.junctions) || !M.idsWellFormed(m)) throw new Error(t('app.files.notAModel'));
+    // an id given to two objects of one collection: the file is refused, naming them (the study open stays as it is)
+    const dup = M.duplicateIds(m);
+    if (dup.length) throw new Error(t('app.files.duplicateIds', { list: dup.map(M.duplicateText).join(' ') }));
     const base = M.newModel();
     m.system = Object.assign(base.system, m.system || {});
     m.solution = Object.assign(base.solution, m.solution || {});

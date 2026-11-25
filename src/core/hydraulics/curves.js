@@ -96,5 +96,69 @@
     return { x, y: polyval(c.a, x) };
   }
 
-  PumpIt.hyd = Object.assign(PumpIt.hyd || {}, { polyfit, polyval, polyder, interp, makeCurve, evalCurve, curveMax });
+  // The checks of a fitted curve that must not go below zero (a loss, an NPSH required) or must rise (the loss of a
+  // component in the compressible mode, which the flow is found from). A fit may leave the range of its points even
+  // when every point is within it: a parabola through (0, 0), (100, 10) and (110, 50) is below zero between the first two.
+  const SAMPLES = 400;
+  // the zeros of a polynomial on [a, b]: where it changes sign between samples, refined by bisection
+  function zerosOf(p, a, b) {
+    const out = [];
+    let x0 = a, y0 = polyval(p, a);
+    for (let i = 1; i <= SAMPLES; i++) {
+      const x1 = a + (b - a) * i / SAMPLES, y1 = polyval(p, x1);
+      if (y1 === 0) out.push(x1);
+      else if (y0 !== 0 && (y0 < 0) !== (y1 < 0)) {
+        let lo = x0, hi = x1;
+        for (let k = 0; k < 100; k++) { const mid = (lo + hi) / 2; if ((polyval(p, mid) < 0) === (y0 < 0)) lo = mid; else hi = mid; }
+        out.push((lo + hi) / 2);
+      }
+      x0 = x1; y0 = y1;
+    }
+    return out;
+  }
+  // the lowest point of a curve on [a, b], { x, y }: an interpolated curve, at its points and at the ends (straight lines
+  // between them, extrapolated beyond them); a polynomial, at the ends, at the samples and where its slope is zero
+  function curveMin(c, a, b) {
+    const xs = [a, b];
+    if (c.kind === 'xy') { for (const x of c.x) if (x > a && x < b) xs.push(x); }
+    else {
+      for (let i = 1; i < SAMPLES; i++) xs.push(a + (b - a) * i / SAMPLES);
+      xs.push(...zerosOf(polyder(c.a), a, b));
+    }
+    let best = { x: NaN, y: Infinity };
+    for (const x of xs) { const y = evalCurve(c, x); if (y < best.y) best = { x, y }; }
+    return best;
+  }
+  // where a curve is below −tol on [a, b]: { from, to } (from the first to the last such sample, its ends refined by
+  // bisection), or null when it never is
+  function belowZero(c, a, b, tol = 0) {
+    const low = (x) => evalCurve(c, x) < -tol;
+    const m = curveMin(c, a, b);
+    if (!(m.y < -tol)) return null;
+    const n = 2000, xs = Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n);
+    const i0 = xs.findIndex(low), i1 = n - [...xs].reverse().findIndex(low);
+    if (i0 < 0) return { from: m.x, to: m.x }; // a dip narrower than a sample: its lowest point
+    const edge = (inside, outside) => {
+      let lo = outside, hi = inside;
+      for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (low(mid)) hi = mid; else lo = mid; }
+      return hi;
+    };
+    const from = i0 > 0 ? edge(xs[i0], xs[i0 - 1]) : xs[i0];
+    const to = i1 < n ? edge(xs[i1], xs[i1 + 1]) : xs[i1];
+    return { from, to };
+  }
+  // whether a curve rises (or stays level) on [a, b], within tol of the value over the interval: an interpolated curve,
+  // segment by segment (extrapolated beyond its points); a polynomial, by the lowest point of its slope
+  function curveRises(c, a, b, tol = 0) {
+    if (!(b > a)) return true;
+    if (c.kind === 'xy') {
+      const xs = [a, ...c.x.filter((x) => x > a && x < b), b];
+      for (let i = 1; i < xs.length; i++) if (evalCurve(c, xs[i]) < evalCurve(c, xs[i - 1]) - tol) return false;
+      return true;
+    }
+    const d = { kind: 'poly', a: polyder(c.a) };
+    return d.a.length === 0 || curveMin(d, a, b).y * (b - a) >= -tol;
+  }
+
+  PumpIt.hyd = Object.assign(PumpIt.hyd || {}, { polyfit, polyval, polyder, interp, makeCurve, evalCurve, curveMax, curveMin, belowZero, curveRises });
 })(typeof window !== 'undefined' ? window : globalThis);

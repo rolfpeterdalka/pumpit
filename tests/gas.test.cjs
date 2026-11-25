@@ -771,5 +771,78 @@ if (PumpIt) {
   }
 }
 
+console.log('\nReview of 319654f, bug 9: the loss curve of a generic component in the compressible mode');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  // the air example with a component on a loss curve between pipe P1 and a new pipe to J2
+  const run = (fit, x, y) => {
+    const m = PumpIt.examples.get('air').build();
+    const p = m.pipes[0], nx = M.clone(p);
+    m.junctions.push(Object.assign(M.newJunction('generic', 9, 0, 0), { elevation: q(0, 'm'), genModel: 'curve', curve: { x, y, xUnit: 'm³/h', yUnit: 'kPa', fit } }));
+    Object.assign(nx, { id: 9, up: 9, down: p.down }); p.down = 9; m.pipes.push(nx);
+    const e = M.effective(m, 'base'), v = M.validate(e), s = PumpIt.solver.run(e);
+    return { v, s, msgs: [...v.undef.values()].flat(), text: [...v.undef.values()].flat().join(' | ') + ' || ' + (s.ok ? 'solved' : s.errors.join('; ')) };
+  };
+  const dip = run('2', [0, 100, 110], [0, 10, 50]), fall = run('xy', [0, 100, 110], [0, 10, 9]), rise = run('xy', [0, 100, 200], [0, 10, 40]);
+  ok('319654f-9 gas: a fit below zero between the points is refused by the checklist and by the solver', !dip.v.ok && dip.msgs.some((x) => /gain from 0 to 97\.18/.test(x)) && !dip.s.ok && /J9/.test(dip.s.errors[0]), dip.text);
+  ok('319654f-9 gas: a loss that falls is refused, the flow being found from the loss', !fall.v.ok && fall.msgs.some((x) => /falls/.test(x)) && !fall.s.ok && /J9.*falls/.test(fall.s.errors[0]), fall.text);
+  const r = rise.s.ok && rise.s.junctions[9];
+  ok('319654f-9 gas: a rising loss curve calculates, with a loss along the flow', rise.v.ok && rise.s.ok && r.m > 0 && r.dP > 0, rise.text);
+}
+
+console.log('\nReview of 319654f, bug 3: laminar flow in an annulus');
+{
+  const Fw = PumpIt.gas.flow, H = PumpIt.hyd;
+  const d = { fm: 'darcy', eD: 0, fx: 0, reLam: 2300, reTurb: 4000 };
+  const phi = H.annulusLaminar(0.8);
+  ok('G3a the gas friction of an annulus is phi·64/Re in laminar flow', Math.abs(Fw.friction(Object.assign({ phiLam: phi }, d), 1000) - phi * 0.064) < 1e-15);
+  ok('G3a ... and of a K element or a circle 64/Re, as before', Fw.friction(d, 1000) === 0.064 && Fw.friction(Object.assign({ phiLam: 1 }, d), 1000) === 0.064);
+  ok('G3a ... no step at Re_lam', Math.abs(Fw.friction(Object.assign({ phiLam: phi }, d), 2300 - 1e-9) - Fw.friction(Object.assign({ phiLam: phi }, d), 2300)) < 1e-12);
+  // an air model whose pipe is an annulus: its d carries the factor
+  const m = PumpIt.examples.get('air').build();
+  m.pipes[0].geometry = { kind: 'annulus', dOuter: PumpIt.model.q(100, 'mm'), dInner: PumpIt.model.q(80, 'mm') };
+  const prep = PumpIt.gas.prepare(PumpIt.model.effective(m, 'base'));
+  const lk = prep && prep.links && prep.links.find((l) => l.kind === 'pipe' && l.pid === m.pipes[0].id);
+  ok('G3a the duct of an annulus pipe in a gas model carries its laminar factor', !!lk && Math.abs(lk.d.phiLam - phi) < 1e-12, JSON.stringify(lk && lk.d.phiLam));
+}
+
+console.log('\nReview of 319654f, bugs 5 and 6: results of a gas that depend on the direction or the end');
+{
+  const M = PumpIt.model, q = M.q;
+  // a valve of K 5 between pipe P1 (100 mm) and a new pipe of 150 mm in the air example, drawn with or against the flow
+  const valve = (flip, type = 'valve') => {
+    const m = PumpIt.examples.get('air').build();
+    const v = Object.assign(M.newJunction(type, 9, 0, 0), { elevation: q(0, 'm') });
+    if (type === 'valve') Object.assign(v, { lossModel: 'K', K: 5 });
+    m.junctions.push(v);
+    const p = m.pipes[0], next = M.clone(p);
+    p.down = 9; Object.assign(next, { id: 9, up: 9, down: 2 });
+    p.geometry = { kind: 'circular', d: q(100, 'mm') };
+    next.geometry = { kind: 'circular', d: q(150, 'mm') };
+    m.pipes.push(next);
+    if (flip) for (const l of [p, next]) [l.up, l.down] = [l.down, l.up];
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(60, 's'), step: q(30, 's') });
+    v.time = { use: true, what: 'K', basis: 'absolute', start: 'single', when: [{ q: 'cv', obj: 'j:9', op: '>=', value: q(300, '') }], tables: [{ t: [0], v: [20], tUnit: 's', vUnit: '' }], interp: 'step', repeat: false };
+    const e = M.effective(m, 'base'), s = PumpIt.solver.run(e);
+    return { e, s, r: s.ok && s.valves[9], text: s.ok ? 'solved' : s.errors.join('; ') };
+  };
+  const fwd = valve(false), rev = valve(true);
+  ok('319654f-5 gas Cv: the same valve and flow drawn against the flow give the same Cv (188.9, the area of the 100 mm pipe it comes from)',
+    fwd.r && rev.r && rev.r.m < 0 && Math.abs(fwd.r.Cv - 188.9001) < 1e-3 && Math.abs(rev.r.Cv - fwd.r.Cv) < 1e-5, `${fwd.r && fwd.r.Cv} ${rev.r && rev.r.Cv}`);
+  const runs = [fwd, rev].map((o) => PumpIt.time.run(o.e));
+  ok('319654f-5 gas Cv: an event on the Cv (≥ 300) fires in neither drawing', runs.every((x) => x.ok && !x.events.some((ev) => ev.key === 'core.time.log.table.started')), JSON.stringify(runs.map((x) => x.events.map((ev) => ev.key))));
+  // bug 6: the extremes of the flows and velocities of a gas pipe take both ends and tell the end
+  const m = PumpIt.examples.get('air').build();
+  Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(60, 's'), step: q(30, 's') });
+  const run = PumpIt.time.run(M.effective(m, 'base'));
+  const all = Object.entries(run.series.pipes).every(([id, row]) => {
+    const X = run.extremes.pipes[id], Qs = [...row.Q, ...row.Qout];
+    return X.Qmax.v === Math.max(...Qs) && X.Qmin.v === Math.min(...Qs) && ['in', 'out'].includes(X.Qmax.end) && ['in', 'out'].includes(X.Vmax.end);
+  });
+  const X1 = run.extremes.pipes[1];
+  ok('319654f-6 gas extremes: Qmax of pipe 1 is 1203.66 m³/h at its outlet (918 m³/h at its inlet), and every pipe takes both ends', run.ok && all
+    && Math.abs(X1.Qmax.v * 3600 - 1203.6649) < 1e-3 && X1.Qmax.end === 'out' && X1.Vmax.end === 'out', JSON.stringify(X1));
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

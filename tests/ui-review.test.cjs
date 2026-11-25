@@ -1613,6 +1613,16 @@ console.log('\nReview of 6043c80: the cells of the fittings and a friction model
   app.loadModel(JSON.parse(text((m) => { m.pipes[0].fittings = [{ model: 'K', qty: 1, value: 0.5 }, { model: 'K', qty: 1, value: -10 }]; })), { fit: false });
   const nk = UI.pending.of('p:1');
   ok('6043c80-2 a file with −10 in fitting 2 opens with P1 pending at the cell of that fitting', !app.validation().ok && nk.length === 1 && nk[0].path === '#fit-v-p:1-1', JSON.stringify(nk));
+  // review of 319654f, bug 4: a file with a pipe id twice is refused, naming it, and the study open stays with its history
+  app.loadModel(JSON.parse(text(() => {})), { fit: false });
+  const kept = JSON.stringify(app.model), undoBefore = JSON.stringify(app.undoStack || null);
+  let err = '';
+  try { app.replaceModel(JSON.parse(text((m) => { m.pipes.push(Object.assign(JSON.parse(JSON.stringify(m.pipes[0])), { id: m.pipes[1].id })); })), { fit: false }); } catch (e) { err = e.message; }
+  ok('319654f-4 a file with pipe P2 twice is refused, naming it', err.includes(P.i18n.t('core.model.duplicate.pipe', { id: 2 })), err);
+  ok('319654f-4 ... the study open and its undo history stay as they were', JSON.stringify(app.model) === kept && JSON.stringify(app.undoStack || null) === undoBefore);
+  err = '';
+  try { app.replaceModel(JSON.parse(text((m) => { m.junctions.push(Object.assign(JSON.parse(JSON.stringify(m.junctions[0])), { id: m.junctions[2].id })); })), { fit: false }); } catch (e) { err = e.message; }
+  ok('319654f-4 a file with a junction id twice is refused, naming it', err.includes(P.i18n.t('core.model.duplicate.junction', { id: 3 })) && JSON.stringify(app.model) === kept, err);
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

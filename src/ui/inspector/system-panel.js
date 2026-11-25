@@ -135,7 +135,13 @@
       s1.appendChild(text(k, 'fluid.name', tx('name')));
       s1.appendChild(qty(k, 'fluid.rho', tx('density'), 'density'));
       s1.appendChild(qty(k, 'fluid.mu', tx('viscosity'), 'viscosity'));
-      s1.appendChild(qty(k, 'fluid.pv', tx('vaporPressure'), 'pressure'));
+      const pvField = s1.appendChild(qty(k, 'fluid.pv', tx('vaporPressure'), 'pressure'));
+      // a vapour pressure the checklist refuses (not a pressure, or below vacuum once absolute): its field is marked
+      if (M.vaporIssue(eff.system)) {
+        const inp = pvField.querySelector('input');
+        if (inp) inp.setAttribute('aria-invalid', 'true');
+        pvField.classList.add('invalid');
+      }
     }
     try {
       const fl = PumpIt.fluids.evaluate(eff.system);

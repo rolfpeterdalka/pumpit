@@ -173,7 +173,22 @@
     const miss = [];
     if (!pos(f.rho)) miss.push(t('core.checklist.fluid.density'));
     if (!pos(f.mu)) miss.push(t('core.checklist.fluid.viscosity'));
+    const pv = vaporIssue(sys);
+    if (pv) miss.push(t('core.checklist.fluid.' + pv.key, pv));
     return miss;
+  }
+  // what is wrong with the vapour pressure of a user liquid, or null: { key: 'vapor' } (not a pressure) or
+  // { key: 'vaporVacuum', and the parameters of its message } (below zero once absolute, a gauge value with the
+  // atmospheric pressure of the system). Empty, it is not known and the cavitation warnings are not given. The system
+  // window marks its field by it.
+  function vaporIssue(sys) {
+    const f = sys.fluid, pv = f && f.kind === 'user' ? f.pv : null;
+    if (!pv || pv.value === null || pv.value === undefined || pv.value === '') return null;
+    if (!Number.isFinite(pv.value) || !PumpIt.units.has('pressure', pv.unit)) return { key: 'vapor' };
+    const patm = M.patmOf(sys);
+    if (!(patm > 0) && PumpIt.units.isGauge(pv.unit)) return null; // the atmospheric pressure is what the checklist asks for
+    const abs = PumpIt.units.toSI(pv.value, pv.unit, 'pressure', patm > 0 ? { patm } : {});
+    return abs < 0 ? Object.assign({ key: 'vaporVacuum' }, M.vaporText(pv, abs)) : null;
   }
 
   function validate(eff) {
@@ -185,13 +200,18 @@
     const solOk = s.tolRel > 0 && s.maxIter >= 1 && s.relax > 0 && s.relax <= 1;
     const pipesBad = [...undef.keys()].filter((k) => k[0] === 'p').length;
     const jBad = [...undef.keys()].filter((k) => k[0] === 'j').length;
+    // an id given to two pipes or two junctions (a file edited by hand): the item of its collection names it
+    const dup = M.duplicateIds(eff);
+    const dupOf = (what) => dup.filter((d) => d.what === what).map(M.duplicateText);
+    const dupP = dupOf('pipe'), dupJ = dupOf('junction');
+    const withDup = (detail, d, bad) => (!d.length ? detail : (bad ? [detail, ...d] : d).join(' '));
     // key: the object the item checks, where it has one (the solution control and the system); net: the item of the
     // pipes or of the junctions, empty when the network has none (the undefined objects are counted in undef)
     const items = [
       { key: 'sol', label: t('core.checklist.items.solution'), ok: solOk },
       { key: 'sys', label: t('core.checklist.items.system'), ok: fluidMiss.length === 0, detail: fluidMiss.join(', ') },
-      { net: 'pipes', empty: !eff.pipes.length, label: t('core.checklist.items.pipes'), ok: eff.pipes.length > 0 && pipesBad === 0, detail: eff.pipes.length ? t('core.checklist.items.pipesIncomplete', { bad: pipesBad, n: eff.pipes.length }) : t('core.checklist.items.noPipes') },
-      { net: 'junctions', empty: !eff.junctions.length, label: t('core.checklist.items.junctions'), ok: eff.junctions.length > 0 && jBad === 0, detail: eff.junctions.length ? t('core.checklist.items.junctionsIncomplete', { bad: jBad, n: eff.junctions.length }) : t('core.checklist.items.noJunctions') },
+      { net: 'pipes', empty: !eff.pipes.length, label: t('core.checklist.items.pipes'), ok: eff.pipes.length > 0 && pipesBad === 0 && !dupP.length, detail: withDup(eff.pipes.length ? t('core.checklist.items.pipesIncomplete', { bad: pipesBad, n: eff.pipes.length }) : t('core.checklist.items.noPipes'), dupP, pipesBad) },
+      { net: 'junctions', empty: !eff.junctions.length, label: t('core.checklist.items.junctions'), ok: eff.junctions.length > 0 && jBad === 0 && !dupJ.length, detail: withDup(eff.junctions.length ? t('core.checklist.items.junctionsIncomplete', { bad: jBad, n: eff.junctions.length }) : t('core.checklist.items.noJunctions'), dupJ, jBad) },
     ];
     // the time control, when the time simulation is on (§3 of its specification)
     if (timeOn(eff)) {
@@ -206,5 +226,5 @@
     return { ok: items.every((i) => i.ok), items, undef };
   }
 
-  Object.assign(M, { validate, checkPipe, checkJunction, reynoldsOk });
+  Object.assign(M, { validate, checkPipe, checkJunction, reynoldsOk, vaporIssue });
 })(typeof window !== 'undefined' ? window : globalThis);

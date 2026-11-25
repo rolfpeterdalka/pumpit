@@ -27,6 +27,9 @@
   // ---------- preparation (§8.1): tables, conditions and tanks in SI, and the clock
   function prepare(eff0) {
     const eff = M.stripLayout(eff0);
+    // a pipe or junction id given to two objects: the tables and tanks are found by id
+    const dup = M.duplicateIds({ pipes: eff.pipes, junctions: eff.junctions });
+    if (dup.length) return { errors: dup.map(M.duplicateText) };
     const tc = eff.solution.time;
     const errors = [];
     const sys = eff.system;
@@ -460,12 +463,14 @@
   }
 
   // the exact time of an event on the level or the volume of a tank (§5.3; an option of the forward method): where the
-  // watched condition, false at tk, becomes true before tn, by a straight line between the values at both ends (the
-  // volumes Vn at tn, limited to the tank). The line ends where the tank fills or empties when that comes before tn
-  // (tanks: the flows of the step, Qnet). The earliest crossing, or null
+  // watched condition, false at tk, becomes true before tn (the volumes Vn at tn, limited to the tank). Over the step the
+  // volume changes at the constant rate of its flows (tanks: Qnet), so the time is the one where the volume reaches that
+  // of the threshold, t = tk + (V_threshold − V_k)/Qnet: a level is first turned into its volume, since the level of a
+  // tank whose section changes with the height is not a straight line in time (T-29). Every condition that crosses at
+  // that earliest time, within 10⁻⁹ of the step, fires there together ({ t, fired: [{ jt, e }] }), or null
   const LEVELS = ['tankLevel', 'surfaceElev', 'tankVolume'];
   function crossing(P, st, Vn, tk, tn, tanks) {
-    let best = null;
+    const found = [];
     for (const jt of P.jts) {
       const e = TM.events.armed(jt, st.trig.get(jt.jid));
       const pc = e < 0 ? null : jt.conds[e];
@@ -474,15 +479,16 @@
       const val = (V) => (pc.q === 'tankVolume' ? V : (pc.q === 'surfaceElev' ? T.zb : 0) + TM.tanks.levelOf(T, V));
       const a = val(st.V[i]), b = val(Vn[i]);
       if (a === b || TM.events.compare(pc.op, a, pc.v) || !TM.events.compare(pc.op, b, pc.v)) continue;
-      const f = (pc.v - a) / (b - a);
-      if (!(f > 0 && f < 1)) continue; // at a step of the clock: the usual rule
-      // the time the volume reaches Vn: tn, or earlier when the tank fills or empties on the way
-      const Q = tanks[i].Qnet, Vu = st.V[i] + (tn - tk) * Q;
-      const te = Vu > T.Vmax && Q > 0 ? tk + (T.Vmax - st.V[i]) / Q : Vu < 0 && Q < 0 ? tk + st.V[i] / -Q : tn;
-      const t = tk + f * (te - tk);
-      if (t > tk && t < tn && (!best || t < best.t)) best = { t, jt, e };
+      // the volume of the threshold (a level within the tank, since the condition holds at Vn and not at V_k)
+      const Vth = pc.q === 'tankVolume' ? pc.v : TM.tanks.volumeOf(T, Math.min(T.H, Math.max(0, pc.v - (pc.q === 'surfaceElev' ? T.zb : 0))));
+      const Q = tanks[i].Qnet;
+      if (!(Q !== 0)) continue;
+      const t = tk + (Vth - st.V[i]) / Q;
+      if (t > tk && t < tn) found.push({ t, jt, e }); // at a step of the clock: the usual rule
     }
-    return best;
+    if (!found.length) return null;
+    const t = Math.min(...found.map((x) => x.t)), tol = 1e-9 * (tn - tk);
+    return { t, fired: found.filter((x) => x.t - t <= tol).map(({ jt, e }) => ({ jt, e })) };
   }
 
   // ---------- the run
@@ -581,8 +587,8 @@
       }
       prev = out;
       if (cross) {
-        // the event fires at its exact time, and the step there is solved with its table
-        fire(P, st, R, cross.jt, cross.e, tn);
+        // the events fire at their exact time, and the step there is solved with their tables
+        for (const x of cross.fired) fire(P, st, R, x.jt, x.e, tn);
         sub = true; tSub = tn;
         return;
       }

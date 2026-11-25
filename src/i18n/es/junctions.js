@@ -117,6 +117,7 @@ PumpIt.i18n.add('es', {
         setP: 'presión de control',
         speed: 'velocidad',
         nPumps: 'número de bombas',
+        npshrPoints: 'puntos del NPSH requerido: tantos caudales como alturas, cada uno cero o más',
       },
       error: { curve: 'Bomba J{id}: {message}' },
       warn: {
@@ -131,6 +132,8 @@ PumpIt.i18n.add('es', {
         speedTooLow: 'Bomba J{id}: velocidad requerida por debajo del 1% de la nominal.',
         reverse: 'Reflujo en la bomba J{id}: la altura no puede predecirse con la curva.',
         beyondCurve: 'Bomba J{id} operando más allá del final de la curva indicada.',
+        npshrRange: 'Bomba J{id}: la curva de NPSH requerido ajustada da {required} m con {flow} m³/h, por debajo de cero. Los puntos introducidos son cero o más: revise el ajuste (la interpolación lineal sigue los puntos). El NPSH disponible no se compara con ella.',
+        npshrFit: 'Bomba J{id}: la curva de NPSH requerido no se puede ajustar ({message}). El NPSH disponible no se compara con ella.',
         npsh: 'Bomba J{id}: NPSH disponible ({available} m) menor que el requerido ({required} m).',
       },
       form: {
@@ -181,6 +184,8 @@ PumpIt.i18n.add('es', {
         off: ' · apagada',
       },
       quick: { head: 'Altura', speed: 'Velocidad', shaftPower: 'Potencia en el eje', hydraulicPower: 'Potencia hidráulica', npsh: 'NPSH disp. / req.', ratio: 'Relación de compresión', dischargeT: 'T0 en la descarga', gasPower: 'Potencia al gas' },
+      // the NPSH required of a fit below zero at the operating point, or of a curve that cannot be fitted
+      invalidFit: 'ajuste no válido',
       info: {
         massFlow: 'Caudal másico',
         ratio: 'Relación de compresión',
@@ -294,7 +299,19 @@ PumpIt.i18n.add('es', {
 
     generic: {
       label: 'Componente genérico',
-      check: { curve: 'curva de pérdida (mín. 2 puntos)' },
+      check: {
+        curve: 'curva de pérdida (mín. 2 puntos)',
+        fit: 'curva de pérdida: {message}',
+        gain: 'curva de pérdida: el ajuste da una ganancia de presión de {from} a {to} {unit}; revise el ajuste (la interpolación lineal sigue los puntos)',
+        falls: 'curva de pérdida: el ajuste baja en parte del rango de caudal hasta {to} {unit}, y el modo compresible necesita una pérdida que crezca con el caudal; revise el ajuste (la interpolación lineal sigue los puntos)',
+      },
+      error: {
+        fit: 'Componente J{id}: {message}',
+        gain: 'Componente J{id}: la curva de pérdida ajustada da una ganancia de presión de {from} a {to} {unit}.',
+        falls: 'Componente J{id}: la curva de pérdida ajustada baja en parte del rango de caudal hasta {to} {unit}; el modo compresible necesita una pérdida que crezca con el caudal.',
+        beyond: 'Componente J{id}: con {flow} {unit}, más allá del último punto de la curva, la pérdida extrapolada es una ganancia de presión ({dp} kPa), y no hay resultado válido. Extienda la curva hasta ese caudal o revise el ajuste.',
+        beyondFalls: 'Componente J{id}: con {flow} {unit}, más allá del último punto de la curva, la pérdida extrapolada baja, y el caudal obtenido de ella no es válido. Extienda la curva hasta ese caudal o revise el ajuste.',
+      },
       form: { model: 'Modelo de pérdida', K: 'K constante', curve: 'Curva ΔP × caudal', KField: 'K (área aguas arriba)' },
       curves: { loss: 'Curva de pérdida ΔP × caudal' },
       summary: { curve: 'curva ({n} puntos)' },

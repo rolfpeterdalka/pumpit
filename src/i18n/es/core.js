@@ -90,6 +90,11 @@ PumpIt.i18n.add('es', {
       fluidName: 'Fluido',
       baseScenario: 'Base',
       unknownJunctionType: 'Tipo de unión desconocido: {type}',
+      duplicate: {
+        pipe: 'La tubería P{id} aparece más de una vez: cada tubería necesita un número propio.',
+        junction: 'La unión J{id} aparece más de una vez: cada unión necesita un número propio.',
+        scenario: 'El escenario "{id}" aparece más de una vez: cada escenario necesita una identificación propia.',
+      },
     },
     checklist: {
       unknownUnit: 'unidad desconocida: {units}',
@@ -130,6 +135,8 @@ PumpIt.i18n.add('es', {
         viscosity: 'viscosidad',
         reynolds: 'números de Reynolds de la transición: los dos por encima de cero, el laminar por debajo del turbulento',
         patm: 'presión atmosférica: un número, mayor que cero en valor absoluto',
+        vapor: 'presión de vapor: un número en una unidad de presión, o vacía',
+        vaporVacuum: 'presión de vapor: {value} {unit} es {abs} {absUnit}, por debajo del vacío; debe ser cero o más en valor absoluto',
       },
       gas: {
         temperature: 'temperatura del gas',
@@ -321,6 +328,7 @@ PumpIt.i18n.add('es', {
       badFittingSum: 'Tubería P{id}: los accesorios suman K = {sum}; la suma es cero o mayor.',
       badFriction: 'Tubería P{id}: el modelo de fricción "{model}" no es uno de la lista.',
       badPatm: 'La presión atmosférica debe ser un número, mayor que cero en valor absoluto.',
+      badVapor: 'La presión de vapor de {value} {unit} es {abs} {absUnit}, por debajo del vacío: debe ser cero o más en valor absoluto.',
       needsTwoPipes: 'Unión J{id}: requiere 2 tuberías.',
       notDirectional: 'Unión J{id} ({label}): una tubería debe llegar a ella y la otra salir.',
       pipeNotConnected: 'Tubería P{id}: debe estar conectada a dos uniones.',

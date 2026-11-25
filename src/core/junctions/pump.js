@@ -38,9 +38,18 @@
       const c = j.eff;
       lk.effCurve = H.makeCurve(c.x.map((v) => U.toSI(v, c.xUnit, 'volFlow')), c.y.map((v) => v / 100), c.fit);
     }
+    // the NPSH required, optional: a curve that cannot be fitted leaves it unknown, with a warning, and the hydraulics as
+    // they are. npshrTol: the rounding a fit through the points may leave below zero (10⁻⁹ of the highest point)
     if (needsCurve && j.npshr && j.npshr.x.length) {
       const c = j.npshr;
-      lk.npshrCurve = H.makeCurve(c.x.map((v) => U.toSI(v, c.xUnit, 'volFlow')), c.y.map((v) => U.toSI(v, c.yUnit, 'head')), c.fit);
+      const ys = c.y.map((v) => U.toSI(v, c.yUnit, 'head'));
+      try {
+        lk.npshrCurve = H.makeCurve(c.x.map((v) => U.toSI(v, c.xUnit, 'volFlow')), ys, c.fit);
+        lk.npshrTol = 1e-9 * Math.max(0, ...ys.filter(Number.isFinite).map(Math.abs));
+      } catch (e) {
+        lk.npshrFailed = true;
+        warnings.push({ level: 'warning', text: t('junctions.pump.warn.npshrFit', { id: j.id, message: e.message }), obj: 'j:' + j.id });
+      }
     }
     lk.phi = (m) => -rho * g * lk.Hof(m / rho);
     if (j.state === 'offClosed') { lk.mode = 'closed'; lk.fixedClosed = true; }
@@ -113,13 +122,28 @@
     r.etaInvalid = !!el.effCurve && (!Number.isFinite(r.eta) || (!valid && r.Pideal > 0));
     if (el.effCurve && !Number.isFinite(Qs)) warn('warning', t('junctions.pump.warn.effNoSpeed', { id: j.id }), 'j:' + j.id);
     else if (r.etaInvalid) warn('warning', t('junctions.pump.warn.effRange', { id: j.id, eta: (r.eta * 100).toFixed(2) }), 'j:' + j.id);
-    if (el.npshrCurve && Number.isFinite(Qs)) r.NPSHR = s * s * H.evalCurve(el.npshrCurve, Qs);
+    // the NPSH required at the operating point, by the affinity laws (s² times the curve at the flow of one pump at full
+    // speed). A fit below zero between valid points gives no NPSH required: never taken as zero, which would show a
+    // margin that does not exist (npshrInvalid, with a warning); the NPSH available and the hydraulics stay
+    if (el.npshrFailed) r.npshrInvalid = true;
+    if (el.npshrCurve && Number.isFinite(Qs)) {
+      const v = s * s * H.evalCurve(el.npshrCurve, Qs);
+      if (v >= -s * s * el.npshrTol) r.NPSHR = Math.max(0, v);
+      else {
+        r.NPSHR = NaN; r.npshrInvalid = true; r.NPSHRfit = v;
+        warn('warning', t('junctions.pump.warn.npshrRange', { id: j.id, required: v.toFixed(2), flow: (Q * 3600).toFixed(2) }), 'j:' + j.id);
+      }
+    }
     if (m < 0) warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
     if (el.curve && Number.isFinite(Qs) && Qs > el.curve.xmax * 1.0001) warn('warning', t('junctions.pump.warn.beyondCurve', { id: j.id }), 'j:' + j.id);
     if (Number.isFinite(r.NPSHR) && r.NPSHA < r.NPSHR) warn('warning', t('junctions.pump.warn.npsh', { id: j.id, available: r.NPSHA.toFixed(2), required: r.NPSHR.toFixed(2) }), 'j:' + j.id);
     if (!el.effCurve) r.etaAssumed = true;
     return r;
   }
+
+  // the points of an NPSH required curve: flows and heads of zero or more, in pairs
+  const npshrPointsOk = (c) => Array.isArray(c.y) && c.y.length === c.x.length
+    && c.x.every((x) => Number.isFinite(x) && x >= 0) && c.y.every((y) => Number.isFinite(y) && y >= 0);
 
   // the points of an efficiency curve, in %: above 0 and up to 100, or 0 at zero flow
   const effPointsOk = (c) => c.y.every((y, i) => Number.isFinite(y) && y <= 100 && (y > 0 || (y === 0 && c.x[i] === 0)));
@@ -164,6 +188,9 @@
       if (j.mode === 'controlDischarge' || j.mode === 'controlSuction') gasP(j.setP, 'junctions.pump.check.setP');
       if (j.mode !== 'fixedFlow' && !(j.speed > 0)) need('speed');
       if (j.mode !== 'fixedFlow' && !(Number.isInteger(j.nPumps) && j.nPumps >= 1)) need('nPumps');
+      // the points of the NPSH required (optional, read by a pump of a liquid on its curve): as many flows as heads, each
+      // a number of zero or more
+      if (!gas && j.mode !== 'fixedFlow' && j.npshr && Array.isArray(j.npshr.x) && j.npshr.x.length && !npshrPointsOk(j.npshr)) need('npshrPoints');
     },
 
     buildElement,

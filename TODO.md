@@ -27,3 +27,8 @@
 
 - [ ] Gas, adiabatic model: with Z ≠ 1 the stagnation temperature is not kept along a level pipe (Z 0.9, Mach 0.31: 300 K in, 300.46 K out). The march balances energy with cp = k·R/(k−1), while T₀ and the Mach number use Z·R. Make the two consistent.
 - [ ] Units: `units.toSI` turns an empty value (`null`) into zero, or into the standard atmosphere for a gauge pressure, in any field. Audit the fields that reach the calculation and report an empty one instead of taking it as zero.
+
+## Calculation (from the review of 319654f)
+
+- [ ] Laminar flow in a rectangular duct: the friction is 64/Re on the hydraulic diameter, while f·Re goes from about 57 (a square) to 96 (flat plates). Use the factor of the aspect ratio (Shah and London), as the annulus does now. Four imported models have rectangular pipes; check them against their reference results first.
+- [ ] Pump: an efficiency curve that cannot be fitted (for example, its points at one flow) stops the whole calculation. Leave the efficiency and the shaft power unknown with a warning, as the NPSH required curve does now; in the compressible mode the compressor needs a fallback for its discharge temperature.

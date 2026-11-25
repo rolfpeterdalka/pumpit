@@ -162,7 +162,8 @@
       },
       results(j, jr, rc) {
         const vr = { type: j.type, m: rc.m, Q: jr.Q, QN: jr.QN, dP: rc.dP, Pin: jr.Pin, P0in: rc.P0in, K: jr.K, choked: jr.choked };
-        vr.Cv = JS.gasEquivalentCv(jr.K, rc.el.d ? rc.el.d.A[0] : NaN);
+        // the K and the area of the pipe the flow comes from (the outlet one in reverse flow, as the K is referred)
+        vr.Cv = JS.gasEquivalentCv(jr.K, rc.el.d ? rc.el.d.A[rc.m < 0 ? 1 : 0] : NaN);
         stateAndWarnings(j, vr, rc);
         rc.valves[j.id] = vr;
       },

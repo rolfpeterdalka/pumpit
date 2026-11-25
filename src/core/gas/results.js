@@ -114,7 +114,9 @@
       const into = atB ? e.m >= 0 : e.m < 0;
       return { s: atB ? e.b : e.a, into, m: Math.abs(e.m) };
     };
-    const shared = { prep, env, cx, links, st, mOf, nodeOf, pipeOf, warn, pumps, valves, res };
+    // refuse(text): the solution is not valid (as in the incompressible results)
+    const refused = [];
+    const shared = { prep, env, cx, links, st, mOf, nodeOf, pipeOf, warn, pumps, valves, res, refuse: (text) => refused.push(text) };
 
     // ---- junctions
     for (const j of eff.junctions) {
@@ -209,6 +211,7 @@
 
     const order = { critical: 0, warning: 1, caution: 2, info: 3 };
     W.sort((a, b) => order[a.level] - order[b.level]);
+    if (refused.length) return { ok: false, errors: refused, warnings: W };
     const out = {
       ok: true, regime: 'compressible', gasMode: env.mode, converged: res.converged, iterations: meta.totalIt, passes: meta.passes,
       history: meta.hist,

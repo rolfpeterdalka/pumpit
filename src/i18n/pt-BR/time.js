@@ -277,7 +277,7 @@ PumpIt.i18n.add('pt-BR', {
       P0max: 'Maior pressão', P0min: 'Menor pressão',
       Hmax: 'Maior altura', Hmin: 'Menor altura', Wmax: 'Maior potência', Wmin: 'Menor potência',
       HmaxGas: 'Maior altura isentrópica', HminGas: 'Menor altura isentrópica', WmaxGas: 'Maior potência entregue ao gás', WminGas: 'Menor potência entregue ao gás',
-      pipesHint: 'Pressões estáticas nas duas pontas de cada tubo.',
+      pipesHint: 'Pressões estáticas nas duas pontas de cada tubo; num gás, também as vazões e velocidades, com a ponta onde ocorreram.',
       energy: 'Energia no eixo', energyIdeal: 'Energia entregue ao líquido', pumped: 'Volume bombeado', ton: 'Tempo ligada', starts: 'Partidas',
       noEff: '* Sem curva de eficiência, a energia e o custo são os da energia entregue ao líquido (eficiência de 100 %).',
       noEffPower: '* Sem curva de eficiência, a potência é a entregue ao líquido (eficiência de 100 %).',

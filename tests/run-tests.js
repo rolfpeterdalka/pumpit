@@ -481,5 +481,183 @@ console.log('\nReview of 6043c80, bugs 2 to 4: inputs the calculation must refus
   }
 }
 
+console.log('\nReview of 319654f, bugs 1 and 9: fitted curves that go below zero');
+{
+  const look = (m, sid = 'base') => {
+    const e = M.effective(m, sid), v = M.validate(e), r = S.run(e);
+    const msgs = [...v.undef.values()].flat();
+    return { v, r, msgs, text: msgs.join(' | ') + ' || ' + (r.ok ? 'solved' : r.errors.join('; ')) };
+  };
+  // bug 1: the NPSH required of the pump example, three rising points of a catalogue
+  const npsh = (curve, set) => {
+    const m = PumpIt.examples.get('pump').build(), j = m.junctions.find((x) => x.id === 2);
+    j.npshr = Object.assign({ xUnit: 'm³/h', yUnit: 'm' }, curve);
+    if (set) set(j);
+    return look(m);
+  };
+  const warns = (o) => (o.r.warnings || []).filter((w) => /NPSH/.test(w.text)).map((w) => w.text);
+  const lin = npsh({ x: [0, 200, 210], y: [15, 16, 23], fit: 'xy' }), par = npsh({ x: [0, 200, 210], y: [15, 16, 23], fit: '2' });
+  check('NPSHR: linear, 15.56 m required against 12.66 m available, with the warning',
+    lin.v.ok && lin.r.ok && Math.abs(lin.r.pumps[2].NPSHR - 15.5568) < 1e-4 && Math.abs(lin.r.pumps[2].NPSHA - 12.6637) < 1e-4 && warns(lin).some((x) => /lower than required \(15\.56 m\)/.test(x)), warns(lin).join(' | '));
+  const pp = par.r.pumps[2];
+  check('NPSHR: quadratic, the fit gives −17.11 m: no NPSHR (not zero), invalid, the pump and the flow named, no comparison',
+    par.v.ok && par.r.ok && Number.isNaN(pp.NPSHR) && pp.npshrInvalid === true && Math.abs(pp.NPSHRfit + 17.111) < 1e-3
+      && warns(par).length === 1 && /J2.*-17\.11 m at 111\.36 m³\/h.*not compared/.test(warns(par)[0]), warns(par).join(' | '));
+  check('NPSHR: the hydraulics do not depend on the NPSHR curve (same flow and NPSHA as the linear fit)',
+    par.r.pumps[2].Q === lin.r.pumps[2].Q && par.r.pumps[2].NPSHA === lin.r.pumps[2].NPSHA && par.r.pipes[1].dP0 === lin.r.pipes[1].dP0);
+  const good = npsh({ x: [0, 100, 200], y: [2, 3, 6], fit: '2' }), none = npsh({ x: [], y: [], fit: '2' });
+  check('NPSHR: a valid quadratic fit is compared (3.24 m, no warning)', good.r.ok && Math.abs(good.r.pumps[2].NPSHR - 3.2402) < 1e-4 && !good.r.pumps[2].npshrInvalid && warns(good).length === 0, String(good.r.pumps[2].NPSHR));
+  check('NPSHR: without the optional curve, no NPSHR and no warning', none.v.ok && none.r.ok && none.r.pumps[2].NPSHR === undefined && !none.r.pumps[2].npshrInvalid && warns(none).length === 0);
+  const slow = npsh({ x: [0, 200, 210], y: [15, 16, 23], fit: '2' }, (j) => { j.speed = 80; j.nPumps = 2; });
+  check('NPSHR: at 80 % speed with two pumps the curve is read at Q/(N·s) and scaled by s² (−5.88 m at 78.15 m³/h, invalid)',
+    slow.r.ok && slow.r.pumps[2].npshrInvalid && Math.abs(slow.r.pumps[2].NPSHRfit - 0.64 * H.evalCurve(H.makeCurve([0, 200, 210].map((x) => x / 3600), [15, 16, 23], '2'), slow.r.pumps[2].Q / 1.6)) < 1e-9 && /-5\.88 m at 78\.15/.test(warns(slow)[0] || ''), warns(slow).join(' | '));
+  const stuck = npsh({ x: [50, 50, 50], y: [3, 4, 5], fit: '2' });
+  check('NPSHR: a curve that cannot be fitted gives a warning and no NPSHR, and the pump still calculates (111.36 m³/h)',
+    stuck.v.ok && stuck.r.ok && Number.isNaN(stuck.r.pumps[2].NPSHR ?? NaN) && stuck.r.pumps[2].npshrInvalid && Math.abs(stuck.r.pumps[2].Q * 3600 - 111.364) < 1e-3 && warns(stuck).some((x) => /cannot be fitted/.test(x)), stuck.text);
+  for (const [what, c] of [['a negative head', { x: [0, 100], y: [-1, 3], fit: 'xy' }], ['a negative flow', { x: [-10, 100], y: [1, 3], fit: 'xy' }], ['a head that is not a number', { x: [0, 100], y: [1, null], fit: 'xy' }], ['fewer heads than flows', { x: [0, 100], y: [1], fit: 'xy' }]]) {
+    const o = npsh(c);
+    check(`NPSHR points: ${what} is refused by the checklist`, !o.v.ok && o.msgs.some((x) => /NPSH required points/.test(x)), o.text);
+  }
+  // bug 9: a generic component on a loss curve, between the reservoir of the gravity example and a demand of 50 m³/h
+  const generic = (fit, x, y, Q = 50, dir = 'out') => {
+    const m = PumpIt.examples.get('gravity').build();
+    const c = Object.assign(M.newJunction('generic', 2, 0, 0), { elevation: q(25, 'm'), genModel: 'curve', curve: { x, y, xUnit: 'm³/h', yUnit: 'kPa', fit } });
+    const d = Object.assign(M.newJunction('flow', 3, 0, 0), { elevation: q(18, 'm'), Q: q(Q, 'm³/h'), dir });
+    m.junctions = [m.junctions[0], c, d];
+    return look(m);
+  };
+  const gl = generic('xy', [0, 100, 110], [0, 10, 50]), gq = generic('2', [0, 100, 110], [0, 10, 50]);
+  check('loss curve: linear, 5.00 kPa lost at 50 m³/h', gl.v.ok && gl.r.ok && Math.abs(gl.r.junctions[2].dP - 5000) < 1e-6, String(gl.r.junctions[2].dP));
+  check('loss curve: the quadratic fit, a gain from 0 to 97.18 m³/h, is refused by the checklist and by the solver, the component named',
+    !gq.v.ok && gq.msgs.some((x) => /gain from 0 to 97\.18 m³\/h/.test(x)) && !gq.r.ok && /J2.*gain from 0 to 97\.18 m³\/h/.test(gq.r.errors[0]), gq.text);
+  const gd = generic('2', [0, 50, 100], [0, 2.5, 10]);
+  check('loss curve: a dissipative quadratic fit is kept (2.5 kPa at 50 m³/h)', gd.v.ok && gd.r.ok && Math.abs(gd.r.junctions[2].dP - 2500) < 1e-6, String(gd.r.junctions[2].dP));
+  const rev = generic('2', [0, 50, 100], [0, 2.5, 10], 50, 'in'), rj = rev.r.junctions[2];
+  check('loss curve: reverse flow loses the same 2.5 kPa, Q·(P0in − P0out) ≥ 0 in both directions',
+    rev.r.ok && rj.m < 0 && Math.abs(rj.P0in - rj.P0out + 2500) < 1e-6 && rj.m * (rj.P0in - rj.P0out) > 0 && gd.r.junctions[2].m * gd.r.junctions[2].dP > 0, `${rj.m} ${rj.P0in - rj.P0out}`);
+  const beyondOk = generic('xy', [0, 50, 100], [0, 5, 4], 150), beyondGain = generic('xy', [0, 50, 100], [0, 5, 4], 400);
+  check('loss curve: beyond the last point, still a loss (3 kPa at 150 m³/h), the result stands', beyondOk.v.ok && beyondOk.r.ok && Math.abs(beyondOk.r.junctions[2].dP - 3000) < 1e-6, beyondOk.text);
+  check('loss curve: beyond the last point, a gain (−2 kPa at 400 m³/h): no result, the component and the flow named',
+    beyondGain.v.ok && !beyondGain.r.ok && /J2: at 400 m³\/h, beyond the last point.*-2\.000 kPa/.test(beyondGain.r.errors[0]), beyondGain.text);
+  check('curves: the lowest point of a parabola between its points, and where it is below zero',
+    Math.abs(H.curveMin(H.makeCurve([0, 100, 110], [0, 10, 50], '2'), 0, 110).x - 48.59) < 0.01 && Math.abs(H.belowZero(H.makeCurve([0, 100, 110], [0, 10, 50], '2'), 0, 110).to - 97.179) < 1e-3
+      && H.belowZero(H.makeCurve([0, 50, 100], [0, 2.5, 10], '2'), 0, 100, 1e-8) === null);
+}
+
+console.log('\nReview of 319654f, bugs 2 and 4: vapor pressure below vacuum, repeated ids');
+{
+  // bug 2: a user liquid in the pump example; the vapor pressure absolute, or gauge with the atmospheric pressure of the scenario
+  const liquid = (pv, patm = 100, childPatm) => {
+    const m = PumpIt.examples.get('pump').build();
+    m.system.patm = q(patm, 'kPa(a)');
+    m.system.fluid = { kind: 'user', name: 'test liquid', rho: q(1000, 'kg/m³'), mu: q(1, 'mPa·s'), pv };
+    let sid = 'base';
+    if (childPatm) { const c = M.addScenario(m, 'base', 'child'); c.overrides['sys|patm'] = q(childPatm, 'kPa(a)'); sid = c.id; }
+    const e = M.effective(m, sid), v = M.validate(e), r = S.run(e);
+    const sys = v.items.find((i) => i.key === 'sys');
+    return { v, r, sys, text: (sys.detail || '') + ' || ' + (r.ok ? 'solved' : r.errors.join('; ')) };
+  };
+  const ok80 = liquid(q(80, 'kPa(a)')), neg = liquid(q(-80, 'kPa(a)')), none = liquid(q(null, 'kPa(a)'));
+  check('vapor pressure: 80 kPa(a) is accepted (NPSHA 4.59 m at 100 kPa(a))', ok80.v.ok && ok80.r.ok && ok80.r.fluid.pv === 80000 && Math.abs(ok80.r.pumps[2].NPSHA - 4.5913) < 1e-4, ok80.text);
+  check('vapor pressure: −80 kPa(a) is refused by the checklist, the field and the absolute value named',
+    !neg.v.ok && !neg.sys.ok && /vapor pressure: -80 kPa\(a\) is -80 kPa\(a\), below vacuum/.test(neg.sys.detail), neg.text);
+  check('vapor pressure: −80 kPa(a) is refused by the solver', !neg.r.ok && /vapor pressure of -80 kPa\(a\) is -80 kPa\(a\), below vacuum/.test(neg.r.errors[0]), neg.text);
+  check('vapor pressure: empty stays unknown (no NPSHA, no refusal)', none.v.ok && none.r.ok && Number.isNaN(none.r.fluid.pv), none.text);
+  const g20 = liquid(q(-20, 'kPa(g)')), g20child = liquid(q(-20, 'kPa(g)'), 100, 90);
+  check('vapor pressure: −20 kPa(g) at 100 kPa(a) is +80 kPa(a), the same as the absolute value', g20.v.ok && g20.r.ok && Math.abs(g20.r.fluid.pv - 80000) < 1e-9 && Math.abs(g20.r.pumps[2].NPSHA - 4.5913) < 1e-4, g20.text);
+  check('vapor pressure: −20 kPa(g) in a child scenario at 90 kPa(a) is +70 kPa(a), accepted', g20child.v.ok && g20child.r.ok && Math.abs(g20child.r.fluid.pv - 70000) < 1e-9, g20child.text);
+  const g95 = liquid(q(-95, 'kPa(g)')), g95child = liquid(q(-95, 'kPa(g)'), 100, 90);
+  check('vapor pressure: −95 kPa(g) is +5 kPa(a) in the base, accepted', g95.v.ok && g95.r.ok && Math.abs(g95.r.fluid.pv - 5000) < 1e-9, g95.text);
+  check('vapor pressure: −95 kPa(g) in the child scenario at 90 kPa(a) is −5 kPa(a), refused by the checklist and the solver',
+    !g95child.v.ok && /-95 kPa\(g\) is -5 kPa\(a\)/.test(g95child.sys.detail) && !g95child.r.ok && /-5 kPa\(a\)/.test(g95child.r.errors[0]), g95child.text);
+  const mca = liquid(q(-20, 'mca(g)'));
+  check('vapor pressure: a gauge unit without an absolute one is told in kPa(a) (−20 mca(g) is −96.13 kPa(a))', !mca.v.ok && /-20 mH₂O\(g\) is -96\.13 kPa\(a\)/.test(mca.sys.detail), mca.text);
+  const wrong = liquid(q(5, 'm'));
+  check('vapor pressure: a unit that is not a pressure is refused by the checklist', !wrong.v.ok && /vapor pressure: a number in a unit of pressure/.test(wrong.sys.detail), wrong.text);
+  const issue = (pv, patm = 100) => M.vaporIssue({ patm: q(patm, 'kPa(a)'), fluid: { kind: 'user', pv } });
+  check('vapor pressure: the issue the system window marks its field by (none, vapor, vaporVacuum; none for a library fluid)',
+    issue(q(80, 'kPa(a)')) === null && issue(q(null, 'kPa(a)')) === null && issue(q(5, 'm')).key === 'vapor' && issue(q(-95, 'kPa(g)'), 90).key === 'vaporVacuum'
+      && M.vaporIssue({ patm: q(100, 'kPa(a)'), fluid: { kind: 'water', T: q(20, '°C'), pv: q(-80, 'kPa(a)') } }) === null);
+
+  // bug 4: the gravity example reduced to its two reservoirs, joined by P1 (100 m) and a copy of it (1000 m)
+  const twin = (id, set) => {
+    const m = PumpIt.examples.get('gravity').build();
+    m.junctions = m.junctions.filter((j) => j.type === 'reservoir');
+    for (const j of m.junctions) j.pipeK = {};
+    const first = m.pipes[0]; first.down = 3; first.length = q(100, 'm');
+    const second = M.clone(first); second.id = id; second.length = q(1000, 'm');
+    m.pipes = [first, second];
+    if (set) set(m);
+    const e = M.effective(m, 'base'), v = M.validate(e), r = S.run(e);
+    return { m, v, r, text: v.items.map((i) => i.label + ': ' + (i.ok ? 'ok' : i.detail)).join(' | ') + ' || ' + (r.ok ? 'solved' : r.errors.join('; ')) };
+  };
+  const two = twin(2);
+  check('ids: two pipes with their own ids give 170.03 and 52.86 m³/h, 61.80 kg/s from J1',
+    two.v.ok && two.r.ok && Math.abs(two.r.pipes[1].Q * 3600 - 170.0324) < 1e-3 && Math.abs(two.r.pipes[2].Q * 3600 - 52.8556) < 1e-3 && Math.abs(two.r.junctions[1].net - 61.8021) < 1e-3, two.text);
+  const dupP = twin(1);
+  check('ids: two pipes P1 are refused by the checklist (the pipes item names P1) and by the solver',
+    !dupP.v.ok && /Pipe P1 appears more than once/.test(dupP.v.items.find((i) => i.net === 'pipes').detail) && !dupP.r.ok && /Pipe P1 appears more than once/.test(dupP.r.errors[0]), dupP.text);
+  const swapped = twin(1, (m) => m.pipes.reverse());
+  check('ids: the same with the copy first is refused too', !swapped.v.ok && !swapped.r.ok, swapped.text);
+  const dupJ = twin(2, (m) => { m.junctions[1].id = 1; });
+  check('ids: two junctions J1 are refused by the checklist (the junctions item names J1) and by the solver',
+    !dupJ.v.ok && /Junction J1 appears more than once/.test(dupJ.v.items.find((i) => i.net === 'junctions').detail) && !dupJ.r.ok && dupJ.r.errors.some((x) => /Junction J1 appears more than once/.test(x)), dupJ.text);
+  const dupS = M.newModel(); M.addScenario(dupS, 'base', 'a'); dupS.scenarios.list.push(M.clone(dupS.scenarios.list[1]));
+  const ds = M.duplicateIds(dupS);
+  check('ids: two scenarios with one id are found, each repeated id once', ds.length === 1 && ds[0].what === 'scenario' && /Scenario "[\w-]+" appears more than once/.test(M.duplicateText(ds[0])), JSON.stringify(ds));
+  // the gas regime and the time simulation refuse them too
+  const air = PumpIt.examples.get('air').build(); air.pipes.push(M.clone(air.pipes[0]));
+  const ra = S.run(M.effective(air, 'base'));
+  check('ids: the compressible mode refuses a repeated pipe id', !ra.ok && /Pipe P\d+ appears more than once/.test(ra.errors[0]), ra.ok ? 'solved' : ra.errors.join('; '));
+  const tm = PumpIt.time.run(M.effective(dupP.m, 'base'));
+  check('ids: the time simulation refuses a repeated pipe id at its start', !tm.ok && /Pipe P1 appears more than once/.test(tm.errors[0]), JSON.stringify(tm.errors));
+}
+
+console.log('\nReview of 319654f, bug 3: laminar flow in an annulus');
+{
+  // an oil (0.1 Pa·s) at 1 m³/h through 100 m of an annulus 100 × 80 mm, from a reservoir at 2 bar(a) to a demand
+  const oil = (geometry, Q = 1, mu = 0.1) => {
+    const m = M.newModel();
+    m.system.fluid = { kind: 'user', name: 'oil', rho: q(1000, 'kg/m³'), mu: q(mu, 'Pa·s') };
+    m.junctions = [
+      Object.assign(M.newJunction('reservoir', 1, 0, 0), { elevation: q(0, 'm'), liquidElev: q(0, 'm'), surfP: q(2, 'bar(a)') }),
+      Object.assign(M.newJunction('flow', 2, 0, 0), { elevation: q(0, 'm'), Q: q(Q, 'm³/h'), dir: 'out' }),
+    ];
+    const p = M.newPipe(1, 1, 2);
+    Object.assign(p, { length: q(100, 'm'), geometry, friction: { model: 'smooth' } });
+    m.pipes = [p];
+    const e = M.effective(m, 'base'), r = S.run(e);
+    return { ok: M.validate(e).ok && r.ok, r, p: r.pipes && r.pipes[1], text: r.ok ? 'solved' : r.errors.join('; ') };
+  };
+  // the exact laminar drop of a concentric annulus: ΔP = 8μLQ / (π[ro⁴ − ri⁴ − (ro² − ri²)²/ln(ro/ri)])
+  const exact = (ro, ri, Q, mu = 0.1, L = 100) => 8 * mu * L * Q / (Math.PI * (ro ** 4 - ri ** 4 - (ro ** 2 - ri ** 2) ** 2 / Math.log(ro / ri)));
+  const an = oil({ kind: 'annulus', dOuter: q(100, 'mm'), dInner: q(80, 'mm') });
+  check('annulus: the laminar drop is the exact one of the annulus (117.79 kPa), 1.4988 times that of 64/Re',
+    an.ok && rel(an.p.dPfric, exact(0.05, 0.04, 1 / 3600)) < 1e-12 && Math.abs(an.p.dPfric - 117794.968) < 1e-2, an.text + ' ' + (an.p && an.p.dPfric));
+  check('annulus: the reported f is phi·64/Re', an.ok && rel(an.p.f, H.annulusLaminar(0.8) * 64 / an.p.Re) < 1e-12, an.p && String(an.p.f * an.p.Re));
+  const thin = oil({ kind: 'annulus', dOuter: q(100, 'mm'), dInner: q(99, 'mm') }, 0.01);
+  check('annulus: a narrow gap (100 × 99 mm) is the exact one too, close to two plates (f·Re → 96)',
+    thin.ok && rel(thin.p.dPfric, exact(0.05, 0.0495, 0.01 / 3600)) < 1e-9 && Math.abs(thin.p.f * thin.p.Re - 96) < 0.01, thin.text + ' ' + (thin.p && thin.p.f * thin.p.Re));
+  const circ = oil({ kind: 'circular', d: q(100, 'mm') }), core0 = oil({ kind: 'annulus', dOuter: q(100, 'mm'), dInner: q(0, 'mm') });
+  check('annulus: without an inner pipe it is the circle (Hagen-Poiseuille, 64/Re), to the last digit',
+    circ.ok && core0.ok && core0.p.dPfric === circ.p.dPfric && core0.p.f === circ.p.f && rel(circ.p.dPfric, 128 * 0.1 * 100 * (1 / 3600) / (Math.PI * 0.1 ** 4)) < 1e-12, core0.text);
+  check('annulus: phi is 1 at k = 0, 1.4988 at 0.8 and 1.5 at k = 1; its series and its formula agree at the switch (k = 0.95)',
+    H.annulusLaminar(0) === 1 && Math.abs(H.annulusLaminar(0.8) - 1.4987584) < 1e-7 && H.annulusLaminar(1) === 1.5
+      && Math.abs(H.annulusLaminar(0.95 + 1e-12) - H.annulusLaminar(0.95 - 1e-12)) < 1e-10 && Math.abs(H.annulusLaminar(1 - 1e-9) - 1.5) < 1e-15);
+  // the transition starts from phi·64/Re_lam: no step in f at Re_lam
+  const fAt = (Re) => H.frictionFactor(Re, 0, 2300, 4000, H.annulusLaminar(0.8));
+  check('annulus: f has no step at Re_lam (the transition starts from phi·64/Re_lam) and reaches Colebrook at Re_turb',
+    rel(fAt(2300 - 1e-9), fAt(2300)) < 1e-9 && rel(fAt(4000), H.colebrook(4000, 0)) < 1e-12 && H.frictionFactor(3000, 0, 2300, 4000) === H.frictionFactor(3000, 0, 2300, 4000, 1));
+  // the turbulent drop does not change (Colebrook on the hydraulic diameter)
+  const turb = oil({ kind: 'annulus', dOuter: q(100, 'mm'), dInner: q(80, 'mm') }, 30, 0.001);
+  check('annulus: in turbulent flow the drop is that of Colebrook on Dh, as before', turb.ok && turb.p.Re > 4000 && rel(turb.p.f, H.colebrook(turb.p.Re, 0)) < 1e-12, turb.text);
+  // the water hammer reads the same laminar factor in its friction that varies with the flow
+  const P = { fm: 'darcy', L: 100, Dh: 0.02, eD: 0, phiLam: H.annulusLaminar(0.8) }, A = Math.PI * (0.05 ** 2 - 0.04 ** 2);
+  const env = { rho: 1000, mu: 0.1, reLam: 2300, reTurb: 4000 };
+  const Rf = PumpIt.surge.network.frictionOf(P, A, 1, env), R1 = PumpIt.surge.network.frictionOf(Object.assign({}, P, { phiLam: 1 }), A, 1, env);
+  const mLam = 1000 * A * 0.1;
+  check('annulus: the variable friction of the water hammer is phi times that of a circle in laminar flow', rel(Rf(mLam) / R1(mLam), H.annulusLaminar(0.8)) < 1e-12);
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

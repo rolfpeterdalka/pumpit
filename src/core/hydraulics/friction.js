@@ -13,12 +13,26 @@
     return 1 / (x * x);
   }
 
-  // Darcy f: 64/Re below Re_lam, Colebrook above Re_turb, linear interpolation between f_lam(Re_lam) and f_turb(Re_turb)
-  function frictionFactor(Re, eD, reLam = 2300, reTurb = 4000) {
-    if (Re < reLam) return 64 / Re;
+  // Darcy f: phi·64/Re below Re_lam, Colebrook above Re_turb, linear interpolation between f_lam(Re_lam) and f_turb(Re_turb).
+  // phi: the laminar factor of the section (1 for a circle, annulusLaminar for an annulus)
+  function frictionFactor(Re, eD, reLam = 2300, reTurb = 4000, phi = 1) {
+    if (Re < reLam) return phi * 64 / Re;
     if (Re > reTurb) return colebrook(Re, eD);
     const w = (Re - reLam) / (reTurb - reLam);
-    return (1 - w) * (64 / reLam) + w * colebrook(reTurb, eD);
+    return (1 - w) * (phi * 64 / reLam) + w * colebrook(reTurb, eD);
+  }
+
+  // The laminar factor of a concentric annulus of diameter ratio k = inner/outer: f·Re = 64·phi on its hydraulic diameter
+  // (outer − inner), phi = (1 − k)² / (1 + k² + (1 − k²)/ln k). It is 1 for k = 0 (a circle) and rises to 1.5 as k → 1
+  // (two parallel plates, f·Re = 96). Near k = 1 the denominator is the difference of two numbers close to 2, so there
+  // its series is used below e = 1 − k = 0.05: the denominator is 2e²/3 + e⁴/90 + e⁵/90 + 37e⁶/3780 + 8e⁷/945 +
+  // 119e⁸/16200 + O(e⁹) (from ln k = −Σ eⁿ/n), and the two agree to about 1e-11 there.
+  function annulusLaminar(k) {
+    if (!(k > 0)) return 1;
+    if (!(k < 1)) return 1.5;
+    const e = 1 - k;
+    if (e < 0.05) return 1.5 / (1 + e * e * (1 / 60 + e * (1 / 60 + e * (37 / 2520 + e * (4 / 315 + e * 119 / 10800)))));
+    return e * e / (1 + k * k + (1 - k * k) / Math.log(k));
   }
 
   // fully turbulent limit (Re → ∞) of the original Colebrook
@@ -40,5 +54,5 @@
     return Math.pow(Math.abs(V) / (HW_K * C * Math.pow(Rh, 0.63)), 1 / 0.54);
   }
 
-  PumpIt.hyd = Object.assign(PumpIt.hyd || {}, { colebrook, frictionFactor, fullyTurbulent, craneFT, EPS_CRANE, hazenWilliamsS, HW_K });
+  PumpIt.hyd = Object.assign(PumpIt.hyd || {}, { colebrook, frictionFactor, annulusLaminar, fullyTurbulent, craneFT, EPS_CRANE, hazenWilliamsS, HW_K });
 })(typeof window !== 'undefined' ? window : globalThis);

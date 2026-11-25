@@ -91,6 +91,11 @@ PumpIt.i18n.add('pt-BR', {
       fluidName: 'Fluido',
       baseScenario: 'Base',
       unknownJunctionType: 'Tipo de junção desconhecido: {type}',
+      duplicate: {
+        pipe: 'O tubo P{id} aparece mais de uma vez: cada tubo precisa de um número próprio.',
+        junction: 'A junção J{id} aparece mais de uma vez: cada junção precisa de um número próprio.',
+        scenario: 'O cenário "{id}" aparece mais de uma vez: cada cenário precisa de uma identificação própria.',
+      },
     },
     checklist: {
       unknownUnit: 'unidade desconhecida: {units}',
@@ -131,6 +136,8 @@ PumpIt.i18n.add('pt-BR', {
         viscosity: 'viscosidade',
         reynolds: 'números de Reynolds da transição: os dois acima de zero, o laminar abaixo do turbulento',
         patm: 'pressão atmosférica: um número, acima de zero em valor absoluto',
+        vapor: 'pressão de vapor: um número numa unidade de pressão, ou vazia',
+        vaporVacuum: 'pressão de vapor: {value} {unit} é {abs} {absUnit}, abaixo do vácuo; deve ser zero ou mais em valor absoluto',
       },
       gas: {
         temperature: 'temperatura do gás',
@@ -322,6 +329,7 @@ PumpIt.i18n.add('pt-BR', {
       badFittingSum: 'Tubo P{id}: os acessórios somam K = {sum}; a soma é zero ou maior.',
       badFriction: 'Tubo P{id}: o modelo de atrito "{model}" não é um dos da lista.',
       badPatm: 'A pressão atmosférica deve ser um número, acima de zero em valor absoluto.',
+      badVapor: 'A pressão de vapor de {value} {unit} é {abs} {absUnit}, abaixo do vácuo: deve ser zero ou mais em valor absoluto.',
       needsTwoPipes: 'Junção J{id}: exige 2 tubos.',
       notDirectional: 'Junção J{id} ({label}): um tubo deve chegar e outro sair dela.',
       pipeNotConnected: 'Tubo P{id}: precisa estar ligado a duas junções.',

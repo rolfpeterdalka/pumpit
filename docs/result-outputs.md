@@ -113,7 +113,7 @@ The selection of outputs follows a list of result outputs written by the specifi
 | Power to the gas | | default | |
 | BEP flow, flow as % of BEP | ✓ | ✓ | C-09 |
 | NPSH available and required | default | | |
-| NPSH margin and ratio | ✓ | | NPSH<sub>A</sub> − NPSH<sub>R</sub> and NPSH<sub>A</sub>/NPSH<sub>R</sub> |
+| NPSH margin and ratio | ✓ | | NPSH<sub>A</sub> − NPSH<sub>R</sub> and NPSH<sub>A</sub>/NPSH<sub>R</sub>. A fitted NPSH<sub>R</sub> curve below zero at the operating point (or one that cannot be fitted) gives no NPSH<sub>R</sub>, margin or ratio, with a warning; it is never taken as zero |
 | T0 at the suction and at the discharge | | ✓, default (discharge) | |
 
 ### Valves

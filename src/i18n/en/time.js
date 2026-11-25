@@ -277,7 +277,7 @@ PumpIt.i18n.add('en', {
       P0max: 'Highest pressure', P0min: 'Lowest pressure',
       Hmax: 'Highest head', Hmin: 'Lowest head', Wmax: 'Highest power', Wmin: 'Lowest power',
       HmaxGas: 'Highest isentropic head', HminGas: 'Lowest isentropic head', WmaxGas: 'Highest power given to the gas', WminGas: 'Lowest power given to the gas',
-      pipesHint: 'Static pressures at both ends of each pipe.',
+      pipesHint: 'Static pressures at both ends of each pipe; in a gas, the flows and velocities too, with the end where they occurred.',
       energy: 'Energy at the shaft', energyIdeal: 'Energy given to the liquid', pumped: 'Volume pumped', ton: 'Time running', starts: 'Starts',
       noEff: '* Without an efficiency curve the energy, and its cost, are those of the energy given to the liquid (an efficiency of 100 %).',
       noEffPower: '* Without an efficiency curve the power is the one given to the liquid (an efficiency of 100 %).',

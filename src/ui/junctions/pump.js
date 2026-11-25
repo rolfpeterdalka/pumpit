@@ -157,7 +157,8 @@
       row(tx('quick.head'), c.out(pr.dH, 'head'));
       if (Number.isFinite(pr.speed)) row(tx('quick.speed'), F.fmt(pr.speed, 4) + ' %');
       if (Number.isFinite(pr.Pshaft)) row(tx('quick.shaftPower'), c.out(pr.Pshaft, 'power')); else row(tx('quick.hydraulicPower'), c.out(pr.Pideal, 'power'));
-      if (Number.isFinite(pr.NPSHA)) row(tx('quick.npsh'), `${F.fmt(pr.NPSHA, 3)} / ${F.fmt(pr.NPSHR, 3)} m`);
+      // the NPSH required: a number, or "invalid fit" (a fit below zero there, or a curve that cannot be fitted)
+      if (Number.isFinite(pr.NPSHA)) row(tx('quick.npsh'), pr.npshrInvalid ? `${F.fmt(pr.NPSHA, 3)} m / ${tx('invalidFit')}` : `${F.fmt(pr.NPSHA, 3)} / ${F.fmt(pr.NPSHR, 3)} m`);
     },
 
     infoResults(add, r, c) {
@@ -186,7 +187,8 @@
       add(tx('info.hydraulicPower'), c.out(pr.Pideal, 'power'));
       if (Number.isFinite(pr.Pshaft) && !pr.etaAssumed) { add(tx('info.efficiency'), F.fmt(pr.eta * 100, 3) + ' %'); add(tx('info.shaftPower'), c.out(pr.Pshaft, 'power')); }
       if (Number.isFinite(pr.NPSHA)) add(tx('info.npshA'), c.out(pr.NPSHA, 'head'));
-      if (Number.isFinite(pr.NPSHR)) add(tx('info.npshR'), c.out(pr.NPSHR, 'head'));
+      if (pr.npshrInvalid) add(tx('info.npshR'), tx('invalidFit'));
+      else if (Number.isFinite(pr.NPSHR)) add(tx('info.npshR'), c.out(pr.NPSHR, 'head'));
     },
   });
 })(typeof window !== 'undefined' ? window : globalThis);

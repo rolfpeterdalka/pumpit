@@ -1472,5 +1472,54 @@ console.log('\nReview of ab3e0d1, bug 2: negating a condition without a value');
   }
 }
 
+console.log('\nReview of 319654f, bugs 7 and 8: exact times of events on tanks');
+{
+  // a finite tank on a reservoir, level 1 m, filled through pipes by flows that stop when an event sees its threshold
+  const run = (tank, flows, threshold, quantity = 'tankLevel') => {
+    const m = M.newModel();
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(10, 's'), step: q(10, 's'), method: 'forward', exactEvents: true });
+    m.junctions.push(Object.assign(M.newJunction('reservoir', 1, 0, 0), { elevation: q(0, 'm'), liquidElev: q(1, 'm'), surfP: q(0, 'kPa(g)'), tank }));
+    for (const [id, rate] of flows) {
+      const condition = { q: quantity, obj: 'j:1', op: '>=', value: q(threshold, quantity === 'tankVolume' ? 'm³' : 'm') };
+      m.junctions.push(Object.assign(M.newJunction('flow', id, 0, 0), {
+        elevation: q(0, 'm'), Q: q(rate, 'm³/s'), dir: 'in',
+        time: { use: true, what: 'Q', basis: 'absolute', start: 'single', when: [condition], tables: [{ t: [0, 10], v: [0, 0], tUnit: 's', vUnit: 'm³/s' }], repeat: false, interp: 'linear' },
+      }));
+      const pipe = M.newPipe(id, id, 1);
+      Object.assign(pipe, { length: q(10, 'm'), geometry: { kind: 'circular', d: q(1, 'm') }, friction: { model: 'explicitF', f: 0.02 } });
+      m.pipes.push(pipe);
+    }
+    m.pipes.sort((a, b) => a.id - b.id);
+    const e = M.effective(m, 'base'), r = TM.run(e);
+    const started = r.events.filter((x) => x.key === 'core.time.log.table.started').map((x) => [x.obj, x.t]);
+    return { ok: M.validate(e).ok && r.ok, r, started, times: [...r.times], h: [...r.series.tanks[1].h] };
+  };
+  // bug 7: a table tank, 1 m³ per metre up to 2 m and 9 m³ per metre above, filled at 1 m³/s from 1 m: 2 m at 1 s
+  const table = { model: 'open', bottom: q(0, 'm'), height: q(4, 'm'), shape: 'table', table: { h: [0, 1, 2, 4], V: [0, 1, 2, 20], hUnit: 'm', vUnit: 'm³' } };
+  const lv = run(table, [[2, 1]], 2), vol = run(table, [[2, 1]], 2, 'tankVolume'), se = run(table, [[2, 1]], 2, 'surfaceElev');
+  check('exact events: a level of 2 m in a table tank is reached at 1 s (the volume at the threshold), not at 5 s of a line between levels',
+    lv.ok && lv.times[1] === 1 && lv.started.length === 1 && lv.started[0][1] === 1 && Math.abs(lv.h[1] - 2) < 1e-12 && Math.abs(lv.h[2] - 2) < 1e-12, JSON.stringify([lv.times, lv.h, lv.started]));
+  check('exact events: the same with the volume of 2 m³ and with the surface elevation of 2 m (bottom at 0)',
+    vol.ok && vol.started[0][1] === 1 && se.ok && se.started[0][1] === 1, JSON.stringify([vol.started, se.started]));
+  // a horizontal cylinder: the time is the one of the volume of the threshold
+  const cyl = { model: 'open', bottom: q(0, 'm'), height: q(2, 'm'), shape: 'horizontalCylinder', diameter: q(2, 'm'), length: q(4, 'm') };
+  const cy = run(cyl, [[2, 1]], 1.5);
+  if (cy.ok) {
+    const T = { R: 1, L: 4 }, V = (h) => TM.tanks.volumeOf(T, h);
+    check('exact events: in a horizontal cylinder the time is (V(1.5 m) − V(1 m))/Q', Math.abs(cy.started[0][1] - (V(1.5) - V(1))) < 1e-9 && Math.abs(cy.h[1] - 1.5) < 1e-9, JSON.stringify([cy.started, cy.h]));
+  } else check('exact events: a horizontal cylinder tank runs', false, JSON.stringify(cy.r.errors));
+  // bug 8: two flows into a tank of 1 m², 0.25 and 0.75 m³/s, each stopped at 2 m: both fire at 1 s, in either order
+  const cons = { model: 'open', bottom: q(0, 'm'), height: q(20, 'm'), shape: 'constant', area: q(1, 'm²') };
+  for (const [name, flows] of [['J2 first', [[2, 0.25], [3, 0.75]]], ['J3 first', [[3, 0.75], [2, 0.25]]]]) {
+    const o = run(cons, flows, 2);
+    const Q = (id) => [...o.r.series.pipes[id].Q];
+    check(`exact events: two conditions crossing at one time both fire there (${name}), the level stays at 2 m`,
+      o.ok && o.started.length === 2 && o.started.every(([, t]) => t === 1) && Math.abs(o.h[2] - 2) < 1e-12 && Q(2)[1] === 0 && Q(3)[1] === 0, JSON.stringify([o.started, o.h, Q(2), Q(3)]));
+  }
+  // a constant section, where the level was already a straight line in time, keeps its time
+  const m2 = run(cons, [[2, 0.25], [3, 0.75]], 2);
+  check('exact events: the level of a constant section is unchanged by the volume form (2 m at 1 s)', m2.ok && m2.times[1] === 1);
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

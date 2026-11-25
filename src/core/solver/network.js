@@ -17,13 +17,14 @@
     const pp = new Map();
     for (const p of eff.pipes) {
       const gm = p.geometry;
-      let A, Dh;
+      let A, Dh, phiLam = 1; // phiLam: the laminar factor of the section (f·Re = 64·phiLam)
       if (gm.kind === 'circular') { const d = si(gm.d, 'length'); A = Math.PI * d * d / 4; Dh = d; }
       else if (gm.kind === 'annulus') {
         const a = si(gm.dOuter, 'length'), b = si(gm.dInner, 'length');
         // an inner diameter below zero or not less than the outer one is no annulus (its area and Dh could still come out positive)
         if (!(b >= 0 && b < a)) { errors.push(t('core.solver.badGeometry', { id: p.id })); continue; }
         A = Math.PI * (a * a - b * b) / 4; Dh = a - b;
+        phiLam = H.annulusLaminar(b / a);
       }
       else if (gm.kind === 'rectangular') { const w = si(gm.width, 'length'), h = si(gm.height, 'length'); A = w * h; Dh = 2 * w * h / (w + h); }
       else { A = si(gm.area, 'area'); Dh = 4 * A / si(gm.perim, 'length'); }
@@ -52,7 +53,7 @@
       for (const it of p.fittings || []) Ksum += (it.qty ?? 1) * (it.model === 'KfT' ? it.value * fT : it.value);
       const ju = jById.get(p.up), jd = jById.get(p.down);
       pp.set(p.id, {
-        id: p.id, p, A, Dh, L: si(p.length, 'length'), fm, eD, fx, C, Ksum, fT,
+        id: p.id, p, A, Dh, phiLam, L: si(p.length, 'length'), fm, eD, fx, C, Ksum, fT,
         fTurb: H.colebrook(1e8, eD), // same pipe at a very high Re (reference of the 'pipeFt' laminar correction)
         N: p.nParallel || 1,
         // a loose end has no elevation: the pipe is left out below, with its message
@@ -80,6 +81,8 @@
     // the atmospheric pressure: a number, above zero once absolute (an empty one would be zero, or the standard one)
     const patm = PumpIt.model.patmOf(sys);
     if (!(patm > 0)) throw new Error(t('core.solver.badPatm'));
+    // a vapour pressure below vacuum once absolute (a gauge value below minus the atmospheric pressure of the scenario)
+    if (fl.pv < 0) throw new Error(t('core.solver.badVapor', PumpIt.model.vaporText(sys.fluid.pv, fl.pv)));
     const g = U.G0 * sys.gravity;
     if (sys.gravity === 0) warnings.push({ level: 'caution', text: t('core.solver.zeroGravity') });
     const ctx = { rho, patm };
@@ -117,8 +120,9 @@
       const Re = rho * aV * P.Dh / mu;
       let dpF = 0, f = NaN;
       if (P.fm === 'darcy') {
-        if (Re < reLam) { dpF = 32 * mu * P.L * V / (P.Dh * P.Dh); f = Re > 0 ? 64 / Re : Infinity; }
-        else { f = H.frictionFactor(Re, P.eD, reLam, reTurb); dpF = f * P.L / P.Dh * rho * V * aV / 2; }
+        // laminar: phi·64/Re of the section (an annulus loses more than a circle of its hydraulic diameter)
+        if (Re < reLam) { dpF = P.phiLam * 32 * mu * P.L * V / (P.Dh * P.Dh); f = Re > 0 ? P.phiLam * 64 / Re : Infinity; }
+        else { f = H.frictionFactor(Re, P.eD, reLam, reTurb, P.phiLam); dpF = f * P.L / P.Dh * rho * V * aV / 2; }
       } else if (P.fm === 'explicit') { f = P.fx; dpF = f * P.L / P.Dh * rho * V * aV / 2; }
       else if (P.fm === 'hw') {
         dpF = Math.sign(V) * rho * U.G0 * H.hazenWilliamsS(V, P.C, P.Dh) * P.L;

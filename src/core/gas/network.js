@@ -122,7 +122,7 @@
       const fr = frictionOf(P);
       const d = {
         L: P.L, N: P.N, A: [P.A, P.A], D: [P.Dh, P.Dh], K: [P.Ksum + endK.fwd, P.Ksum + endK.rev], lam: [lamOf(P), lamOf(P)],
-        fm: fr.fm, eD: fr.eD, fx: fr.fx, dz: zbEff - zaEff, reLam: env.reLam, reTurb: env.reTurb, nSeg: 100,
+        fm: fr.fm, eD: fr.eD, fx: fr.fx, phiLam: P.phiLam, dz: zbEff - zaEff, reLam: env.reLam, reTurb: env.reTurb, nSeg: 100,
       };
       const lk = { kind: 'pipe', pid: p.id, a: na.ix, b: nb.ix, mode: P.closed ? 'closed' : 'loss', fixedClosed: P.closed, rel: 'duct', d, P };
       // a pipe without friction nor losses at one elevation ties the pressures of its ends; a pipe whose losses may
