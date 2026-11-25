@@ -208,6 +208,8 @@
 
   // ------------------------------------------------------------ the condition of an event (pfx: the start of the ids of
   // its fields; title: the title of its block, none when empty)
+  // the name of a quantity of a condition: the head of a pump is, in the compressible mode, the isentropic head of a compressor
+  const qLabel = (k, eff) => tx('cond.qs.' + (k === 'pumpHead' && eff && M.isCompressible(eff) ? 'pumpHeadGas' : k));
   const OP_LABEL = { '>': '>', '>=': '≥', '<': '<', '<=': '≤', '=': '=', '!=': '≠' };
   function conditionBlock(pfx, title, c, onChange) {
     const eff = app.eff();
@@ -241,7 +243,7 @@
     };
     const objectsFor = (nq) => eff.pipes.map((p) => ['p:' + p.id]).concat(eff.junctions.map((j) => ['j:' + j.id]))
       .filter(([k]) => { const ob = E().objectOf(eff, k); return ob && E().fits(nq.at, ob); });
-    box.appendChild(lab(tx('cond.q'), select('q', Object.keys(Q).map((k) => [k, tx('cond.qs.' + k)]), c.q, (v) => onChange(fresh(v)))));
+    box.appendChild(lab(tx('cond.q'), select('q', Object.keys(Q).map((k) => [k, qLabel(k, eff)]), c.q, (v) => onChange(fresh(v)))));
     if (q.at) {
       const obs = objects();
       box.appendChild(lab(tx('cond.obj'), select('obj', (obs.some(([k]) => k === c.obj) ? [] : [['', '—']]).concat(obs), c.obj || '', (v) => {
@@ -291,7 +293,7 @@
   function conditionText(c, eff) {
     const Q = E().QUANTITIES[c && c.q];
     if (!Q) return '—';
-    const parts = [tx('cond.qs.' + c.q)];
+    const parts = [qLabel(c.q, eff)];
     if (Q.at) parts.push(objLabel(eff, c.obj));
     if (c.end && E().needsEnd(Q.at)) parts.push(tx('cond.ends.' + c.end));
     if (c.obj2) parts.push('− ' + objLabel(eff, c.obj2) + (c.end2 && E().needsEnd(Q.at) ? ' ' + tx('cond.ends.' + c.end2) : ''));

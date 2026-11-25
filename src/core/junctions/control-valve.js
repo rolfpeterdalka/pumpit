@@ -150,6 +150,7 @@
           else {
             lk.setMass = (na) => f.Q * PumpIt.gas.flow.rhoOf(cx, na.P, PumpIt.gas.flow.tempOf(cx, na));
             lk.ctrl = { mode: 'fixedFlow', value: f.Q * net.env.rhoN, conScale: 'M', con: (m, na) => m - lk.setMass(na) };
+            lk.localVolume = true; // its value is a scale only, not the mass of the set flow
           }
           lk.value = lk.ctrl.value;
         } else {

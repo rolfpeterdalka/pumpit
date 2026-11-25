@@ -1057,5 +1057,24 @@ console.log('\nA level table in metres or in % of the steady level');
   check('the two representations give the same series', Pa.every((x, i) => Math.abs(x - Pb[i]) <= 1e-9 * Math.abs(x)));
 }
 
+// Review of aca2807, case 13: the highest pressure of a pipe is optional; blank with a unit (a file of before) it is no
+// limit, and a number below the pressure reached still gives its warning
+console.log('\nReview of aca2807, case 13: the highest pressure of a pipe');
+{
+  const closing = (pMax) => {
+    const m = base();
+    J(m, 'pressure', 1, { P: q(2000, 'kPa(a)'), ptype: 'stagnation' });
+    J(m, 'flow', 2, { Q: q(area(0.5), 'm³/s'), dir: 'out', surge: closure() });
+    pipe(m, 1, 1, 2, 1200, 0.5, 0, 1200);
+    m.pipes[0].surge.pMax = pMax;
+    control(m, 0.1, 2);
+    return m;
+  };
+  const blank = closing({ value: null, unit: 'bar(g)' });
+  check('blank with a unit: the model is complete and runs, without the warning', M.validate(M.effective(blank, 'base')).ok && !simulate(blank).warnings.some((w) => w.key === 'surge.warn.pMax'));
+  const low = simulate(closing({ value: 10, unit: 'bar(g)' }));
+  check('10 bar(g), below the pressure reached: the warning of the highest pressure', low.warnings.some((w) => w.key === 'surge.warn.pMax' && w.obj === 'p:1'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

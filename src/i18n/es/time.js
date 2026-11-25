@@ -147,7 +147,7 @@ PumpIt.i18n.add('es', {
           time: 'Tiempo', elapsed: 'Tiempo desde el inicio de la tabla', tankLevel: 'Nivel del tanque', surfaceElev: 'Cota de la superficie',
           tankVolume: 'Volumen del tanque', surfP: 'Presión en la superficie', pStatic: 'Presión estática', pStag: 'Presión de estancamiento',
           hgl: 'Línea piezométrica', egl: 'Línea de energía', flowVol: 'Caudal volumétrico', flowMass: 'Caudal másico', velocity: 'Velocidad',
-          pumpSpeed: 'Velocidad de la bomba', pumpFlow: 'Caudal de la bomba', pumpHead: 'Altura de la bomba', cv: 'Cv de la válvula', state: 'Estado',
+          pumpSpeed: 'Velocidad de la bomba', pumpFlow: 'Caudal de la bomba', pumpHead: 'Altura de la bomba', pumpHeadGas: 'Altura isentrópica del compresor', cv: 'Cv de la válvula', state: 'Estado',
           opening: 'Apertura de la válvula',
         },
         states: { on: 'encendida', off: 'detenida', open: 'abierta', closed: 'cerrada', control: 'controlando' },

@@ -336,5 +336,78 @@ console.log('\nThe efficiency of a pump stays within 0 to 100 %');
     && rf.warnings.some((w) => w.obj === 'j:2' && w.text.includes('without the speed')), pf ? `${pf.speed} ${pf.eta}` : JSON.stringify(rf.errors));
 }
 
+// Review of aca2807, case 3: a vapour pressure in a gauge unit is the same absolute pressure, with the ambient pressure of
+// the scenario
+console.log('\nReview of aca2807, case 3: a gauge vapour pressure');
+{
+  const npsh = (pv, patm2) => {
+    const m = PumpIt.examples.get('pump').build();
+    m.system.fluid = { kind: 'user', name: 'u', rho: q(1000, 'kg/m³'), mu: q(1, 'cP'), pv };
+    m.system.patm = q(80, 'kPa(a)');
+    let sid = 'base';
+    if (patm2) { const s = M.addScenario(m, 'base', 'child'); s.overrides['sys|patm'] = q(patm2, 'kPa(a)'); sid = s.id; }
+    const r = solveOk(m, sid);
+    return { pv: r.fluid.pv, N: r.pumps[2].NPSHA };
+  };
+  const a = npsh(q(5, 'kPa(a)')), g = npsh(q(-75, 'kPa(g)'));
+  check('5 kPa(a) and −75 kPa(g) with 80 kPa(a): 5000 Pa, the same NPSHA (10.1997 m)', a.pv === 5000 && Math.abs(g.pv - 5000) < 1e-9 && Math.abs(a.N - g.N) < 1e-3 && Math.abs(a.N - 10.1997) < 1e-4, a.N + ' ' + g.N);
+  const ca = npsh(q(5, 'kPa(a)'), 90), cg = npsh(q(-85, 'kPa(g)'), 90);
+  check('a child at 90 kPa(a): −85 kPa(g) is 5000 Pa, the same NPSHA', Math.abs(cg.pv - 5000) < 1e-9 && Math.abs(ca.N - cg.N) < 1e-3, ca.N + ' ' + cg.N);
+}
+
+// Review of aca2807, case 8: a loss at the pipe of a single-node junction is zero or more
+console.log('\nReview of aca2807, case 8: a negative loss at a reservoir');
+{
+  const with_ = (k, type) => {
+    const m = PumpIt.examples.get('pump').build();
+    if (type) { const j = m.junctions[0]; j.type = type; }
+    m.junctions[0].pipeK[1].kOut = k;
+    return M.validate(M.effective(m, 'base'));
+  };
+  const v = with_(-10);
+  check('K leaving −10: J1 is pending, the item names P1, the direction and −10', !v.ok && (v.undef.get('j:1') || []).some((x) => x.includes('P1') && x.includes('leaving') && x.includes('-10')), JSON.stringify(v.undef.get('j:1')));
+  check('K = 0 and K = 0.5 are accepted', with_(0).ok && with_(0.5).ok);
+  const left = PumpIt.examples.get('pump').build(); left.junctions[0].pipeK[9] = { kOut: -10, kIn: 0 };
+  check('an entry left by a pipe no longer connected (P9) does not count', M.validate(M.effective(left, 'base')).ok);
+  const m = PumpIt.examples.get('pump').build(); m.junctions[0].pipeK[1].kIn = -1;
+  check('K arriving below zero too', (M.validate(M.effective(m, 'base')).undef.get('j:1') || []).some((x) => x.includes('arriving')));
+  const t = PumpIt.examples.get('pump').build();
+  t.junctions.find((j) => j.id === 3).time = { use: true, what: 'K', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 1], v: [0.14, -1], tUnit: 'h', vUnit: '' }], repeat: false, interp: 'step' };
+  t.solution.time.on = true;
+  check('a negative K in a table over time still closes a valve', M.validate(M.effective(t, 'base')).ok);
+}
+
+// Review of aca2807, case 9: the Reynolds numbers of the transition are above zero and in order
+console.log('\nReview of aca2807, case 9: the Reynolds numbers of the transition');
+{
+  const v = (a, b) => { const m = PumpIt.examples.get('pump').build(); Object.assign(m.system, { reLam: a, reTurb: b }); return M.validate(M.effective(m, 'base')); };
+  const item = PumpIt.i18n.t('core.checklist.fluid.reynolds');
+  for (const [a, b] of [[300000, 3000], [3000, 3000], [0, 4000], [2300, null]]) {
+    const r = v(a, b);
+    check(a + ' and ' + b + ': the system is pending', !r.ok && r.items.find((i) => i.key === 'sys').detail.includes(item));
+  }
+  const saved = PumpIt.examples.get('pump').build(); Object.assign(saved.system, { reLam: 300000, reTurb: 3000 });
+  check('the same in a model saved and read again', !M.validate(M.effective(JSON.parse(JSON.stringify(saved)), 'base')).ok);
+  const r = solveOk(PumpIt.examples.get('pump').build());
+  check('2300 and 4000: P1 turbulent, f = 0.0172403', v(2300, 4000).ok && /turbulent/i.test(r.pipes[1].regime) && Math.abs(r.pipes[1].f - 0.0172403) < 1e-7, r.pipes[1].f);
+}
+
+// Review of aca2807, case 10: the Cv of a valve drawn against the flow is that of the loss along the flow
+console.log('\nReview of aca2807, case 10: the Cv of a valve drawn against the flow');
+{
+  const run = (flip, measure) => {
+    const m = PumpIt.examples.get('gravity').build();
+    Object.assign(m.junctions.find((j) => j.id === 2), { lossModel: 'Cv', Cv: 100 });
+    if (flip) for (const p of m.pipes.filter((p) => p.id === 1 || p.id === 2)) [p.up, p.down] = [p.down, p.up];
+    return solveOk(m).valves[2];
+  };
+  const a = run(false), b = run(true);
+  check('as drawn and reversed: |Q| 66.471 m³/h and Cv 100, the signs of Q and ΔP kept', Math.abs(a.Q * 3600 - 66.471) < 1e-3 && Math.abs(b.Q * 3600 + 66.471) < 1e-3 && b.dP < 0
+    && Math.abs(a.Cv - 100) < 1e-6 && Math.abs(b.Cv - 100) < 1e-6, a.Cv + ' ' + b.Cv);
+  check('the effective K too: the same positive K in both orientations', a.K > 0 && Math.abs(a.K - b.K) < 1e-9 * a.K, a.K + ' ' + b.K);
+  const JS = PumpIt.junctionTypes.shared;
+  check('no flow and no pressure drop: no coefficient', Number.isNaN(JS.flowCv(0, 0, 998)) && Number.isNaN(JS.flowCv(-1, 1000, 998)));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

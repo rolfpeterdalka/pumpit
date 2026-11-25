@@ -518,5 +518,38 @@ console.log('\nJunction symbols as solids (D-29)');
     && oIn.scale === isoMax.scale && same3(oIn.target, isoMax.target));
 }
 
+// Review of aca2807, case 14: a pump its table stops looks closed at the steps where it is stopped, and running again at
+// the first one; the class is the one of a pump closed in the steady state (both themes style the class)
+console.log('\nReview of aca2807, case 14: the look of a pump at the step of the time cursor');
+{
+  const fs = require('fs'), path = require('path'), vm = require('vm');
+  const { ROOT } = require('./load-core');
+  const m = EX.get('pump').build();
+  m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(15, 'min') });
+  m.junctions.find((j) => j.id === 2).time = { use: true, what: 'speed', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 0.5], v: [100, 0], tUnit: 'h', vUnit: '%' }], repeat: false, interp: 'step' };
+  const run = PumpIt.time.run(M.effective(m, 'base'));
+  let cursor = 0, made = 0;
+  const counted = Object.assign({}, run, { modelAt: (i) => { made++; return run.modelAt(i); } });
+  const ui = { format: {}, solids3d: { closed: (type, j) => type === 'pump' && j.state === 'offClosed' }, colorScales: {}, scene3d: {}, edit3d: {} };
+  const app = { model: m, eff: () => M.effective(m, 'base'), timeRun: () => counted, cursorIndex: () => cursor };
+  const c = vm.createContext({ console, document: { getElementById: () => null } });
+  c.window = { PumpIt: { ...PumpIt, ui, app } };
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/view3d/render.js'), 'utf8'), c, { filename: 'src/ui/view3d/render.js' });
+  const fr = { sel: new Set(), undef: new Set(), res: null };
+  const j2 = m.junctions.find((j) => j.id === 2);
+  const looks = (order) => order.map((i) => { cursor = i; return ui.render3d.junctionLook(fr, j2).includes('closed'); });
+  const fwd = looks([0, 1, 2, 3, 4]);
+  ok('aca2807-14 running at 0 and 15 min, closed from 30 to 60 min', run.ok && fwd.join() === 'false,false,true,true,true', fwd.join());
+  const back = looks([4, 3, 2, 1, 0]);
+  ok('aca2807-14 ... and so backwards, running again at the first step', back.join() === 'true,true,true,false,false', back.join());
+  cursor = 4; ui.render3d.junctionLook(fr, j2); const before = made;
+  for (let k = 0; k < 20; k++) ui.render3d.junctionLook(fr, j2);
+  ok('aca2807-14 ... the model of a step is made once, not at every frame drawn at it', made === before);
+  app.timeRun = () => null;
+  const on = ui.render3d.junctionLook(fr, j2).includes('closed');
+  j2.state = 'offClosed';
+  ok('aca2807-14 the same class as a pump closed in the steady state (no run)', !on && ui.render3d.junctionLook(fr, j2).includes('closed'));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

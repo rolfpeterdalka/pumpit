@@ -147,7 +147,7 @@ PumpIt.i18n.add('en', {
           time: 'Time', elapsed: 'Time since the table began', tankLevel: 'Tank level', surfaceElev: 'Elevation of the surface',
           tankVolume: 'Tank volume', surfP: 'Surface pressure', pStatic: 'Static pressure', pStag: 'Stagnation pressure',
           hgl: 'Hydraulic grade line', egl: 'Energy grade line', flowVol: 'Volume flow', flowMass: 'Mass flow', velocity: 'Velocity',
-          pumpSpeed: 'Pump speed', pumpFlow: 'Pump flow', pumpHead: 'Pump head', cv: 'Cv of the valve', state: 'State',
+          pumpSpeed: 'Pump speed', pumpFlow: 'Pump flow', pumpHead: 'Pump head', pumpHeadGas: 'Isentropic head of the compressor', cv: 'Cv of the valve', state: 'State',
           opening: 'Opening of the valve',
         },
         states: { on: 'running', off: 'stopped', open: 'open', closed: 'closed', control: 'controlling' },

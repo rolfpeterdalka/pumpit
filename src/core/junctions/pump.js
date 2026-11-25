@@ -277,7 +277,7 @@
     const flowRow = (qt) => {
       const f = net.flowExt(qt, 1, j) || { m: 0 };
       if (f.m !== undefined) { lk.mode = 'fixedFlow'; lk.value = f.m; return; }
-      lk.mode = 'fixedFlow'; lk.value = f.Q * net.env.rhoN; lk.conScale = 'M';
+      lk.mode = 'fixedFlow'; lk.value = f.Q * net.env.rhoN; lk.conScale = 'M'; lk.localVolume = true; // value: a scale only
       lk.con = (m, na) => m - f.Q * Fw().rhoOf(cx, na.P, Fw().tempOf(cx, na));
     };
     if (j.mode === 'ratio') {

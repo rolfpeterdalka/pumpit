@@ -97,7 +97,7 @@ The decisions of Annex A are followed as written. They are repeated here with th
 
 **W-25 Output stations** at the ends by default, `all` or a list per pipe; the extremes always cover every station.
 
-**W-26 Maximum pressure** of a pipe, optional, for a warning only.
+**W-26 Maximum pressure** of a pipe, optional, for a warning only. A blank field is no limit (null), whatever unit is chosen for it; a file whose blank limit kept a unit (`{ value: null, unit }`) opens with no limit too.
 
 **W-27 Performance** is a target, not a test (see Performance below).
 

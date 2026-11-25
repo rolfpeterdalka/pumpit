@@ -250,7 +250,10 @@
     const out = PumpIt.surge.wavespeed.inputs(p, K).miss.slice();
     const st = d.stations;
     if (!(PIPE_STATIONS.includes(st) || (Array.isArray(st) && st.length && st.every((i) => Number.isInteger(i) && i >= 0)))) out.push('stations');
-    if (d.pMax !== null && d.pMax !== undefined && !(isQty(d.pMax) && Number.isFinite(d.pMax.value) && U.has('pressure', d.pMax.unit))) out.push('pMax');
+    // the highest pressure is optional: none, or a number without its value (a file of before: a unit chosen on a blank
+    // field), is no limit
+    const noLimit = d.pMax === null || d.pMax === undefined || (isQty(d.pMax) && (d.pMax.value === null || d.pMax.value === undefined));
+    if (!noLimit && !(isQty(d.pMax) && Number.isFinite(d.pMax.value) && U.has('pressure', d.pMax.unit))) out.push('pMax');
     // the coefficient of Brunone, optional (phase G3): empty, it comes from the Reynolds number of the steady state
     if (d.k !== null && d.k !== undefined && !(typeof d.k === 'number' && d.k >= 0)) out.push('k');
     return out;

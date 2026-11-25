@@ -46,6 +46,14 @@
     return (x, cat) => U.toSI(x.value, x.unit, cat, ctx);
   }
 
+  // the absolute temperature (K) of the gas a boundary supplies, which a relative second column is a percentage of (1 K
+  // when it is not known yet: the sign of the percentage decides)
+  function sourceT(j, qt, eff) {
+    let T = NaN;
+    try { T = qt.second.steady(j, siOf(eff), { T: PumpIt.fluids.evaluateGas(eff.system).T }); } catch (e) { /* incomplete: its own checklist */ }
+    return T > 0 ? T : 1;
+  }
+
   // what is missing in the time data of a junction, as keys under core.checklist.time (an empty list: complete)
   function check(j, eff) {
     const d = j.time, out = [];
@@ -83,6 +91,8 @@
       if (qt && qt.second && Array.isArray(tb.v2) && tb.v2.length) {
         if (!(tb.v2.length === tb.t.length && tb.v2.every(Number.isFinite) && (d.basis === 'relative' || U.has(qt.second.cat, tb.v2Unit)))) out.push('data.table');
         else if (d.basis === 'absolute' && qt.second.cat === 'temperature' && !tb.v2.every((x) => U.toSI(x, tb.v2Unit, 'temperature') > 0)) out.push('data.temperature');
+        // a relative column: % of the absolute temperature of the source (that of the junction, or of the gas)
+        else if (d.basis === 'relative' && qt.second.cat === 'temperature' && !tb.v2.every((x) => (x / 100) * sourceT(j, qt, eff) > 0)) out.push('data.temperature');
       }
       if (!tb.t.every((x, k) => k === 0 || x >= tb.t[k - 1])) out.push('data.order');
       if (tb.t[0] < 0) out.push('data.order');

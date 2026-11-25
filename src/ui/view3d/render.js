@@ -102,6 +102,22 @@
   }
   const effPipes = () => effIndexOf().pipes;
   const effJunctions = () => effIndexOf().junctions;
+  // the junctions as the step of the time cursor has them (its tables applied: a pump a table stops), indexed once per
+  // run and step, since the model of a step is a new copy and the quick frames of a drag draw every junction again;
+  // without a run, those of the effective model
+  const cursorIndex = new WeakMap();
+  function shownJunctions() {
+    const run = app.timeRun && app.timeRun();
+    if (!run || !run.modelAt || !app.cursorIndex) return effJunctions();
+    const i = app.cursorIndex();
+    let c = cursorIndex.get(run);
+    if (!c || c.i !== i) {
+      const m = run.modelAt(i);
+      c = { i, junctions: m ? new Map(m.junctions.map((j) => [j.id, j])) : null };
+      cursorIndex.set(run, c);
+    }
+    return c.junctions || effJunctions();
+  }
 
   // The end q of a segment that goes towards o, moved to the body of the junction symbol at q (at: its entry in
   // f.place), at most 45 % of the segment: the pipe meets the solid where it enters it.
@@ -274,7 +290,7 @@
     if (f.undef.has(key)) cls.push('undef');
     const jr = f.res && f.res.junctions[j.id];
     if (jr && jr.isolated) cls.push('iso');
-    if (SO.closed(j.type, effJunctions().get(j.id) || j)) cls.push('closed');
+    if (SO.closed(j.type, shownJunctions().get(j.id) || effJunctions().get(j.id) || j)) cls.push('closed');
     return cls;
   }
 

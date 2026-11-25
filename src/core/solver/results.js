@@ -113,9 +113,12 @@
       const P0in = Pn(jn.in.ix), P0out = Pn(jn.out.ix);
       const Vin = pipeV(jn.pin), Vout = pipeV(jn.pout);
       const dP = P0in - P0out;
+      // K: the loss along the flow, referred to the velocity of the pipe the flow comes from (a junction drawn against
+      // the flow has the same K as drawn with it; a rise, as that of a pump, stays negative)
+      const Vup = m < 0 ? Vout : Vin;
       const jr = {
         type: j.type, m, Q: m / rho, P0in, P0out, Pin: P0in - rho * Vin * Vin / 2, Pout: P0out - rho * Vout * Vout / 2,
-        dP, K: Vin ? dP / (rho * Vin * Vin / 2) : NaN, z, isolated: jn.in.isolated && jn.out.isolated,
+        dP, K: Vup ? (m < 0 ? -dP : dP) / (rho * Vup * Vup / 2) : NaN, z, isolated: jn.in.isolated && jn.out.isolated,
       };
       jr.HGL = jr.Pin / rg + z;
       if (jr.isolated) Object.assign(jr, { P0in: NaN, P0out: NaN, Pin: NaN, Pout: NaN, dP: NaN, K: NaN, HGL: NaN });

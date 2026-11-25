@@ -52,7 +52,9 @@
     const addNode = (o) => {
       o.ix = nodes.length;
       const nd = Object.assign({ kind: 'free', value: 0, pk: internal, T0: fl.T, ext: null, demand: 0 }, o);
-      if (nd.ext && (nd.ext.m || nd.ext.Q)) nd.demand = 1; // an external flow makes its part active (connectivity.js)
+      // an external flow makes its part active (connectivity.js); its demand is the mass that leaves (kg/s, as in the
+      // incompressible mode), unknown for a volume at the conditions of the node, whose density an isolated node lacks
+      if (nd.ext && (nd.ext.m || nd.ext.Q)) { nd.active = true; nd.demand = nd.ext.m ? -nd.ext.m : NaN; }
       nodes.push(nd);
       return nd;
     };

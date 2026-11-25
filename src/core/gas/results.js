@@ -166,9 +166,13 @@
       const rhoIn = Fw.rhoOf(cx, vi.P, vi.T);
       const Vin = pinEnd ? Math.abs(pinEnd.s.V) || 0 : 0;
       const dP = vi.P0 - vo.P0;
+      // K: the loss along the flow, referred to the pipe the flow comes from (its velocity and density), as in the
+      // incompressible mode: a junction drawn against the flow has the same K as drawn with it
+      const Vout = poutEnd ? Math.abs(poutEnd.s.V) || 0 : 0, rhoOut = Fw.rhoOf(cx, vo.P, vo.T);
+      const [Vup, rhoUp] = m < 0 ? [Vout, rhoOut] : [Vin, rhoIn];
       const jr = {
         type: j.type, m, Q: rhoIn > 0 ? m / rhoIn : NaN, QN: m / env.rhoN, P0in: vi.P0, P0out: vo.P0, Pin: vi.P, Pout: vo.P,
-        Tin: vi.T, Tout: vo.T, T0in: vi.T0, T0out: vo.T0, dP, K: Vin ? dP / (rhoIn * Vin * Vin / 2) : NaN, z,
+        Tin: vi.T, Tout: vo.T, T0in: vi.T0, T0out: vo.T0, dP, K: Vup && rhoUp > 0 ? (m < 0 ? -dP : dP) / (rhoUp * Vup * Vup / 2) : NaN, z,
         isolated: jn.in.isolated && jn.out.isolated, rho: rhoIn,
         choked: !!(el && el.idx >= 0 && el.mode === 'loss' && res.st[el.idx] && res.st[el.idx].choked),
       };

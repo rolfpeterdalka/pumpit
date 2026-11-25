@@ -582,7 +582,7 @@
         const out = { junction: jr };
         if (def.time && def.time.results === 'valves') {
           const JS = PumpIt.junctionTypes.shared;
-          out.valve = { Cv: JS.equivalentCv(st.m, st.P1 - st.P2, r), open: track ? 100 * st.x : jc.lossModel === 'opening' ? (jc.closed ? 0 : jc.open) : NaN };
+          out.valve = { Cv: JS.flowCv(st.m, st.P1 - st.P2, r), open: track ? 100 * st.x : jc.lossModel === 'opening' ? (jc.closed ? 0 : jc.open) : NaN };
         }
         return out;
       },

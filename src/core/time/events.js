@@ -164,7 +164,8 @@
       }
       case 'pumpSpeed': return sol.pumps[x.id] ? sol.pumps[x.id].speed : NaN;
       case 'pumpFlow': return sol.pumps[x.id] ? sol.pumps[x.id].Q : NaN;
-      case 'pumpHead': return sol.pumps[x.id] ? sol.pumps[x.id].dH : NaN;
+      // the head of the regime of the machine: a pump, its head; a compressor, its isentropic head
+      case 'pumpHead': { const r = sol.pumps[x.id]; return r ? (r.dHs !== undefined || r.Pgas !== undefined ? r.dHs : r.dH) : NaN; }
       case 'cv': return sol.valves[x.id] ? sol.valves[x.id].Cv : NaN;
       case 'opening': return sol.valves[x.id] && Number.isFinite(sol.valves[x.id].open) ? sol.valves[x.id].open : NaN;
       case 'state': {

@@ -601,5 +601,29 @@ if (PumpIt) {
   ok('6c4f0fa-4 a compressor whose fitted efficiency passes 100 %: no power to the gas, a warning', hi.p.eta > 1 && Number.isNaN(hi.p.Pgas) && hi.p.etaInvalid && wh.length === 1, `${hi.p.eta * 100}`);
 }
 
+// Review of aca2807, case 9: the Reynolds numbers of the transition are checked in the compressible mode too
+console.log('\nReview of aca2807, case 9 in the compressible mode');
+{
+  const m = PumpIt.examples.get('air').build();
+  Object.assign(m.system, { reLam: 300000, reTurb: 3000 });
+  const v = PumpIt.model.validate(PumpIt.model.effective(m, 'base'));
+  // the effective K of a valve drawn against the flow of a gas (review of aca2807, beside case 10)
+  const kOf = (flip) => {
+    const g = PumpIt.examples.get('air').build();
+    const v = PumpIt.model.newJunction('valve', 9, 200, 200);
+    Object.assign(v, { elevation: PumpIt.model.q(0, 'm'), lossModel: 'K', K: 5 });
+    g.junctions.push(v);
+    const p1 = g.pipes.find((p) => p.id === 1), p9 = PumpIt.model.newPipe(9, 9, 2);
+    Object.assign(p9, JSON.parse(JSON.stringify({ material: p1.material, geometry: p1.geometry, friction: p1.friction, length: p1.length })));
+    p1.down = 9; g.pipes.push(p9);
+    if (flip) for (const p of [p1, p9]) [p.up, p.down] = [p.down, p.up];
+    const r = PumpIt.solver.run(PumpIt.model.effective(g, 'base'));
+    return r.ok ? r.junctions[9] : { K: NaN, m: NaN, err: r.errors };
+  };
+  const ka = kOf(false), kb = kOf(true);
+  ok('aca2807-10 gas: a valve of K 5 drawn against the flow gives the same effective K as drawn with it', ka.m > 0 && kb.m < 0 && Math.abs(ka.K - kb.K) < 1e-6 * ka.K && ka.K > 0, `${ka.K} ${kb.K}`);
+  ok('aca2807-9 a gas with inverted limits: the system is pending', !v.ok && v.items.find((i) => i.key === 'sys').detail.includes(PumpIt.i18n.t('core.checklist.fluid.reynolds')));
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

@@ -36,7 +36,7 @@
       const td0 = el('td', {}, `<span class="num">P${p.id}</span>`);
       const mk = (field, aria) => {
         const i = NC.input({
-          id: `pk-${j.id}-${p.id}-${field}`, aria, value: cur[field] ?? 0, errs,
+          id: `pk-${j.id}-${p.id}-${field}`, aria, value: cur[field] ?? 0, errs, check: (n) => (n >= 0 ? '' : tx('kNegative')),
           where: NC.where('P' + p.id, tx(field)), onCommit: (n) => write({ [field]: n }),
         });
         const td = el('td'); td.appendChild(i); return td;
@@ -66,6 +66,13 @@
 
     function switchTo(to) {
       const pairs = [['connBy', to]];
+      // a blank active cell is the bottom: so is the other reference, whatever old value it held (a blank, not the
+      // elevation of the bottom, so that it follows a later change of the bottom); only where it holds a value
+      const other = to === 'depth' ? 'depth' : 'elev';
+      for (const p of pipes) {
+        const pk = j.pipeK && j.pipeK[p.id];
+        if (pk && !fin(pk[field]) && fin(pk[other])) pairs.push(['pipeK.' + p.id + '.' + other, null]);
+      }
       if (!Number.isFinite(zL)) return pairs; // without a level nothing converts: the values wait in their own field
       for (const p of pipes) {
         const pk = j.pipeK && j.pipeK[p.id];

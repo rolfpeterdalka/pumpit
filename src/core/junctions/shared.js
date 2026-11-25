@@ -55,11 +55,15 @@
     return dP > 0 ? Qg * Math.sqrt((rho / 999.0) / dPpsi) : NaN;
   }
 
+  // the same with the loss along the flow (m and dP in the direction of the drawing): a valve drawn against the flow
+  // has its coefficient too; the results keep the signs of the flow and of the pressure difference
+  const flowCv = (m, dP, rho) => equivalentCv(m, m < 0 ? -dP : dP, rho);
+
   // valve result row of an in-line (two-port) valve
   function inlineValveResult(j, jr, rc) {
     const { rho } = rc.env;
     const vr = { type: j.type, m: rc.m, Q: rc.m / rho, dP: rc.dP, Pin: jr.Pin, P0in: rc.P0in, K: jr.K, state: PumpIt.i18n.t('junctions.states.open') };
-    vr.Cv = equivalentCv(rc.m, rc.dP, rho);
+    vr.Cv = flowCv(rc.m, rc.dP, rho);
     return vr;
   }
 
@@ -181,7 +185,7 @@
 
   PumpIt.junctionTypes.shared = {
     LOSS_FIELDS, keepsOnRetype, valveTime, gasTemperature, K_SPACE, CHARS, cvAtOpening, openingOfCv, openingCv, shutByOpening, checkCharacteristic,
-    valveLoss, checkValveLoss, equivalentCv, inlineValveResult, dischargeResults,
+    valveLoss, checkValveLoss, equivalentCv, flowCv, inlineValveResult, dischargeResults,
     gasValveK, gasEquivalentCv, gasDischargeResults, gasNode, gasMachAt, gasBasisP,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -140,7 +140,7 @@
         const JS = PumpIt.junctionTypes.shared;
         return {
           junction: { P0in: st.P1, P0out: st.P2, Pin: st.P1 - rho * Vi * Vi / 2, Pout: st.P2 - rho * Vo * Vo / 2, m: st.m, Q: st.m / rho },
-          valve: { Cv: JS.equivalentCv(st.m, st.P1 - st.P2, rho), open: b.opening ? b.opening() : st.state === 'closed' ? 0 : 100 },
+          valve: { Cv: JS.flowCv(st.m, st.P1 - st.P2, rho), open: b.opening ? b.opening() : st.state === 'closed' ? 0 : 100 },
         };
       },
     });

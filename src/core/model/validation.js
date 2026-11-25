@@ -74,6 +74,15 @@
       const pr = M.ports(m, j);
       if (def.directional && pr && !pr.consistent) miss.push(t('core.checklist.junction.direction'));
     }
+    // the losses at the pipes of a single-node junction are losses: a negative one would give energy to a passive pipe.
+    // Only those of the pipes connected to it, which the calculation reads and its table shows (a pipe whose end moved
+    // to another junction may leave its entry behind)
+    const connected = new Set(M.pipesAt(m, j.id).map((p) => String(p.id)));
+    for (const [pid, pk] of Object.entries(j.pipeK || {})) {
+      if (!pk || !connected.has(String(pid))) continue;
+      if (Number.isFinite(pk.kOut) && pk.kOut < 0) miss.push(t('core.checklist.junction.pipeKOutNegative', { pipe: pid, value: pk.kOut }));
+      if (Number.isFinite(pk.kIn) && pk.kIn < 0) miss.push(t('core.checklist.junction.pipeKInNegative', { pipe: pid, value: pk.kIn }));
+    }
     if (def.validate) def.validate(j, miss, { fin, pos, curveOk, pipeCount: n, gas: M.isCompressible(m), gasP: gasPressure(m, miss) });
     if (timeOn(m)) checkTime(m, j, def, miss);
     if (surgeOn(m)) for (const k of PumpIt.surge.inputs.checkJunction(m, j)) miss.push(surgeText(k));
@@ -129,7 +138,15 @@
     return miss;
   }
 
+  // the Reynolds numbers of the transition, in both regimes: finite, above zero and in order (the friction and the
+  // laminar correction interpolate between them)
+  const reynoldsOk = (sys) => Number.isFinite(sys.reLam) && Number.isFinite(sys.reTurb) && sys.reLam > 0 && sys.reLam < sys.reTurb;
   function checkFluid(sys) {
+    const out = checkFluidOnly(sys);
+    if (!unitMiss(sys).length && !reynoldsOk(sys)) out.push(t('core.checklist.fluid.reynolds'));
+    return out;
+  }
+  function checkFluidOnly(sys) {
     const f = sys.fluid;
     const um = unitMiss(sys);
     if (um.length) return um;
@@ -171,5 +188,5 @@
     return { ok: items.every((i) => i.ok), items, undef };
   }
 
-  Object.assign(M, { validate, checkPipe, checkJunction });
+  Object.assign(M, { validate, checkPipe, checkJunction, reynoldsOk });
 })(typeof window !== 'undefined' ? window : globalThis);

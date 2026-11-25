@@ -18,8 +18,11 @@
     if (fl.kind === 'user') {
       const rho = U.toSI(fl.rho.value, fl.rho.unit, 'density');
       const mu = U.toSI(fl.mu.value, fl.mu.unit, 'viscosity');
+      // a gauge vapour pressure is converted with the ambient pressure of the scenario, as the dialog of conversion does
+      let patm;
+      try { patm = U.toSI(system.patm.value, system.patm.unit, 'pressure'); } catch (e) { /* the checklist reports it */ }
       const pv = fl.pv && Number.isFinite(fl.pv.value) && fl.pv.value !== null
-        ? U.toSI(fl.pv.value, fl.pv.unit, 'pressure') : NaN;
+        ? U.toSI(fl.pv.value, fl.pv.unit, 'pressure', patm > 0 ? { patm } : {}) : NaN;
       return { name: fl.name || t('core.fluids.userFluid'), rho, mu, pv, T: NaN, warnings };
     }
     const lib = LIBRARY[fl.kind];

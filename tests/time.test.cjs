@@ -1250,5 +1250,142 @@ console.log('\nThe extremes of a compressor');
   check('1 h: 92.432 kWh given to the gas, no marker', near(o.E / 3.6e6, 92.432, 5e-4) && !o.noEff, `${o.E / 3.6e6}`);
 }
 
+// Review of aca2807, case 1: a gas line whose valve closes at 0.5 h leaves its demand without supply; what it lacks is
+// the mass of its own flow, not 1 kg/s. A volume at the conditions of the node has no known mass while it has no supply.
+console.log('\nReview of aca2807, case 1: the mass of a gas demand without supply');
+{
+  const line = (Q, unit) => {
+    const m = base();
+    m.system.regime = 'compressible';
+    m.system.gasMode = 'isothermal';
+    m.system.fluidGas = Object.assign(M.newGasFluid(), { gas: 'air', T: q(20, '°C') });
+    junction(m, 'reservoir', 1, { elevation: q(0, 'm'), liquidElev: q(0, 'm'), surfP: q(5, 'bar(g)') });
+    junction(m, 'valve', 2, { elevation: q(0, 'm'), lossModel: 'K', K: 1, time: timeData('K', 'time', [], [table([0, 0.5], [1, -1], 'h', '')], { interp: 'step' }) });
+    junction(m, 'flow', 3, { elevation: q(0, 'm'), Q: q(Q, unit), dir: 'out' });
+    pipe(m, 1, 1, 2, 10, 0.10226, 0.02);
+    pipe(m, 2, 2, 3, 10, 0.10226, 0.02);
+    control(m, 1, 0.25, 'h');
+    return simulate(m);
+  };
+  for (const kg of [0.1, 0.2, 0.4]) {
+    const o = line(kg, 'kg/s').totals.flows[3];
+    check(kg + ' kg/s: ' + kg * 1800 + ' kg delivered and ' + kg * 1800 + ' kg without supply', near(o.M, kg * 1800, 1e-6) && near(o.unmetM, kg * 1800, 1e-6), o.M + ' / ' + o.unmetM);
+  }
+  const rN = line(400, 'Nm³/h'), oN = rN.totals.flows[3];
+  check('400 Nm³/h: about 258.45 kg each half hour', near(oN.M, 258.45, 0.01) && near(oN.unmetM, oN.M, 1e-6), oN.M + ' / ' + oN.unmetM);
+  check('the log gives the demand without supply at 0.5 h', rN.events.some((e) => e.key === 'core.time.log.demand.unsupplied' && e.t === 1800));
+  const o0 = line(0, 'kg/s').totals.flows[3] || { M: 0, unmetM: 0 };
+  check('no demand: nothing delivered, nothing without supply', o0.M === 0 && o0.unmetM === 0, JSON.stringify(o0));
+  const rV = line(600, 'm³/h'), oV = rV.totals.flows[3];
+  check('a volume at the conditions of the node: its mass without supply is not known, with a caution', Number.isNaN(oV.unmetM) && oV.M > 0
+    && rV.warnings.some((w) => w.obj === 'j:3' && /mass it lacks/.test(w.text)), oV.M + ' / ' + oV.unmetM);
+}
+
+// Review of aca2807, case 2: the exact time of an event on a level is on the line of the volume up to where the tank
+// fills or empties, not on the line from the volume of the step to the capacity of the tank
+console.log('\nReview of aca2807, case 2: the exact time of a level event in a step that fills or empties the tank');
+{
+  const fill = (lev0, dir, op, step) => {
+    const m = base();
+    junction(m, 'reservoir', 1, { elevation: q(0, 'm'), liquidElev: q(lev0, 'm'), surfP: q(0, 'kPa(g)'), tank: tank(0, 4, 1) });
+    junction(m, 'flow', 2, { elevation: q(0, 'm'), Q: q(1, 'm³/s'), dir, time: timeData('Q', 'single', [{ q: 'tankLevel', obj: 'j:1', op, value: q(2, 'm') }], [table([0, 10], [0, 0], 's', 'm³/s')]) });
+    pipe(m, 1, 2, 1, 10, 1, 0.02);
+    control(m, 10, step, 's', { method: 'forward', exactEvents: true });
+    return simulate(m);
+  };
+  for (const [lev0, dir, op, what] of [[1, 'in', '>=', 'filling'], [3, 'out', '<=', 'emptying']]) {
+    for (const step of [10, 2.5]) {
+      const r = fill(lev0, dir, op, step), T = r.totals.tanks[1];
+      const ev = events(r, 'core.time.log.table.started').map((e) => e.t);
+      check(what + ', Δt = ' + step + ' s: the event at 1 s, 2 m³ at the end, no overflow nor deficit', ev.length === 1 && near(ev[0], 1, 1e-9) && near(T.Vf, 2, 1e-9) && T.over === 0 && T.def === 0,
+        ev.join(',') + ' s, ' + T.Vf + ' m³, ' + T.over + ' / ' + T.def);
+    }
+  }
+}
+
+// Review of aca2807, case 4: a relative column of temperature is a percentage of the absolute temperature of the source,
+// so 0 % and less are below absolute zero
+console.log('\nReview of aca2807, case 4: a relative temperature column above absolute zero');
+{
+  const vessel = (basis, v, v2, v2Unit) => {
+    const m = PumpIt.examples.get('air').build();
+    m.system.gasMode = 'adiabatic';
+    m.junctions[0].time = timeData('surfP', 'time', [], [Object.assign(table([0, 1], v, 'h', basis === 'relative' ? '%' : 'bar(g)'), { v2, v2Unit })], { basis, interp: 'step' });
+    control(m, 1, 0.25, 'h', { on: true });
+    return m;
+  };
+  const pend = (m) => (M.validate(M.effective(m, 'base')).undef.get('j:1') || []).join('; ');
+  const key = PumpIt.i18n.t('core.checklist.time.data.temperature');
+  for (const [v2, unit] of [[[100, -10], '%'], [[100, 0], '%']]) check('relative ' + v2[1] + ' %: J1 has the pending item of its temperature column', pend(vessel('relative', [100, 100], v2, unit)).includes(key), pend(vessel('relative', [100, 100], v2, unit)));
+  check('absolute −30 K: the same item (the control)', pend(vessel('absolute', [5, 5], [300, -30], 'K')).includes(key));
+  const r = simulate(vessel('relative', [100, 100], [100, 90], '%'));
+  const T = r.series.junctions[1].T0, last = T[T.length - 1];
+  check('relative 90 %: the run ends with 270 K', near(last, 270, 1e-9), String(last));
+}
+
+// Review of aca2807, case 5: the head of a pump in a condition is, for a compressor, its isentropic head
+console.log('\nReview of aca2807, case 5: an event on the head of a compressor and of a pump');
+{
+  const plant = (cond) => {
+    const m = PumpIt.examples.get('airPlant').build();
+    m.junctions.find((j) => j.id === 5).time = timeData('Q', 'single', [cond], [table([0, 1], [300, 300], 'h', 'Nm³/h')], { interp: 'step' });
+    control(m, 1, 0.25, 'h', { on: true });
+    return simulate(m);
+  };
+  const rhoN = PumpIt.fluids.normalDensity(PumpIt.fluids.evaluateGas(PumpIt.examples.get('airPlant').build().system).MW);
+  const nm3 = (r) => [...r.series.junctions[5].m].map((x) => Math.abs(x) / rhoN * 3600);
+  const r = plant({ q: 'pumpHead', obj: 'j:2', op: '>=', value: q(20000, 'm') }), Q = nm3(r);
+  check('20 000 m: an event at 0 h, then 300 Nm³/h after 400 at the start', events(r, 'core.time.log.table.started').map((e) => e.t).join() === '0'
+    && near(Q[0], 400, 1e-6) && Q.slice(1).every((x) => near(x, 300, 1e-6)), Q.map((x) => x.toFixed(3)).join(' '));
+  const r2 = plant({ q: 'pumpHead', obj: 'j:2', op: '>=', value: q(30000, 'm') });
+  check('30 000 m, above the head reached: no event, 400 Nm³/h all along', !events(r2, 'core.time.log.table.started').length && nm3(r2).every((x) => near(x, 400, 1e-6)));
+  // a pump of liquid: the head of its curve
+  const m = PumpIt.examples.get('pump').build();
+  m.junctions.find((j) => j.id === 3).time = timeData('K', 'single', [{ q: 'pumpHead', obj: 'j:2', op: '>=', value: q(30, 'm') }], [table([0], [100], 's', '')]);
+  control(m, 1, 0.5, 'h', { on: true });
+  const r3 = simulate(m);
+  check('a pump of liquid: an event on its head at 0 h', events(r3, 'core.time.log.table.started').map((e) => e.t).join() === '0' && r3.series.pumps[2].dH[0] > 30, String(r3.series.pumps[2].dH[0]));
+}
+
+// Review of aca2807, case 6: a table of K whose first point is 0 (an infinite value in its space) resumes where it takes
+// the value in use, as with any other first point
+console.log('\nReview of aca2807, case 6: the resume of a table of K with a point at K = 0');
+{
+  const run = (k0) => {
+    const m = PumpIt.examples.get('pump').build();
+    m.junctions.find((j) => j.id === 3).time = timeData('K', 'single', [{ q: 'time', op: '>=', value: q(0.5, 'h') }], [table([0, 1, 2], [k0, 0.14, 100], 'h', '')], { interp: 'step', resume: 'current' });
+    control(m, 3, 0.5, 'h', { on: true });
+    return simulate(m);
+  };
+  const r = run(0);
+  const res = events(r, 'core.time.log.table.resumed');
+  check('the log gives the resume at 1 h of the table, without a jump', res.length === 1 && res[0].params.tau === 3600 && !events(r, 'core.time.log.table.jump').length);
+  check('K is 0.14 at 1 h and 100 at 1.5 h of the clock', near(at(r, 'inputs', 3, 'v', 3600), 0.14, 1e-12) && near(at(r, 'inputs', 3, 'v', 5400), 100, 1e-9), at(r, 'inputs', 3, 'v', 3600) + ' / ' + at(r, 'inputs', 3, 'v', 5400));
+  const T = TM.tables.prepare(table([0, 1, 2], [0, 0.14, 100], 'h', ''), { cat: 'none', space: PumpIt.junctionTypes.shared.K_SPACE }, { basis: 'absolute' });
+  check('the times of K = 0.14, 100 and 0 in that table: 1 h, 2 h and 0 h', TM.tables.timeOfValue(T, 0.14, { interp: 'step' }) === 3600 && TM.tables.timeOfValue(T, 100, { interp: 'step' }) === 7200 && TM.tables.timeOfValue(T, 0, { interp: 'step' }) === 0);
+  const T2 = TM.tables.prepare(table([0, 1], [0.5, 0.14], 'h', ''), { cat: 'none', space: PumpIt.junctionTypes.shared.K_SPACE }, { basis: 'absolute' });
+  check('K = 0 in use, a table that never takes it: none', TM.tables.timeOfValue(T2, 0, { interp: 'linear' }) === null);
+}
+
+// Review of aca2807, case 12: an extrapolated opening stays between 0 and 100 %, in the table as in the valve
+console.log('\nReview of aca2807, case 12: an extrapolated opening within 0 to 100 %');
+{
+  const run = (to, dataEnd) => {
+    const m = PumpIt.examples.get('pump').build();
+    Object.assign(m.junctions.find((j) => j.id === 3), { lossModel: 'opening', open: 60, CvMax: 100, char: 'linear' });
+    m.junctions.find((j) => j.id === 3).time = timeData('open', 'time', [], [table([0, 1], [60, to], 'h', '%')]);
+    control(m, 3, 0.5, 'h', { dataEnd, on: true });
+    return simulate(m);
+  };
+  const series = (r) => [[...r.series.inputs[3].v], [...r.series.valves[3].open]];
+  const same = (xs, ys) => xs.length === ys.length && xs.every((x, i) => near(x, ys[i], 1e-9));
+  const [a, b] = series(run(90, 'extrapolate'));
+  check('rising: 60, 75, 90, 100, 100, 100, 100 % in both series', same(a, [60, 75, 90, 100, 100, 100, 100]) && same(b, a), a.join(' ') + ' / ' + b.join(' '));
+  const [c, d] = series(run(30, 'extrapolate'));
+  check('falling: down to 0 % in both series', same(c, [60, 45, 30, 15, 0, 0, 0]) && same(d, c), c.join(' '));
+  const [e, g] = series(run(90, 'hold'));
+  check('held: 90 % after 1 h', same(e, [60, 75, 90, 90, 90, 90, 90]) && same(g, e), e.join(' '));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

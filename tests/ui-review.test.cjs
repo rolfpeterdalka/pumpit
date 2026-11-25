@@ -26,7 +26,9 @@ function ok(name, cond, detail = '') {
 
 // ------------------------------------------------------------ a stand-in of the DOM
 class Node {
-  constructor(tag) { this.tagName = tag.toUpperCase(); this.attrs = new Map(); this.children = []; this.parent = null; this.listeners = {}; this.value = ''; this.textContent = ''; this.className = ''; }
+  constructor(tag) { this.tagName = tag.toUpperCase(); this.attrs = new Map(); this.children = []; this.parent = null; this.listeners = {}; this.value = ''; this.textContent = ''; this.className = '';
+    const cls = new Set(); this.classList = { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }; }
+  prepend(c) { c.parent = this; this.children.unshift(c); return c; }
   setAttribute(k, v) { this.attrs.set(k, String(v)); if (k === 'id') this.id = String(v); }
   getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
   hasAttribute(k) { return this.attrs.has(k); }
@@ -36,7 +38,8 @@ class Node {
   remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
   querySelector(sel) {
     const m = /^\[id="(.+)"\]$/.exec(sel);
-    const walk = (n) => { for (const c of n.children) { if (m && c.id === m[1]) return c; const r = walk(c); if (r) return r; } return null; };
+    const tag = /^[a-z]+$/i.test(sel) ? sel.toUpperCase() : null; // a tag name, or an id
+    const walk = (n) => { for (const c of n.children) { if ((m && c.id === m[1]) || (tag && c.tagName === tag)) return c; const r = walk(c); if (r) return r; } return null; };
     return walk(this);
   }
   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
@@ -1026,6 +1029,16 @@ console.log('\nA field inside a block of a scenario follows the parent');
   // the elevation of the connection of P1 to the reservoir J1, typed in the child, is one field of its own
   type('s1', 'elev', 1);
   ok('I5 the elevation of the connection is a field of its own', own('j:1|') === 'j:1|pipeK.1.elev,j:1|pipeK.1.kIn' && pk('s1').kOut === 2, own('j:1|'));
+  // review of aca2807, case 8: a negative K is refused in its cell, with a message that names the pipe and the direction
+  {
+    app.model.scenarios.current = 'base';
+    const s = UI.pipeLossesTable.build('j:1', M.getObj(app.eff(), 'j:1'));
+    const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+    const inp = all(s).find((n) => n.id === 'pk-1-1-kOut');
+    inp.value = '-10'; inp.fire('change');
+    const msg = all(s).find((n) => n.id === 'pk-1-1-kOut-err');
+    ok('aca2807-8 K leaving −10 is refused, by its pipe and direction (pt-BR text), and the model keeps 2', pk('base').kOut === 2 && inp.getAttribute('aria-invalid') === 'true' && !!msg && /P1/.test(msg.textContent) && /K saindo/.test(msg.textContent) && /zero ou mais/.test(msg.textContent), msg && msg.textContent);
+  }
 
   // a file of before: the whole entry in the child, split on opening without any value changing
   fresh();
@@ -1246,6 +1259,120 @@ console.log('\nThe basis of a table of the water hammer converts its values');
   const before = JSON.stringify(data(1));
   choose(1, 'relative');
   ok('S1 a steady level of zero: the tables and the basis stay, with the message', JSON.stringify(data(1)) === before && toasts.length === 1 && /não podem acompanhar/.test(toasts[0]), toasts.join());
+}
+
+// Review of aca2807, cases 7 and 13: switching the reference of the connections of a reservoir keeps a blank cell at the
+// bottom (and never brings back an old elevation), and a blank maximum pressure of a pipe stays no limit whatever unit
+// is chosen for it, also in a file of before
+console.log('\nReview of aca2807, cases 7 and 13: a blank connection and a blank pressure limit');
+{
+  const cx = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const PX = cx.PumpIt, UI = PX.ui, M = PX.model;
+  UI.dialogs = { toast() {}, modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  const sections = {};
+  UI.inspector = { addSection: (kind, fn) => { sections[kind] = fn; } };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), cx, { filename: f });
+  run('src/ui/app/state.js');
+  const app = PX.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/inspector/pipe-losses-table.js');
+  UI.junctionTypes = { get: (type) => ({ connectionElevation: type === 'reservoir' }) };
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  app.effObj = (key) => M.getObj(app.eff(), key);
+  const reopen = () => app.loadModel(JSON.parse(JSON.stringify(app.model)), { fit: false });
+  PX.i18n.setLanguage('pt-BR');
+  const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+  const table = () => UI.pipeLossesTable.build('j:1', M.getObj(app.eff(), 'j:1'));
+  const typeIn = (field, text) => { const inp = all(table()).find((n) => n.id === 'pk-1-1-' + field); inp.value = text; inp.fire('change'); };
+  const switchTo = (which) => all(table()).filter((n) => n.getAttribute && n.getAttribute('role') === 'radio')[which === 'depth' ? 1 : 0].fire('click');
+  const pk = (sid = app.model.scenarios.current) => M.getObj(M.effective(app.model, sid), 'j:1').pipeK[1];
+  const kPa = (sid = app.model.scenarios.current) => PX.solver.run(M.effective(app.model, sid)).pipes[1].Pin / 1000;
+  const fresh = (sid = 'base') => { app.model = PX.examples.get('pump').build(); app.model.scenarios.current = sid; app.undoStack = []; app.redoStack = []; };
+
+  fresh();
+  typeIn('elev', '2');
+  const at2 = kPa();
+  switchTo('depth');
+  ok('aca2807-7 an elevation of 2 m becomes a depth of 1 m', app.model.junctions[0].connBy === 'depth' && pk().depth && pk().depth.value === 1 && Math.abs(kPa() - at2) < 1e-9, JSON.stringify(pk()));
+  typeIn('depth', '');
+  const bottom = kPa();
+  ok('aca2807-7 the depth erased: the bottom, about 128.63 kPa(a) at P1', Math.abs(bottom - 128.63) < 0.01, bottom.toFixed(3));
+  switchTo('elevation');
+  ok('aca2807-7 back to the elevation: still the bottom, the old 2 m gone', !(pk().elev && Number.isFinite(pk().elev.value)) && Math.abs(kPa() - bottom) < 1e-9, JSON.stringify(pk()) + ' ' + kPa().toFixed(3));
+  app.undo();
+  ok('aca2807-7 undo: the depth again, still blank', app.model.junctions[0].connBy === 'depth' && !(pk().depth && Number.isFinite(pk().depth.value)) && Math.abs(kPa() - bottom) < 1e-9, app.model.junctions[0].connBy + ' ' + JSON.stringify(pk()));
+  switchTo('elevation'); switchTo('depth'); switchTo('elevation');
+  reopen();
+  ok('aca2807-7 twice more, saved and opened again: the bottom', !(pk().elev && Number.isFinite(pk().elev.value)) && !(pk().depth && Number.isFinite(pk().depth.value)) && Math.abs(kPa() - bottom) < 1e-9, JSON.stringify(pk()));
+  // a filled value still converts, and a child that inherits the losses of the base writes only its connection fields
+  fresh('s1');
+  M.setField(app.model, 'base', 'j:1', 'pipeK.1.elev', M.q(2, 'm'));
+  switchTo('depth');
+  const own = () => Object.keys(app.model.scenarios.list.find((x) => x.id === 's1').overrides).filter((k) => k.startsWith('j:1|')).sort().join(',');
+  ok('aca2807-7 a child: 2 m becomes a depth of 1 m, only connBy and the depth in the child', pk('s1').depth.value === 1 && own() === 'j:1|connBy,j:1|pipeK.1.depth' && pk('s1').kOut === 0.5, own());
+  typeIn('depth', '');
+  switchTo('elevation');
+  ok('aca2807-7 ... erased and back: the bottom in the child, the base keeps its 2 m', !(pk('s1').elev && Number.isFinite(pk('s1').elev.value)) && pk('base').elev.value === 2 && pk('s1').kOut === 0.5, JSON.stringify(pk('s1')));
+
+  // case 13: the field of the maximum pressure of P1
+  // the hint of the unit fields lives in the page once
+  cx.document = Object.assign({}, documentStub, { body: new Node('body'), getElementById: () => null });
+  run('src/ui/surge/pipe-section.js');
+  fresh();
+  app.surgeOn = () => true;
+  const field = () => { const host = new Node('div'); sections.pipe(host, 1); const ns = all(host); return { inp: ns.find((n) => n.id === UI.forms.idOf('p:1', 'surge.pMax')), us: ns.find((n) => n.id === UI.forms.idOf('p:1', 'surge.pMax') + '-u') }; };
+  const pMax = () => app.model.pipes[0].surge && app.model.pipes[0].surge.pMax;
+  let fx;
+  try { fx = field(); } catch (e) { fx = null; console.log('  (the section could not be drawn: ' + e.message + ')'); }
+  ok('aca2807-13 the field of the maximum pressure is drawn', !!(fx && fx.inp && fx.us));
+  if (fx && fx.inp) {
+    fx.us.value = 'bar(g)'; fx.us.fire('change');
+    ok('aca2807-13 only the unit of a blank limit changed: nothing written, no limit', pMax() === null || pMax() === undefined, JSON.stringify(pMax()));
+    fx.inp.value = '10'; fx.inp.fire('change');
+    ok('aca2807-13 a number then takes the unit chosen', pMax() && pMax().value === 10 && pMax().unit === 'bar(g)', JSON.stringify(pMax()));
+    fx.inp.value = ''; fx.inp.fire('change');
+    ok('aca2807-13 erased again: no limit', pMax() === null, JSON.stringify(pMax()));
+  }
+  const pending = (v) => { const m = PX.examples.get('pump').build(); m.pipes[0].surge = Object.assign({}, m.pipes[0].surge || {}, { pMax: v }); return PX.surge.inputs.checkPipe(M.effective(m, 'base'), M.effective(m, 'base').pipes[0]); };
+  ok('aca2807-13 a file of before with {value: null, unit: "bar(g)"}: no limit, P1 complete', !pending({ value: null, unit: 'bar(g)' }).includes('pMax') && !pending(null).includes('pMax'));
+  ok('aca2807-13 a limit that is not a pressure is still refused', pending({ value: 10, unit: 'm' }).includes('pMax'));
+}
+
+// Review of aca2807, case 11: over time, an exit valve of one node gives the stagnation pressure at its inlet, the static
+// pressure outside and no stagnation pressure at its outlet, as in the table of the step; an in-line valve its two sides
+console.log('\nReview of aca2807, case 11: the end pressures of a valve over time');
+{
+  const cy = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js']);
+  const PY = cy.PumpIt, UI = PY.ui, M = PY.model;
+  UI.lineChart = { lineChart: () => '' };
+  UI.timeFormat = { unitFor: () => 'h', clock: () => '00:00:00' };
+  const app = PY.app || (PY.app = {});
+  let m = null, run = null;
+  Object.assign(app, { prefs: { colUnits: {} }, outUnit: (k, cat) => PY.units.list(cat)[0], eff: () => M.effective(m, 'base'), timeRun: () => run, cursorIndex: () => 0, currentResults: () => run.snapshotAt(0) });
+  ['src/ui/results/catalog.js', 'src/ui/results/columns.js', 'src/ui/time/results.js'].forEach((f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), cy, { filename: f }));
+  UI.junctionTypes = UI.junctionTypes || { get: () => null };
+  const sim = (id, set) => {
+    m = PY.examples.get(id).build();
+    if (set) set(m);
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: M.q(0, 'h'), stop: M.q(1, 'h'), step: M.q(10, 'min') });
+    run = PY.time.run(M.effective(m, 'base'));
+  };
+  sim('exit', (x) => Object.assign(x.junctions.find((j) => j.id === 3), { lossModel: 'K', K: 15 }));
+  const patm = PY.units.toSI(m.system.patm.value, m.system.patm.unit, 'pressure');
+  const kgf = (P) => (P - patm) / 98066.5;
+  const r = UI.timeResults.rowAt(run, 'valves', 3, 0), st = run.snapshotAt(0);
+  const step = UI.resultCatalog.rows('valves', st, M.effective(m, 'base'), { dn: () => '', series: () => '', boundary: () => NaN }).find((x) => x.id === 3);
+  ok('aca2807-11 the exit valve: P0 inlet 1.7589, P static outlet 1.5 and no P0 outlet, in kgf/cm²(g)', Math.abs(kgf(r.P0in) - 1.7589) < 1e-4 && Math.abs(kgf(r.Pout) - 1.5) < 1e-9 && !Number.isFinite(r.P0out),
+    kgf(r.P0in).toFixed(4) + ' ' + kgf(r.Pout).toFixed(4) + ' ' + r.P0out);
+  ok('aca2807-11 ... the same as the table of the step', step && step.P0in === r.P0in && step.Pout === r.Pout && !Number.isFinite(step.P0out));
+  sim('pump');
+  const v = UI.timeResults.rowAt(run, 'valves', 3, 0), jr = run.snapshotAt(0).junctions[3];
+  ok('aca2807-11 an in-line valve: its two stagnation pressures, from its junction', v.P0in === jr.P0in && v.P0out === jr.P0out && v.P0in > v.P0out, v.P0in + ' ' + v.P0out);
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

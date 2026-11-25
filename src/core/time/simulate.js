@@ -461,9 +461,10 @@
 
   // the exact time of an event on the level or the volume of a tank (§5.3; an option of the forward method): where the
   // watched condition, false at tk, becomes true before tn, by a straight line between the values at both ends (the
-  // volumes Vn at tn). The earliest crossing, or null
+  // volumes Vn at tn, limited to the tank). The line ends where the tank fills or empties when that comes before tn
+  // (tanks: the flows of the step, Qnet). The earliest crossing, or null
   const LEVELS = ['tankLevel', 'surfaceElev', 'tankVolume'];
-  function crossing(P, st, Vn, tk, tn) {
+  function crossing(P, st, Vn, tk, tn, tanks) {
     let best = null;
     for (const jt of P.jts) {
       const e = TM.events.armed(jt, st.trig.get(jt.jid));
@@ -475,7 +476,10 @@
       if (a === b || TM.events.compare(pc.op, a, pc.v) || !TM.events.compare(pc.op, b, pc.v)) continue;
       const f = (pc.v - a) / (b - a);
       if (!(f > 0 && f < 1)) continue; // at a step of the clock: the usual rule
-      const t = tk + f * (tn - tk);
+      // the time the volume reaches Vn: tn, or earlier when the tank fills or empties on the way
+      const Q = tanks[i].Qnet, Vu = st.V[i] + (tn - tk) * Q;
+      const te = Vu > T.Vmax && Q > 0 ? tk + (T.Vmax - st.V[i]) / Q : Vu < 0 && Q < 0 ? tk + st.V[i] / -Q : tn;
+      const t = tk + f * (te - tk);
       if (t > tk && t < tn && (!best || t < best.t)) best = { t, jt, e };
     }
     return best;
@@ -555,7 +559,7 @@
       let tn = last ? tk : P.timeOf(k + 1), cross = null;
       if (P.exact && !last) {
         const Vn = P.tanks.map((T, i) => limit(T, st.V[i] + (tn - tk) * tanks[i].Qnet).V);
-        cross = crossing(P, st, Vn, tk, tn);
+        cross = crossing(P, st, Vn, tk, tn, tanks);
         if (cross) tn = cross.t;
       }
       // the interval this step stands for: [t_k, t_k+1] with the forward method, [t_k−1, t_k] with the central and the

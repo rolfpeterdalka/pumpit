@@ -23,7 +23,8 @@
     inp.value = F.inputStr(val.value);
     const us = el('select', { class: 'unit has-tip', 'aria-label': t('inspector.fields.unitOf', { label }), 'aria-describedby': UI.forms.unitTip(), id: id + '-u' }, UI.forms.unitOptions(cat, val.unit || unit0));
     inp.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(key, path, Number.isFinite(n) ? { value: n, unit: us.value } : null); });
-    us.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(key, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
+    // a blank field is no value (null), whatever its unit: the unit chosen waits for a number on the screen
+    us.addEventListener('change', () => { const n = F.parseNum(inp.value); if (Number.isFinite(n)) app.setVal(key, path, { value: n, unit: us.value }); });
     return UI.forms.wrap(key, path, label, inp, Object.assign({}, opts, { after: UI.forms.unitCtl(key, path, label, cat, inp, us) }));
   }
   // a choice whose stored value may be missing (the default of the data of the pipe)

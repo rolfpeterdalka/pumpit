@@ -164,15 +164,16 @@
   // the rows of a table: the result of each object with the fields its outputs read. hooks: what the interface knows,
   //   dn(p, r), series(p)   the nominal size and series of a pipe (or its inner diameter)
   //   boundary(j, r)        the net mass flow into the network at a junction (NaN: not a boundary)
+  // the pressures at both sides of a pump or of a valve between two pipes, from its junction (a junction of one node, as
+  // an exit valve, has a net flow and no second side: its own row gives its pressures)
+  const sides = (jr) => {
+    const s = {};
+    if (jr && !('net' in jr)) for (const k of ['P0in', 'P0out', 'Pin', 'Pout']) if (k in jr) s[k] = jr[k];
+    return s;
+  };
   function rows(table, res, eff, hooks) {
     const name = (k) => (M.getObj(eff, k) || {}).name || '';
     const choked = (r) => (r.choked ? t('results.gas.choked') : '');
-    // the pressures at both sides of a pump or of a valve between two pipes, from its junction
-    const sides = (jr) => {
-      const s = {};
-      if (jr && !('net' in jr)) for (const k of ['P0in', 'P0out', 'Pin', 'Pout']) if (k in jr) s[k] = jr[k];
-      return s;
-    };
     if (table === 'pipes') return eff.pipes.map((p) => {
       const r = res.pipes[p.id] || {};
       return Object.assign({ id: p.id, name: p.name, key: 'p:' + p.id }, r, { dn: hooks.dn(p, r), schTxt: hooks.series(p), chokedTxt: choked(r) });
@@ -197,5 +198,5 @@
   }
 
   PumpIt.ui = PumpIt.ui || {};
-  PumpIt.ui.resultCatalog = { TABLES, REGIMES, GROUPS, KV_PER_CV, outputs, find, defaults, label, value, ctxOf, rows };
+  PumpIt.ui.resultCatalog = { TABLES, REGIMES, GROUPS, KV_PER_CV, outputs, find, defaults, label, value, ctxOf, rows, sides };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -166,6 +166,8 @@
       for (const u of sol.unsupplied || []) {
         const o = T.flows[u.jid];
         if (o) { o.unmet += w * Math.abs(u.m) / rho; o.unmetM += w * Math.abs(u.m); }
+        // a gas flow given as a volume at the conditions of a node without pressure: its mass is not known
+        if (!Number.isFinite(u.m)) warnOnce(R, 'caution', 'core.time.warn.unmetUnknown', { id: u.jid }, 'j:' + u.jid);
       }
       for (const x of tanks) {
         const o = T.tanks[x.jid];

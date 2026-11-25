@@ -3,7 +3,8 @@
 // isolated (zero flow, undefined pressure); parts with a flow source but no reference are an error.
 // With opts.dropUnsupplied (the time simulation, docs/time-simulation.md) such a part is isolated instead, the links
 // that impose a flow or a pressure on it carry no flow, and its imposed flows go to prep.unsupplied: [{ jid, m }]
-// (m in kg/s, positive when it leaves the network).
+// (m in kg/s, positive when it leaves the network; NaN when its mass is not known: a gas flow given as a volume at the
+// conditions of a node that has no pressure). A node with active set has an imposed flow whatever its demand.
 (function (root) {
   const PumpIt = root.PumpIt;
   const { t } = PumpIt.i18n;
@@ -22,7 +23,7 @@
       const ref = new Set(), active = new Set();
       nodes.forEach((n, i) => {
         if (n.kind !== 'free') ref.add(find(i));
-        if (n.demand) active.add(find(i));
+        if (n.demand || n.active) active.add(find(i));
       });
       for (const lk of links) {
         if (off.has(lk)) continue;
@@ -52,8 +53,8 @@
     for (const lk of links) lk.isolated = (ties(lk) && nodes[lk.a].isolated) || off.has(lk);
     if (opts.dropUnsupplied) {
       const out = [];
-      nodes.forEach((n, i) => { if (n.demand && dropRoots.has(find(i))) out.push({ jid: n.jid, m: n.demand }); });
-      for (const lk of off) if (lk.mode === 'fixedFlow' && lk.value && lk.jid !== undefined) out.push({ jid: lk.jid, m: Math.abs(lk.value) });
+      nodes.forEach((n, i) => { if ((n.demand || n.active) && dropRoots.has(find(i))) out.push({ jid: n.jid, m: n.demand }); });
+      for (const lk of off) if (lk.mode === 'fixedFlow' && lk.value && lk.jid !== undefined) out.push({ jid: lk.jid, m: lk.localVolume ? NaN : Math.abs(lk.value) });
       prep.unsupplied = out;
     }
     return errors;

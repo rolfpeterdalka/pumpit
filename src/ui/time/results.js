@@ -92,8 +92,9 @@
       Object.assign(row, { Qt: r.m / rho, two: !('net' in r), mnet: net === null || net === undefined ? NaN : net, Qnet: net === null || net === undefined ? NaN : net / rho });
     }
     if (kind === 'pumps' || kind === 'valves') {
-      const jr = pick(run.series.junctions[id]);
-      for (const k of ['P0in', 'P0out', 'Pin', 'Pout']) if (!(k in row) && k in jr) row[k] = jr[k];
+      // the same rule as the table of the step (catalog.js): the sides of a junction between two pipes only
+      const jr = UI.resultCatalog.sides(pick(run.series.junctions[id]));
+      for (const k in jr) if (!(k in row)) row[k] = jr[k];
       if (kind === 'pumps') { row.etaPct = r.etaAssumed ? NaN : r.eta * 100; if (r.etaAssumed) row.Pshaft = NaN; }
     }
     return row;

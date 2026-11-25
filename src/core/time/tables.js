@@ -16,7 +16,8 @@
     const col = (xs, unit, cat, st) => (basis === 'relative' ? xs.map((x) => (x / 100) * st) : xs.map((x) => U.toSI(x, unit, cat, ctx)));
     const v = col(tt.v, tt.vUnit, q.cat, steady);
     const c = q.space ? v.map(q.space.to) : v;
-    const T = { t, c, n: t.length, space: q.space || null, min: q.min };
+    // min and max: the domain of the quantity (an opening from 0 to 100 %), which an extrapolated value stays in
+    const T = { t, c, n: t.length, space: q.space || null, min: q.min, max: q.range ? q.range[1] : undefined };
     if (q.second && hasSecond(tt)) { T.c2 = col(tt.v2, tt.v2Unit, q.second.cat, steady2); T.min2 = q.second.min; }
     return T;
   }
@@ -55,7 +56,7 @@
       at = inside(t, t[0] + (((tau - t[0]) % P) + P) % P, o);
     } else if (tau > t[n - 1]) at = { past: tau - t[n - 1] };
     else at = inside(t, tau, o);
-    const first = column(T, T.c, T.space, T.min, at, o);
+    const first = column(T, T.c, T.space, T.min, at, o, T.max);
     const r = { v: first.v, past: first.past };
     if (T.c2) r.v2 = column(T, T.c2, null, T.min2, at, o).v;
     return r;
@@ -67,7 +68,7 @@
     return { i, f: (tau - t[i]) / (t[i + 1] - t[i]) };
   }
   // the value of one column of values c at the place at: inside the table, or past its last point by at.past
-  function column(T, c, space, min, at, o) {
+  function column(T, c, space, min, at, o, max) {
     const { t, n } = T;
     let x, past = '';
     if (at.past === undefined) x = at.f === undefined ? c[at.i] : lerp(c[at.i], c[at.i + 1], at.f);
@@ -80,12 +81,13 @@
       } else { x = c[n - 1]; past = 'held'; }
     }
     let v = space ? space.from(x) : x;
-    if (past === 'extrapolated') v = limit(min, v);
+    if (past === 'extrapolated') v = limit(min, max, v);
     return { v, past };
   }
 
-  // an extrapolated value stays in the domain of its quantity (a flow, a speed, a Cv, an area are not negative)
-  const limit = (min, v) => (Number.isFinite(min) && v < min ? min : v);
+  // an extrapolated value stays in the domain of its quantity (a flow, a speed, a Cv, an area are not negative; an
+  // opening is not above 100 %)
+  const limit = (min, max, v) => (Number.isFinite(min) && v < min ? min : Number.isFinite(max) && v > max ? max : v);
 
   // the first time τ*, from the first point on, at which a prepared table takes the value x (SI, of the quantity of the
   // table; item 5 of D.10): at a point, or between two points on the straight line of a linear table. Null when the table
@@ -94,7 +96,8 @@
     const { t, c, n } = T;
     const y = T.space ? T.space.to(x) : x;
     if (Number.isNaN(y)) return null;
-    const same = (a, b) => a === b || Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b));
+    // two infinities (a valve with K = 0) only by equality: the rounding is of finite numbers
+    const same = (a, b) => a === b || (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b)));
     for (let i = 0; i < n; i++) {
       if (same(c[i], y)) return t[i];
       if (i === n - 1 || o.interp === 'step' || !(t[i + 1] > t[i])) continue;

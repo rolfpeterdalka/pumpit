@@ -87,8 +87,10 @@
     const s2 = section(tx('environment'), { info: tx('flowHint') });
     s2.appendChild(qty(k, 'patm', tx('patm'), 'pressure'));
     s2.appendChild(num(k, 'gravity', tx('gravity'), { suffix: '× g₀' }));
-    s2.appendChild(num(k, 'reLam', tx('reLam'), { int: true }));
-    s2.appendChild(num(k, 'reTurb', tx('reTurb'), { int: true }));
+    s2.appendChild(num(k, 'reLam', tx('reLam'), { int: true, info: tx('reOrder') }));
+    s2.appendChild(num(k, 'reTurb', tx('reTurb'), { int: true, info: tx('reOrder') }));
+    // the relation the two numbers must keep, under them while it does not hold
+    if (!M.reynoldsOk(eff.system)) s2.appendChild(hint(F.esc(tx('reOrder'))));
     s2.appendChild(sel(k, 'laminarK', tx('laminarK'), [['craneFt', tx('craneFt')], ['pipeFt', tx('pipeFt')], ['none', tx('noCorrection')]]));
     right.appendChild(s2);
 
