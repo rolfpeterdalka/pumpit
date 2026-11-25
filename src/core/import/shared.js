@@ -506,25 +506,48 @@
     }
   }
 
-  // largest differences between a calculation and the results stored in the file: the mass flow relative to the
-  // largest stored flow, and the stagnation pressure at the pipe ends relative to the largest stored pressure drop in a
-  // pipe (the measure of the validation of section 10)
+  // The steady state of a calculation against the results stored in the file (F-31): the mass flow of each pipe relative
+  // to the largest stored flow, and the stagnation pressure at each end of a pipe relative to the largest stored pressure
+  // drop in a pipe (the measure of the validation of section 10). Each quantity is compared wherever the file and the
+  // calculation both have a finite value, whatever the other quantity has; n of pipes and pressureN of the ends (2 per
+  // pipe of the calculation) were. A scale of zero (no stored flow, or no pressure drop in a pipe) leaves the difference
+  // absolute, in kg/s or Pa (flowAbs, pressureAbs). verdict: 'none' (nothing to compare), 'partial' (a pipe or an end
+  // without a pair), 'notConverged', 'diff' (beyond MATCH of a scale), 'unscaled' (a scale of zero: no percentage, so no
+  // confirmation) or 'match' (converged, everything compared, within MATCH of both scales)
+  const MATCH = 1e-3;
   function compare(res, stored) {
     let mmax = 0, dpmax = 0;
     for (const x of stored.values()) {
       if (Number.isFinite(x.m)) mmax = Math.max(mmax, Math.abs(x.m));
       if (Number.isFinite(x.P0in - x.P0out)) dpmax = Math.max(dpmax, Math.abs(x.P0in - x.P0out));
     }
-    const out = { n: 0, flow: 0, flowPipe: null, pressure: 0, pressurePipe: null };
-    for (const [id, x] of stored) {
-      const y = res.pipes && res.pipes[id];
-      if (!y || !Number.isFinite(x.m)) continue;
-      out.n++;
-      const em = Math.abs(y.m - x.m) / (mmax || 1);
-      if (em > out.flow) { out.flow = em; out.flowPipe = id; }
-      const ep = Math.max(Math.abs(y.P0in - x.P0in), Math.abs(y.P0out - x.P0out)) / (dpmax || 1);
-      if (Number.isFinite(ep) && ep > out.pressure) { out.pressure = ep; out.pressurePipe = id; }
+    const ids = Object.keys((res && res.pipes) || {});
+    const out = {
+      pipes: ids.length, ends: 2 * ids.length, converged: !!(res && res.converged),
+      n: 0, flow: 0, flowPipe: null, flowAbs: !(mmax > 0), pressureN: 0, pressure: 0, pressurePipe: null, pressureAbs: !(dpmax > 0),
+    };
+    for (const id of ids) {
+      const x = stored.get(Number(id)), y = res.pipes[id];
+      if (!x) continue;
+      if (Number.isFinite(x.m) && Number.isFinite(y.m)) {
+        out.n++;
+        const e = Math.abs(y.m - x.m) / (mmax || 1);
+        if (e > out.flow) { out.flow = e; out.flowPipe = Number(id); }
+      }
+      for (const end of ['P0in', 'P0out']) {
+        if (!Number.isFinite(x[end]) || !Number.isFinite(y[end])) continue;
+        out.pressureN++;
+        const e = Math.abs(y[end] - x[end]) / (dpmax || 1);
+        if (e > out.pressure) { out.pressure = e; out.pressurePipe = Number(id); }
+      }
     }
+    const beyond = (!out.flowAbs && out.flow >= MATCH) || (!out.pressureAbs && out.pressure >= MATCH);
+    out.verdict = !out.n && !out.pressureN ? 'none'
+      : out.n < out.pipes || out.pressureN < out.ends ? 'partial'
+      : !out.converged ? 'notConverged'
+      : beyond ? 'diff'
+      : out.flowAbs || out.pressureAbs ? 'unscaled'
+      : 'match';
     return out;
   }
 
@@ -735,6 +758,6 @@
     key, LENGTH, AREA, VOLUME, PRESSURE, DP, FLOW, VISCOSITY, TEMPERATURE, inTable, quantities,
     hasNetwork, listScenarios, scenarios, targetScenario, chainOf, put, mergeList, overlay, pipeLayout, mergePipe,
     junctionLayout, mergePerPipe, PER_PIPE, mergeJunction, scenarioRecords, fluidLines, goalSeek, pumpConfigs, shutoffRange,
-    makeNotes, LEVELS, sortNotes, noteText, stopIsolated, place, compare, TIME, timeControl, timeData,
+    makeNotes, LEVELS, sortNotes, noteText, stopIsolated, place, compare, MATCH, TIME, timeControl, timeData,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

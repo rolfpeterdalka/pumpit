@@ -58,10 +58,10 @@
     const timeOn = app.timeOn();
     CS.syncPicker(document.getElementById('overlay-select'), gas, app.prefs.overlay);
     const ovKey = CS.offered(app.prefs.overlay, gas) ? app.prefs.overlay : 'none';
-    const ov = CS.overlayValues(res, ovKey);
     const unitOf = (cat) => app.outUnit('canvas', cat);
     const ctx = res ? { rho: res.fluid.rho, patm: res.patm } : {};
     const fmtOv = (v, cat) => F.fmt(F.conv(v, cat, unitOf(cat), ctx), 3);
+    const ov = CS.scale(res, ovKey, fmtOv, gas);
     const jById = new Map(m.junctions.map((j) => [j.id, j]));
     const s = view.s;
 
@@ -102,8 +102,7 @@
       let over = false;
       if (ov && ov.vals.has(p.id)) {
         const v = ov.vals.get(p.id);
-        const t = ov.max > ov.min ? (v - ov.min) / (ov.max - ov.min) : 0.5;
-        if (!sel.has(key)) { color = CS.pipeColor(ovKey, v, t, gas); over = CS.beyondScale(ovKey, v, gas); }
+        if (!sel.has(key)) { color = CS.pipeColor(ovKey, v, CS.rampT(ov, v), gas); over = CS.beyondScale(ovKey, v, gas); }
         val = CS.labelOf(fmtOv, unitOf, v, CS.OVERLAY[ovKey].cat);
       }
       const lineStyle = color ? ` style="stroke:${color};stroke-width:4.5"` : '';

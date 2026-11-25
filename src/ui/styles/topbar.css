@@ -21,6 +21,17 @@
 }
 .stamp:hover { border-color: var(--ink-3); color: var(--ink); }
 .stamp.gas { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); color: var(--ink); }
+/* a model the browser could not keep (header.js): beside the title until saving works again, whole (the title and the
+   stamp give up room first); the sentence that explains it is its tip */
+.brand > .save-warn { flex: none; }
+.save-warn {
+  display: flex; align-items: center; gap: 6px; padding: 2px 3px 2px 9px; border-radius: 999px; font-size: 12px; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--crit) 55%, var(--line)); background: color-mix(in srgb, var(--crit) 12%, var(--panel));
+}
+.save-warn[hidden] { display: none; }
+.save-warn svg { flex: none; color: var(--crit); }
+.save-warn-text { white-space: nowrap; }
+.save-warn .btn { flex: none; border-radius: 999px; }
 .menus { display: flex; gap: 2px; }
 .menu { position: relative; }
 .scenario { display: flex; align-items: center; gap: 6px; }

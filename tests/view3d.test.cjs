@@ -490,7 +490,7 @@ console.log('\nJunction symbols as solids (D-29)');
   const camF = { projection: 'persp', target: [0, 0, 0], azimuth: -90, elevation: 10, distance: 6, fov: 35 };
   const ui = {
     format: {}, solids3d: {}, edit3d: { preview: () => null },
-    colorScales: { syncPicker() {}, offered: () => false, overlayValues: () => null },
+    colorScales: { syncPicker() {}, offered: () => false, overlayValues: () => null, scale: () => null },
     scene3d: { camera: () => camF, scene: () => ({ pos: new Map(), routes: new Map([[1, [[-1, -4, 0], [1, 30, 0]]]]) }) },
   };
   const appF = {

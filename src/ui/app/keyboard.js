@@ -1,7 +1,9 @@
 // Keyboard shortcuts: F1 (help), Esc, Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z), and on the network view Ctrl+C, Ctrl+V, Ctrl+A,
 // Del / Backspace, P (pipe tool), V (select tool), 1 / 2 (schematic, 3D), Home (fit), + / − (zoom) and F (full
 // screen); the 3D view adds its camera keys (src/ui/view3d/navigation.js) and the view cube its own
-// (src/ui/view3d/cube.js).
+// (src/ui/view3d/cube.js). A key that a control has already used (preventDefault: the arrows, Home and End on the tabs
+// of the properties panel and in the checklist) is no shortcut: Home does not fit the drawing, an arrow does not turn the
+// 3D view.
 (function (root) {
   const PumpIt = root.PumpIt;
   const UI = PumpIt.ui;
@@ -19,6 +21,7 @@
 
   function bind() {
     document.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented) return;
       const typing = e.target.closest('input, textarea, select');
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === 'F1') { e.preventDefault(); if (!isModalOpen()) UI.help.open(); return; }

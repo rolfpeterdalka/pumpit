@@ -152,12 +152,12 @@
     const ovKey = CS.offered(app.prefs.overlay, gas) ? app.prefs.overlay : 'none';
     const unitOf = (cat) => app.outUnit('canvas', cat);
     const conv = res ? { rho: res.fluid.rho, patm: res.patm } : {};
+    const fmtOv = (x, cat) => F.fmt(F.conv(x, cat, unitOf(cat), conv), 3);
     // positions and routes of the scene, with the preview of a drag in progress
     const sc = S3.scene(UI.edit3d.preview());
     const f = {
       svg, vp, m, v, set: v.free, cam, res, ovKey, unitOf, gas,
-      sel: app.selSet, undef: app.undefSet(), ov: CS.overlayValues(res, ovKey),
-      fmtOv: (x, cat) => F.fmt(F.conv(x, cat, unitOf(cat), conv), 3),
+      sel: app.selSet, undef: app.undefSet(), ov: CS.scale(res, ovKey, fmtOv, gas), fmtOv,
       sc, routes: sc.routes, posOf: (j) => sc.pos.get(j.id),
       widths: new Map(), arriving: new Map(), leaving: new Map(), longest: new Map(), place: new Map(), items: [],
     };
@@ -255,7 +255,7 @@
     let color = '', over = false;
     if (f.ov && f.ov.vals.has(p.id)) {
       const x = f.ov.vals.get(p.id);
-      color = CS.pipeColor(f.ovKey, x, f.ov.max > f.ov.min ? (x - f.ov.min) / (f.ov.max - f.ov.min) : 0.5, f.gas);
+      color = CS.pipeColor(f.ovKey, x, CS.rampT(f.ov, x), f.gas);
       over = CS.beyondScale(f.ovKey, x, f.gas);
     }
     return { cls, isSel, isUndef, solid: !isUndef && !eff.closed && !isolated, color, over };

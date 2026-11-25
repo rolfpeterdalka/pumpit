@@ -10,8 +10,11 @@
 // quantity of fittings (validation.js, solver/network.js, fittings-editor.js), and the curve of a pump drawn at the speed
 // its control found (pump-chart.js, solver/system-curve.js), and the links of a renamed event and of the conditions of
 // a pasted pump (time/events-section.js, clipboard.js), and the numbers without unit of the chart over time
-// (charts/time-chart.js), and a draft of a cell kept in the scenario it was typed in (num-cell.js). The interface
-// files run on a small stand-in of the DOM: only what these modules use of it.
+// (charts/time-chart.js), and a draft of a cell kept in the scenario it was typed in (num-cell.js), and the fixes of the
+// UX script of d5fa5e9: a model the browser does not keep (state.js), what the import report compared
+// (import-report.js), one colour for values that read the same (color-scales.js), keys that a control used
+// (keyboard.js) and the tools of a closed group in a narrow window (responsive.css). The interface files run on a small
+// stand-in of the DOM: only what these modules use of it.
 // Usage: node tests/ui-review.test.cjs
 const fs = require('fs');
 const path = require('path');
@@ -1373,6 +1376,146 @@ console.log('\nReview of aca2807, case 11: the end pressures of a valve over tim
   sim('pump');
   const v = UI.timeResults.rowAt(run, 'valves', 3, 0), jr = run.snapshotAt(0).junctions[3];
   ok('aca2807-11 an in-line valve: its two stagnation pressures, from its junction', v.P0in === jr.P0in && v.P0out === jr.P0out && v.P0in > v.P0out, v.P0in + ' ' + v.P0out);
+}
+
+// The fixes of the UX script of d5fa5e9. Item 1: a model the browser refuses to keep (state.js) is known apart from the
+// preferences, and the header hears of each change of that state once
+console.log('\nUX script d5fa5e9, item 1: a model the browser does not keep');
+{
+  const cs = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js']);
+  const stored = new Map();
+  let refuse = null; // the key whose write fails, as with no room left
+  cs.localStorage = {
+    getItem: (k) => (stored.has(k) ? stored.get(k) : null),
+    setItem: (k, v) => { if (k === refuse) throw new Error('QuotaExceededError'); stored.set(k, String(v)); },
+  };
+  cs.PumpIt.ui.dialogs = { toast: () => {} };
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/app/state.js'), 'utf8'), cs, { filename: 'src/ui/app/state.js' });
+  const app = cs.PumpIt.app, calls = [];
+  cs.PumpIt.ui.header = { renderSave: (changed) => calls.push([app.saveFailed, changed]) };
+  app.model = { title: 'Estudo A' };
+  app.save();
+  ok('ux-1 a model kept: no warning', !app.saveFailed && !calls.length && JSON.parse(stored.get('pumpit.model')).title === 'Estudo A');
+  refuse = 'pumpit.model';
+  app.model = { title: 'Estudo B' };
+  app.save(); app.save();
+  ok('ux-1 a write refused: the state says so, and the header hears it once', app.saveFailed && calls.length === 1 && calls[0][0] === true && calls[0][1] === true && JSON.parse(stored.get('pumpit.model')).title === 'Estudo A', JSON.stringify(calls));
+  app.prefs.grid = false;
+  app.savePrefs();
+  ok('ux-1 ... the preferences are kept apart from it', app.saveFailed && JSON.parse(stored.get('pumpit.prefs')).grid === false && calls.length === 1);
+  refuse = null;
+  app.model = { title: 'Estudo C' };
+  app.save();
+  ok('ux-1 the next write that works takes the warning away, once', !app.saveFailed && calls.length === 2 && calls[1][0] === false && JSON.parse(stored.get('pumpit.model')).title === 'Estudo C', JSON.stringify(calls));
+}
+
+// Item 2: the report says what the comparison covered, and confirms only a complete one (import-report.js)
+console.log('\nUX script d5fa5e9, item 2: what the import report compared');
+{
+  const cr = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js']);
+  const PR = cr.PumpIt;
+  let body = null;
+  PR.ui.dialogs = { modal: (o) => { body = o.body; } };
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/app/import-report.js'), 'utf8'), cr, { filename: 'src/ui/app/import-report.js' });
+  PR.i18n.setLanguage('pt-BR');
+  const IMP = PR.importers.imp;
+  const texts = (n) => [n.textContent, ...n.children.flatMap(texts)].filter(Boolean);
+  const report = (stored, res = { ok: true, converged: true, pipes: { 1: { m: 10, P0in: 3e5, P0out: 2e5 } } }) => {
+    PR.ui.importReport.show('x.imp', { counts: { pipes: 1, junctions: 2, scenario: 'Base' }, notes: [], stored: new Map([[1, stored]]) }, res, IMP);
+    return texts(body).join(' | ');
+  };
+  const all = report({ m: 10, P0in: 3e5, P0out: 2e5 });
+  ok('ux-2 everything stored and equal: the steady state matches, 1 of 1 pipe and 2 of 2 ends', all.includes('O regime permanente confere') && all.includes('Vazão mássica, 1 de 1 tubos') && all.includes('Pressão de estagnação, 2 de 2 extremidades de tubo'), all);
+  const flow = report({ m: 10, P0in: NaN, P0out: NaN });
+  ok('ux-2 only the flow: a partial comparison, and no pressure compared', flow.includes('Comparação parcial') && flow.includes('Vazão mássica, 1 de 1 tubos') && flow.includes('nenhuma extremidade de tubo tem pressão gravada') && !flow.includes('confere'), flow);
+  const press = report({ m: NaN, P0in: 3.5e5, P0out: 2.5e5 });
+  ok('ux-2 only the pressures, 50 kPa off: compared and found, with the pipe', press.includes('Comparação parcial') && press.includes('nenhum tubo tem vazão gravada') && press.includes('Pressão de estagnação, 2 de 2 extremidades de tubo: maior diferença 50') && press.includes('(P1)'), press);
+  const none = report({ m: NaN, P0in: NaN, P0out: NaN });
+  ok('ux-2 neither: no comparable data, and nothing else said of the comparison', none.includes('Sem dados comparáveis') && !none.includes('Vazão mássica') && !none.includes('confere'), none);
+  const zero = report({ m: 0, P0in: 3e5, P0out: 2e5 });
+  ok('ux-2 every stored flow zero: the difference in kg/s, not a percentage', zero.includes('10,0 kg/s, pois todas as vazões gravadas são zero') && !zero.includes('confere'), zero);
+  const conv = report({ m: 10, P0in: 3e5, P0out: 2e5 }, { ok: true, converged: false, pipes: { 1: { m: 10, P0in: 3e5, P0out: 2e5 } } });
+  ok('ux-2 a calculation that did not converge confirms nothing', conv.includes('O cálculo não convergiu') && !conv.includes('confere'), conv);
+  PR.i18n.setLanguage('en');
+}
+
+// Item 6: values the labels show alike take one colour, and the legend says so (color-scales.js)
+console.log('\nUX script d5fa5e9, item 6: one colour for values that read the same');
+{
+  const cc = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/network/color-scales.js']);
+  const PC = cc.PumpIt, CS = PC.ui.colorScales, F = PC.ui.format;
+  PC.i18n.setLanguage('pt-BR');
+  const fmtOv = (v, cat) => F.fmt(F.conv(v, cat, cat === 'volFlow' ? 'm³/h' : 'm/s', {}), 3);
+  const resOf = (qs) => ({ regime: 'incompressible', pipes: Object.fromEntries(qs.map((q, i) => [i + 1, { Q: q / 3600, V: 1.2 }])) });
+  const colours = (ov) => [...ov.vals.values()].map((v) => CS.pipeColor('Q', v, CS.rampT(ov, v)));
+  const same = CS.scale(resOf([111.364, 111.364, 111.364]), 'Q', fmtOv);
+  ok('ux-6 equal flows: one colour, the middle of the ramp', same.uniform === 'same' && new Set(colours(same)).size === 1 && colours(same)[0] === CS.rampColor(0.5));
+  const near = CS.scale(resOf([578.834, 578.834, 578.831, 578.831]), 'Q', fmtOv);
+  ok('ux-6 578.834 and 578.831 m³/h, both shown as 579: one colour, not red against blue', near.uniform === 'shown' && new Set(colours(near)).size === 1, colours(near).join(' '));
+  const lg = { hidden: true, innerHTML: '' };
+  CS.renderLegend(lg, near, 'Q', () => 'm³/h', fmtOv);
+  ok('ux-6 ... the legend gives the value once, at the precision shown, without a ramp', lg.innerHTML.includes('Mesmo valor em todos os tubos, na precisão mostrada: 579') && !lg.innerHTML.includes('class="ramp"'), lg.innerHTML);
+  CS.renderLegend(lg, same, 'Q', () => 'm³/h', fmtOv);
+  ok('ux-6 ... and equal values as such', lg.innerHTML.includes('Mesmo valor em todos os tubos: 111'));
+  const spread = CS.scale(resOf([13.56, 175, 100.32]), 'Q', fmtOv);
+  ok('ux-6 flows that read differently keep the ramp from end to end', !spread.uniform && CS.rampT(spread, 13.56 / 3600) === 0 && CS.rampT(spread, 175 / 3600) === 1);
+  CS.renderLegend(lg, spread, 'Q', () => 'm³/h', fmtOv);
+  ok('ux-6 ... with the ramp in the legend', lg.innerHTML.includes('class="ramp"') && lg.innerHTML.includes('13,6') && lg.innerHTML.includes('175'));
+  const vel = CS.scale(resOf([100, 100]), 'V', fmtOv);
+  ok('ux-6 the velocity of a liquid keeps its fixed scale', vel && !vel.uniform);
+  documentStub.getElementById = () => null; // no selector of the overlay on this page
+  CS.addOverlay('xr', { cat: 'volFlow', label: 'network.overlay.Q', offered: () => true, values: () => ({ vals: new Map([[1, 0.03], [2, 0.03]]), min: 0, max: 0.1 }), title: () => 'x' });
+  delete documentStub.getElementById;
+  const given = CS.scale(resOf([1]), 'xr', fmtOv);
+  ok('ux-6 a range a module gives stays its own', given.given && !given.uniform && CS.rampT(given, 0.03) === 0.3);
+  PC.i18n.setLanguage('en');
+}
+
+// Item 7: a key a control has used is no shortcut (keyboard.js), so Home on the tabs of the properties panel does not
+// fit the drawing and an arrow does not turn the 3D view
+console.log('\nUX script d5fa5e9, item 7: keys that a control used');
+{
+  const listeners = {};
+  documentStub.addEventListener = (type, fn) => { listeners[type] = fn; };
+  const ck = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js']);
+  const UI = ck.PumpIt.ui;
+  let fits = 0, turns = 0, in3d = false;
+  UI.dialogs = { isModalOpen: () => false, closeModal: () => {} };
+  UI.help = { open: () => {}, isOpen: () => false, close: () => {} };
+  UI.systemWindow = { isOpen: () => false, close: () => {} };
+  UI.columnWindow = { isOpen: () => false, close: () => {} };
+  UI.canvas = { fit: () => fits++, zoomBy: () => {}, cancel: () => {}, setTool: () => {} };
+  UI.scene3d = { active: () => in3d, setMode: () => {} };
+  UI.nav3d = { key: () => { turns++; return true; } };
+  UI.fullScreen = { toggle: () => {} };
+  ck.PumpIt.app = { view: 'net', hideMenus: () => {} };
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/app/keyboard.js'), 'utf8'), ck, { filename: 'src/ui/app/keyboard.js' });
+  UI.keyboard.bind();
+  delete documentStub.addEventListener;
+  const press = (key, used) => listeners.keydown({ key, target: { closest: () => null }, defaultPrevented: used, preventDefault() {} });
+  press('Home', true);
+  ok('ux-7 Home used by a tab bar does not fit the drawing', fits === 0);
+  press('Home', false);
+  ok('ux-7 ... Home on the drawing still does', fits === 1);
+  in3d = true;
+  press('ArrowRight', true);
+  ok('ux-7 an arrow used by a tab bar does not turn the 3D view', turns === 0);
+  press('ArrowRight', false);
+  ok('ux-7 ... an arrow on the 3D view still does', turns === 1);
+}
+
+// Item 3: in a narrow window the tools of a closed group show too: the rule that shows them weighs as much as the one
+// that hides them and comes after it
+console.log('\nUX script d5fa5e9, item 3: the tools of a closed group in a narrow window');
+{
+  const css = (f) => fs.readFileSync(path.join(ROOT, 'src/ui/styles', f), 'utf8');
+  const weight = (sel) => (sel.match(/[.:][a-z]/gi) || []).length - (sel.match(/:not\(/g) || []).length;
+  const hide = /([^\n{}]*\.palette-items\.shut[^{}]*)\{\s*display:\s*none;\s*\}/.exec(css('network.css'));
+  const narrow = css('responsive.css').split('@media (max-width: 860px)')[1] || '';
+  const show = /([^\n{}]*\.palette-items\.shut[^{}]*)\{\s*display:\s*flex;\s*\}/.exec(narrow);
+  const order = (f) => fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').indexOf('styles/' + f);
+  ok('ux-3 the narrow rule weighs as much as the rule that hides the tools, and its sheet comes later', hide && show && weight(show[1]) >= weight(hide[1]) && order('responsive.css') > order('network.css'),
+    `${hide && hide[1].trim()} (${hide && weight(hide[1])}) · ${show && show[1].trim()} (${show && weight(show[1])})`);
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

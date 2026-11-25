@@ -29,6 +29,12 @@
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="11" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.2 9.2L15.6 13L8.2 16.8z" fill="currentColor"/><path d="M11 5.5V2.5H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
       <span class="brand-name">Pump It</span>
       <input id="model-title" class="title-input" type="text" aria-label="Model title" spellcheck="false" data-i18n-aria-label="app.page.titleInput">
+      <!-- a model the browser could not keep: shown until saving works again (src/ui/topbar/header.js) -->
+      <div class="save-warn" id="save-warn" title="Saving failed. The changes are only in this tab." data-i18n-title="app.saving.failed" hidden>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.8L15 14H1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v4M8 11.7v.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span class="save-warn-text" data-i18n="app.saving.short">Saving failed</span>
+        <button type="button" class="btn small" id="save-copy" data-i18n="app.saving.download">Download a copy</button>
+      </div>
       <button id="regime-stamp" class="stamp" type="button" title="Calculation regime: click to open the system properties" data-i18n-title="app.stamp.title"></button>
       <!-- the time simulation: its stamp, the progress of its run and the button that stops it (src/ui/time/bar.js) -->
       <button id="time-stamp" class="stamp time" type="button" hidden></button>

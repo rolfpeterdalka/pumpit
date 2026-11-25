@@ -38,12 +38,17 @@
     const SR = UI.surgeResults, srun = SR && app.surgeRun ? app.surgeRun() : null;
     const surgeTabs = srun ? SR.TABS : [];
     const tab = OUT_TABS.concat(timeTabs, surgeTabs).includes(app.prefs.outTab) ? app.prefs.outTab : 'general';
+    // the tabs are written again: a tab that had the focus (Enter on it, a click) keeps it, and the focus elsewhere (the
+    // time cursor during a playback) stays where it is
+    const focused = document.activeElement && tabsEl.contains(document.activeElement) ? document.activeElement.dataset.out : null;
     tabsEl.innerHTML = OUT_TABS.map((k) => {
       let extra = '';
       if (k === 'warnings' && res && res.ok) extra = ` (${res.warnings.length + (run ? run.warnings.length : 0) + (srun ? srun.warnings.length : 0)})`;
       return `<button data-out="${k}" class="${k === tab ? 'on' : ''}">${tx('tabs.' + k)}${extra}</button>`;
     }).join('') + timeTabs.map((k) => `<button data-out="${k}" class="time-tab${k === tab ? ' on' : ''}">${F.esc(t('time.results.tabs.' + k))}</button>`).join('')
       + surgeTabs.map((k) => `<button data-out="${k}" class="time-tab surge-tab${k === tab ? ' on' : ''}">${F.esc(t('surge.results.tabs.' + k))}</button>`).join('');
+    const again = focused && [...tabsEl.querySelectorAll('[data-out]')].find((b) => b.dataset.out === focused);
+    if (again) again.focus();
     const scn = app.scenario();
     if (!res) {
       subEl.textContent = tx('subNoResults', { name: scn.name });

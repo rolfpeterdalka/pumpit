@@ -1,6 +1,7 @@
 // Results on the drawing: values per pipe, colour scales and the legend.
 // Velocity uses a fixed water scale (PumpIt.data.WATER_VELOCITY, in m/s) for a liquid; every other quantity, and the
-// velocity of a gas, is coloured from the smallest to the largest value in the model. Mass flow and Mach number are
+// velocity of a gas, is coloured from the smallest to the largest value in the model, unless the labels show every value
+// alike: then every pipe takes the middle colour and the legend says so (scale). Mass flow and Mach number are
 // offered for a gas, the hydraulic grade line for a liquid (OVERLAY_FOR). A module adds quantities of its own with
 // addOverlay (the water hammer: src/ui/surge/overlay.js), each with its option in the selector.
 (function (root) {
@@ -78,7 +79,7 @@
     if (EXTRA.has(key)) {
       const o = EXTRA.get(key).values(res);
       if (!o || !o.vals.size) return null;
-      if (Number.isFinite(o.min) && Number.isFinite(o.max)) return o;
+      if (Number.isFinite(o.min) && Number.isFinite(o.max)) return Object.assign({}, o, { given: true });
       const arr = [...o.vals.values()];
       return { vals: o.vals, min: Math.min(...arr), max: Math.max(...arr) };
     }
@@ -98,6 +99,21 @@
     return { vals, min: Math.min(...arr), max: Math.max(...arr) };
   }
 
+  // The values of the chosen quantity with their scale, shared by the schematic, the 3D view and the legend. A range of
+  // the model whose values the labels show alike (fmtOv, the format of the labels of the drawing) is uniform: 'same' when
+  // the values are equal, 'shown' when they differ only beyond the precision shown. The fixed scale of the velocity of a
+  // liquid and a range a module gives (given) stay as they are.
+  function scale(res, key, fmtOv, gas = false) {
+    const ov = overlayValues(res, key);
+    if (!ov || ov.given || (key === 'V' && !gas)) return ov;
+    const cat = OVERLAY[key].cat;
+    if (ov.max === ov.min) ov.uniform = 'same';
+    else if (fmtOv(ov.min, cat) === fmtOv(ov.max, cat)) ov.uniform = 'shown';
+    return ov;
+  }
+  // the place of a value on the ramp, from 0 to 1: the middle for a uniform scale or an empty range
+  const rampT = (ov, v) => (ov.uniform || !(ov.max > ov.min) ? 0.5 : (v - ov.min) / (ov.max - ov.min));
+
   // pipe colour: fixed scale for the velocity of a liquid, model range for the rest
   function pipeColor(ovKey, v, t, gas = false) { return ovKey === 'V' && !gas ? velColor(v) : rampColor(t); }
   const beyondScale = (ovKey, v, gas = false) => ovKey === 'V' && !gas && Math.abs(v) > VEL.max;
@@ -111,7 +127,10 @@
       const cat = OVERLAY[ovKey].cat;
       const title = EXTRA.has(ovKey) ? F.esc(EXTRA.get(ovKey).title()) : t('network.legend.' + ovKey);
       lg.hidden = false;
-      lg.innerHTML = `<div class="eyebrow">${title}${cat ? ` (${F.esc(F.unit(unitOf(cat)))})` : ''}</div>
+      const head = `<div class="eyebrow">${title}${cat ? ` (${F.esc(F.unit(unitOf(cat)))})` : ''}</div>`;
+      // one value: its colour and the value, instead of a ramp from a number to the same number
+      if (ov.uniform) lg.innerHTML = `${head}<div class="uniform"><i style="background:${rampColor(0.5)}"></i><span>${F.esc(t(ov.uniform === 'same' ? 'network.legend.uniform' : 'network.legend.uniformShown', { value: fmtOv(ov.min, cat) }))}</span></div>`;
+      else lg.innerHTML = `${head}
         <div class="ramp" style="background:linear-gradient(90deg,${RAMP.join(',')})"></div>
         <div class="ends"><span>${fmtOv(ov.min, cat)}</span><span>${fmtOv(ov.max, cat)}</span></div>`;
     } else lg.hidden = true;
@@ -136,5 +155,5 @@
     return ovKey === 'HGL' ? labelOf(fmtOv, unitOf, jr.HGL, 'head') : labelOf(fmtOv, unitOf, jr.Pin, 'pressure');
   }
 
-  PumpIt.ui.colorScales = { OVERLAY, RAMP, offered, isGas, rampColor, velColor, velLegend, overlayValues, pipeColor, beyondScale, renderLegend, syncPicker, labelOf, junctionLabel, addOverlay };
+  PumpIt.ui.colorScales = { OVERLAY, RAMP, offered, isGas, rampColor, velColor, velLegend, overlayValues, scale, rampT, pipeColor, beyondScale, renderLegend, syncPicker, labelOf, junctionLabel, addOverlay };
 })(typeof window !== 'undefined' ? window : globalThis);

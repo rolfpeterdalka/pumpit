@@ -38,6 +38,8 @@ PumpIt.i18n.add('es', {
       low: 'baja',
       economic: 'económica',
       aboveShort: 'superior',
+      uniform: 'Mismo valor en todas las tuberías: {value}',
+      uniformShown: 'Mismo valor en todas las tuberías, con la precisión mostrada: {value}',
     },
     view3: {
       aria: 'Vista del dibujo',

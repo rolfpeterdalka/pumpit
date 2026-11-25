@@ -161,7 +161,7 @@ PumpIt.i18n.add('en', {
           },
           saving: {
             title: 'Your work is saved',
-            body: `<p>Every change is stored automatically in the browser: when you open Pump It again on the same computer and in the same browser, the last model comes back.</p>
+            body: `<p>Every change is stored automatically in the browser: when you open Pump It again on the same computer and in the same browser, the last model comes back. If the browser refuses to keep it (no room left, or storage blocked), a warning beside the title says that the changes are only in this tab, with [[t:app.saving.download]] to keep them in a file; it goes away once the browser keeps the model again.</p>
 <p class="warn"><b>Note:</b> this automatic copy lives only in this browser, and clearing the browsing data erases it. To really keep your work, use [[t:app.menu.file]] → [[t:app.menu.save]] and keep the <code>.json</code> file.</p>
 <ul>
 <li><b>Undo and redo:</b> <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>, or the [[t:app.menu.edit]] menu. The app keeps the last 80 changes. Moving the camera of the 3D view does not enter the undo history.</li>
@@ -881,7 +881,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li>reservoirs with their liquid level, surface pressure and, for each pipe, its K and its depth below the surface, exit valves with their outlet pressure and nozzles with their K factor;</li>
 <li>the fluid of the file and its ambient pressure, the reference of the gauge pressures.</li>
 </ul>
-<p>A report then shows how the first calculation compares with the results stored in the file, what needs your input (left blank and marked in red in the checklist), what was assumed, what was left out (add-on modules, heat transfer) and what was read. Detailed tee losses come from the stored operating point, and some readings of the format still to be confirmed have a note each. Use the import for your own models.</p>
+<p>A report then shows how the first calculation compares with the results stored in the file, what needs your input (left blank and marked in red in the checklist), what was assumed, what was left out (add-on modules, heat transfer) and what was read. The comparison is that of the steady state: it says how many pipes it compared by their flow and how many pipe ends by their stagnation pressure, and it confirms the results only when the calculation converged, everything could be compared and both differences stay under 0.1 %. Detailed tee losses come from the stored operating point, and some readings of the format still to be confirmed have a note each. Use the import for your own models.</p>
 <h4>Models in the .aro format</h4>
 <p>[[t:app.menu.open]] also reads <code>.aro</code> files, the same kind of text format for networks of a gas. The model comes in the compressible mode, with the scenario you choose, as for a .fth file:</p>
 <ul>

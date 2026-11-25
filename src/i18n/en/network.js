@@ -38,6 +38,8 @@ PumpIt.i18n.add('en', {
       low: 'low',
       economic: 'economic',
       aboveShort: 'above',
+      uniform: 'Same value in every pipe: {value}',
+      uniformShown: 'Same value in every pipe at the precision shown: {value}',
     },
     view3: {
       aria: 'Drawing view',

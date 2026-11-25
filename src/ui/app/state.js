@@ -6,10 +6,11 @@
   const M = PumpIt.model, U = PumpIt.units, F = PumpIt.ui.format;
   const KEY = { model: 'pumpit.model', prefs: 'pumpit.prefs' };
 
-  // browser storage (may be unavailable)
+  // browser storage (may be unavailable); set is true when the browser kept the value, false when it refused it (no room
+  // left, storage blocked or unavailable)
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
   };
 
   const app = {
@@ -54,7 +55,16 @@
   };
 
   // ------------------------------------------------------------ persistence
-  app.save = () => { store.set(KEY.model, app.model); };
+  // The model is kept in the browser after every change. A write that fails leaves the changes only in this tab: saveFailed
+  // says so, apart from the preferences and the calculation, and the header shows it until a write succeeds again
+  // (src/ui/topbar/header.js). The preferences are kept the same way, without a warning.
+  app.saveFailed = false;
+  app.save = () => {
+    const failed = !store.set(KEY.model, app.model);
+    if (failed === app.saveFailed) return;
+    app.saveFailed = failed;
+    if (PumpIt.ui.header) PumpIt.ui.header.renderSave(true);
+  };
   app.savePrefs = () => { store.set(KEY.prefs, app.prefs); };
   app.storedModel = () => store.get(KEY.model);
 

@@ -19,9 +19,10 @@
   .palette { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); padding: 6px; }
   #palette-junctions { display: flex; gap: 2px; }
   .palette-group { display: none; }
-  /* a row of tools: every group shows all its tools */
+  /* a row of tools: every group shows all its tools, a closed one too (the selector of network.css that hides them, with
+     the same weight, comes before this one) */
   .palette-items { display: contents; }
-  .palette-items.shut .tool { display: flex; }
+  .palette-items.shut .tool:not(.active) { display: flex; }
   .palette-sep { width: 1px; height: auto; margin: 4px 6px; }
   .tool { min-width: 68px; }
   .inspector { border-left: 0; border-top: 1px solid var(--line); }

@@ -80,6 +80,9 @@
 }
 .legend .ramp { height: 8px; border-radius: 4px; margin: 5px 0 3px; }
 .legend .ends { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); }
+/* a scale of one value (color-scales.js): its colour and the value */
+.legend .uniform { display: flex; align-items: center; gap: 7px; margin-top: 5px; color: var(--ink-2); }
+.legend .uniform i { flex: none; width: 22px; height: 8px; border-radius: 4px; }
 .vel-bar { display: flex; height: 10px; margin: 6px 0 2px; width: 250px; max-width: calc(100vw - 72px); }
 .vel-ramp { flex: 1; border-radius: 5px 0 0 5px; }
 .vel-over { width: 26px; background: #000; border-radius: 0 5px 5px 0; box-shadow: inset 0 0 0 1px var(--ink-3); }

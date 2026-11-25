@@ -9,8 +9,29 @@
 
   // a relative difference as a percentage; differences below 0.001 % read as such
   const pct = (x) => (x < 1e-5 ? '< ' + F.fmt(0.001, 1) + ' %' : F.fmt(x * 100, 2) + ' %');
-  // the results agree when flows and pressures differ by less than 0.1 % of their scales
-  const MATCH = 1e-3;
+  // an absolute difference (a scale of zero) in the default unit of its category
+  const abs = (x, cat) => `${F.fmt(PumpIt.units.fromSI(x, F.DEFAULT_OUT[cat], cat), 3)} ${F.unit(F.DEFAULT_OUT[cat])}`;
+
+  // The steady state against the results stored in the file (F-31). Results that match say so, with what was compared
+  // under it; anything else is one warning: what kept the comparison from confirming them (nothing to compare, a partial
+  // comparison, a calculation that did not converge; a plain difference needs no such line), then one line per quantity
+  // with what it covered and its largest difference.
+  function comparison(add, c) {
+    if (c.verdict === 'match') add('p', 'ok', tx('match'));
+    const box = add('div', 'cmp ' + (c.verdict === 'match' ? 'muted' : 'warn'), '');
+    const el = (tag, text, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = text; return e; };
+    const head = { none: 'none', partial: 'partial', notConverged: 'notConverged' }[c.verdict];
+    if (head) box.appendChild(el('p', tx(head), 'head'));
+    if (c.verdict === 'none') return;
+    box.appendChild(el('p', tx('against')));
+    const ul = box.appendChild(el('ul', ''));
+    const li = (text) => ul.appendChild(el('li', text));
+    const pipe = (id) => (id ? 'P' + id : '—');
+    if (!c.n) li(tx('flowNone'));
+    else li(tx('flow', { n: c.n, total: c.pipes, pipe: pipe(c.flowPipe), diff: c.flowAbs ? tx('noFlowScale', { value: abs(c.flow, 'massFlow') }) : tx('ofFlow', { pct: pct(c.flow) }) }));
+    if (!c.pressureN) li(tx('pressureNone'));
+    else li(tx('pressure', { n: c.pressureN, total: c.ends, pipe: pipe(c.pressurePipe), diff: c.pressureAbs ? tx('noDropScale', { value: abs(c.pressure, 'dp') }) : tx('ofDrop', { pct: pct(c.pressure) }) }));
+  }
 
   // name: the file name; res: what the importer imp (one of PumpIt.importers) read; r: the calculation of the imported
   // model (null while its checklist is incomplete)
@@ -21,15 +42,8 @@
     add('p', '', tx('summary', res.counts));
     if (!r) add('p', 'warn', tx('incomplete'));
     else if (!r.ok) add('p', 'warn', tx('refused', { message: (r.errors || [])[0] || '' }));
-    else if (res.stored) {
-      const c = imp.compare(r, res.stored);
-      const match = c.flow < MATCH && c.pressure < MATCH;
-      if (match) add('p', 'ok', tx('match'));
-      add('p', match ? 'muted' : 'warn', tx('compared', {
-        n: c.n, flow: pct(c.flow), pressure: pct(c.pressure),
-        flowPipe: c.flowPipe ? 'P' + c.flowPipe : '—', pressurePipe: c.pressurePipe ? 'P' + c.pressurePipe : '—',
-      }));
-    } else add('p', 'muted', tx('noStored'));
+    else if (res.stored) comparison(add, imp.compare(r, res.stored));
+    else add('p', 'muted', tx('noStored'));
     if (!res.notes.length) add('p', 'muted', tx('clean'));
     for (const level of imp.LEVELS) {
       const notes = res.notes.filter((n) => n.level === level);

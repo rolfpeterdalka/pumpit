@@ -161,7 +161,7 @@ PumpIt.i18n.add('pt-BR', {
           },
           saving: {
             title: 'Seu trabalho fica salvo',
-            body: `<p>Cada alteração é gravada automaticamente no navegador: ao reabrir o Pump It no mesmo computador e no mesmo navegador, o último modelo volta à tela.</p>
+            body: `<p>Cada alteração é gravada automaticamente no navegador: ao reabrir o Pump It no mesmo computador e no mesmo navegador, o último modelo volta à tela. Se o navegador se recusar a guardá-lo (sem espaço, ou com o armazenamento bloqueado), um aviso ao lado do título diz que as alterações estão só nesta aba, com [[t:app.saving.download]] para guardá-las num arquivo; ele some quando o navegador volta a guardar o modelo.</p>
 <p class="warn"><b>Atenção:</b> essa cópia automática fica só neste navegador, e limpar os dados de navegação a apaga. Para guardar o trabalho de verdade, use [[t:app.menu.file]] → [[t:app.menu.save]] e guarde o arquivo <code>.json</code>.</p>
 <ul>
 <li><b>Desfazer e refazer:</b> <kbd>Ctrl</kbd>+<kbd>Z</kbd> e <kbd>Ctrl</kbd>+<kbd>Y</kbd>, ou o menu [[t:app.menu.edit]]. O app guarda as últimas 80 alterações. Mexer na câmera da vista 3D não entra no desfazer.</li>
@@ -881,7 +881,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>reservatórios com o nível do líquido, a pressão na superfície e, para cada tubo, o K e a profundidade abaixo da superfície, válvulas de saída com a pressão de saída e bocais com o fator K;</li>
 <li>o fluido do arquivo e a pressão ambiente, referência das pressões manométricas.</li>
 </ul>
-<p>Em seguida, um relatório mostra como o primeiro cálculo se compara com os resultados gravados no arquivo, o que precisa de você (deixado em branco e marcado em vermelho na lista de verificação), o que foi assumido, o que ficou de fora (módulos adicionais, troca de calor) e o que foi lido. As perdas detalhadas dos tês vêm do ponto de operação gravado, e algumas leituras do formato ainda a confirmar têm uma nota cada. Use a importação para os seus próprios modelos.</p>
+<p>Em seguida, um relatório mostra como o primeiro cálculo se compara com os resultados gravados no arquivo, o que precisa de você (deixado em branco e marcado em vermelho na lista de verificação), o que foi assumido, o que ficou de fora (módulos adicionais, troca de calor) e o que foi lido. A comparação é a do regime permanente: ela diz quantos tubos comparou pela vazão e quantas extremidades pela pressão de estagnação, e só confirma os resultados quando o cálculo convergiu, tudo pôde ser comparado e as duas diferenças ficam abaixo de 0,1 %. As perdas detalhadas dos tês vêm do ponto de operação gravado, e algumas leituras do formato ainda a confirmar têm uma nota cada. Use a importação para os seus próprios modelos.</p>
 <h4>Modelos no formato .aro</h4>
 <p>[[t:app.menu.open]] também lê arquivos <code>.aro</code>, o mesmo tipo de formato de texto para redes de gás. O modelo entra no modo compressível, com o cenário que você escolher, como num arquivo .fth:</p>
 <ul>

@@ -440,7 +440,7 @@ console.log('\nThe calculation and the stored results (section 16, I-34)');
   const ja = [[1, 30, 0, 2, 0], [2, 29, 0, 10, 0], [3, 28, 0, 20, 0], [4, 25, 0, 16, 0]].map((x) => x.join(','));
   const r2 = read(imp({ secs: secs([[BASE('PIPE ARCHIVE DATA'), [`NumberOfArchivePipes= ${pa.length}`, ...pa]], [BASE('JUNCTION ARCHIVE DATA'), [`NumberOfArchiveJcts= ${ja.length}`, ...ja]]]) }));
   const c = IMP.compare(run(r2.model), r2.stored);
-  ok('the stored results of the pipes, compared as for .fth files', r2.stored && r2.stored.size === 3 && c.n === 3 && c.flow < 1e-9 && c.pressure < 1e-9, JSON.stringify(c));
+  ok('the stored results of the pipes, compared as for .fth files', r2.stored && r2.stored.size === 3 && c.n === 3 && c.flow < 1e-9 && c.pressure < 1e-9 && c.verdict === 'match', JSON.stringify(c));
   ok('the stored results of the junctions: the stagnation pressure in column 1 and the kind in column 3', r2.storedJunctions && r2.storedJunctions.size === 4 && near(r2.storedJunctions.get(2).P0, 29 * PSI) && r2.storedJunctions.get(4).type === 16);
   const jb = [[1, 30, 0, 2, 0], [2, 29, 0, 8, 0]].map((x) => x.join(','));
   const r3 = read(imp({ secs: secs([[BASE('JUNCTION ARCHIVE DATA'), [`NumberOfArchiveJcts= ${jb.length}`, ...jb]]]) }));
@@ -452,7 +452,49 @@ console.log('\nThe calculation and the stored results (section 16, I-34)');
   fs.writeFileSync(file, imp({ header: 'Synthetic file written by tests/imp-import.test.cjs', secs: secs([[BASE('PIPE ARCHIVE DATA'), [`NumberOfArchivePipes= ${pa.length}`, ...pa]]]) }), 'latin1');
   const { validateFile } = require('./validate-imp.js');
   const rows = validateFile(file);
-  ok('the validation script imports the file, checks it and compares its stored results', rows.length === 1 && rows[0].compared === 3 && rows[0].flow < 1e-9 && rows[0].pressure < 1e-9 && !rows[0].dangling.length && !rows[0].bad.length, JSON.stringify(Object.assign({}, rows[0], { file: undefined })));
+  ok('the validation script imports the file, checks it and compares its stored results', rows.length === 1 && rows[0].compared === 3 && rows[0].flow < 1e-9 && rows[0].pressure < 1e-9 && rows[0].verdict === 'match' && !rows[0].dangling.length && !rows[0].bad.length, JSON.stringify(Object.assign({}, rows[0], { file: undefined })));
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+console.log('\nWhat the comparison with the stored results covered (F-31)');
+{
+  // two reservoirs and one pipe, whose stored results have both quantities, only the flow, only the pressures or neither
+  const one = (archive = []) => [
+    [BASE('JUNCTIONS'), [junc({ type: 2, id: 1, pipes: [-1], t: tank({ level: 40 }) }), junc({ type: 2, id: 2, pipes: [1], t: tank({ level: 10 }) })]],
+    [BASE('PIPES'), [pipe({ id: 1, from: 1, to: 2, L: 200, D: 15 })]],
+    ...archive,
+  ];
+  const x = run(read(imp({ secs: one() })).model).pipes[1];
+  const line = (f) => [1, f.m, 0, f.p0in, f.p0out, 527.67, 527.67, 998.2 / (LBM / FT ** 3), 1.002e-3 / (LBM / FT), 0, 0].join(',');
+  const archive = (f) => [[BASE('PIPE ARCHIVE DATA'), ['NumberOfArchivePipes= 1', line(f)]]];
+  const full = { m: x.m / LBM, p0in: x.P0in / PSI, p0out: x.P0out / PSI };
+  const fileOf = (f) => imp({ header: 'Synthetic file written by tests/imp-import.test.cjs', secs: one(archive(Object.assign({}, full, f))) });
+  const cmpOf = (f, res) => { const r = read(fileOf(f)); return IMP.compare(res ? res(run(r.model)) : run(r.model), r.stored); };
+  const show = (c) => JSON.stringify(c);
+  const cFull = cmpOf({});
+  ok('both stored and equal: 1 of 1 pipe and 2 of 2 ends compared, and the results match', cFull.verdict === 'match' && cFull.n === 1 && cFull.pipes === 1 && cFull.pressureN === 2 && cFull.ends === 2, show(cFull));
+  const cFlow = cmpOf({ p0in: '', p0out: '' });
+  ok('only the flow stored: the flow is compared and the pressure is not, a partial comparison', cFlow.verdict === 'partial' && cFlow.n === 1 && cFlow.pressureN === 0 && cFlow.flow < 1e-9, show(cFlow));
+  const cP = cmpOf({ m: '' });
+  ok('only the pressures stored: they are compared without the flow, a partial comparison', cP.verdict === 'partial' && cP.n === 0 && cP.pressureN === 2 && cP.pressure < 1e-9, show(cP));
+  const cOff = cmpOf({ m: '', p0out: full.p0out + 2 });
+  ok('a stored pressure 2 psi off is found without the flow, with its pipe', cOff.pressurePipe === 1 && near(cOff.pressure, (2 * PSI) / Math.abs(x.P0in - x.P0out - 2 * PSI), 1e-6), show(cOff));
+  const cNone = cmpOf({ m: '', p0in: '', p0out: '' });
+  ok('neither stored: nothing to compare', cNone.verdict === 'none' && cNone.n === 0 && cNone.pressureN === 0, show(cNone));
+  const cDiff = cmpOf({ p0in: full.p0in * 1.01 });
+  ok('a stored pressure beyond the tolerance: a difference, with its pipe', cDiff.verdict === 'diff' && cDiff.pressurePipe === 1 && cDiff.pressure > 1e-3, show(cDiff));
+  const cZero = cmpOf({ m: 0 });
+  ok('every stored flow zero: the flow differs in kg/s, with no percentage and no confirmation', cZero.verdict === 'unscaled' && cZero.flowAbs && !cZero.pressureAbs && near(cZero.flow, Math.abs(x.m), 1e-6), show(cZero));
+  const cConv = cmpOf({}, (r) => Object.assign({}, r, { converged: false }));
+  ok('a calculation that did not converge does not confirm the results', cConv.verdict === 'notConverged', show(cConv));
+  // the validation script: the same verdict, nothing to compare included
+  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'pumpit-imp-'));
+  const file = path.join(dir, 'synthetic.imp');
+  const { validateFile } = require('./validate-imp.js');
+  const verdictOf = (f) => { fs.writeFileSync(file, fileOf(f), 'latin1'); const rows = validateFile(file); return rows.length === 1 ? rows[0] : null; };
+  const vFull = verdictOf({}), vNone = verdictOf({ m: '', p0in: '', p0out: '' }), vFlow = verdictOf({ p0in: '', p0out: '' });
+  ok('the validation script says the same: match, nothing to compare, partial', vFull && vFull.verdict === 'match' && vNone && vNone.verdict === 'none' && vFlow && vFlow.verdict === 'partial' && vFlow.compared === 1 && vFlow.pressureN === 0,
+    [vFull, vNone, vFlow].map((r) => r && r.verdict).join(' '));
   fs.rmSync(dir, { recursive: true, force: true });
 }
 

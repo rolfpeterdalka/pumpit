@@ -128,7 +128,7 @@ The readings of the swinging and sliding discs, probable in the answers, have a 
 
 **I-42 Keys of the fluid.** As section 10 of the description asks, an ambient pressure that varies with the elevation (`Ambient Pressure Variation` other than 0) and a gravity that varies (`VariableGExists` other than 0) are reported; Pump It keeps the ambient pressure and the gravity of the file.
 
-**I-43 Validation on the user's files.** `node tests/validate-imp.js <folder>` imports every scenario with a network of every `.imp` file of a folder and its subfolders, checks that every pipe connects junctions of the model and that every number of the model is finite, and calculates the steady state of each scenario with stored results, comparing it with them by the measure of the report (section 19.3 of the description). The files stay on the user's computer: the script writes nothing.
+**I-43 Validation on the user's files.** `node tests/validate-imp.js <folder>` imports every scenario with a network of every `.imp` file of a folder and its subfolders, checks that every pipe connects junctions of the model and that every number of the model is finite, and calculates the steady state of each scenario with stored results, comparing it with them by the measure and the verdict of the report (F-31 of [fth-import.md](fth-import.md); section 19.3 of the description): within 0.1 %, beyond it, partial, not converged, with a scale of zero or with nothing to compare. The files stay on the user's computer: the script writes nothing.
 
 **I-44 Units of the transient block of a child.** The check of I-10 takes "None" as an empty unit at w−4, w−6 and w−9, the units of the material a pipe may leave without a value, but not at w, the anchor itself.
 

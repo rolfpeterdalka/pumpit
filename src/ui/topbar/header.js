@@ -1,5 +1,5 @@
-// Header state: model title, scenario list, checklist indicator, status line and the warnings badge of the
-// results tab.
+// Header state: model title, the warning of a model the browser could not keep, scenario list, checklist indicator,
+// status line and the warnings badge of the results tab.
 (function (root) {
   const PumpIt = root.PumpIt;
   const UI = PumpIt.ui;
@@ -19,8 +19,17 @@
     st.className = 'stamp' + (gas ? ' gas' : '');
   }
 
+  // a model the browser could not keep (app.save): the warning beside the title, with its download of the model, until a
+  // write succeeds again (its texts follow the language with data-i18n); changed: the state has just changed, which a
+  // message announces once
+  function renderSave(changed) {
+    $('#save-warn').hidden = !app.saveFailed;
+    if (changed) app.toast(t(app.saveFailed ? 'app.saving.failed' : 'app.saving.again'));
+  }
+
   function render() {
     $('#model-title').value = app.model.title || '';
+    renderSave();
     renderStamp();
     const list = app.model.scenarios.list;
     const depth = (s) => { let d = 0; for (let c = s; c.parent; c = app.scenarioById(c.parent)) d++; return d; };
@@ -64,7 +73,9 @@
     $('#model-title').addEventListener('change', (e) => { app.pushUndo(); app.model.title = e.target.value.trim() || t('core.model.untitled'); app.save(); });
     // the stamp opens the system window, where the regime and the fluid are chosen
     $('#regime-stamp').addEventListener('click', () => UI.systemWindow.open());
+    // the copy of the model that only this tab has
+    $('#save-copy').addEventListener('click', () => app.downloadModel());
   }
 
-  PumpIt.ui.header = { render, bind };
+  PumpIt.ui.header = { render, renderSave, bind };
 })(window);

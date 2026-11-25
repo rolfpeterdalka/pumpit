@@ -22,8 +22,13 @@
 .import-report { max-height: min(62vh, 560px); overflow: auto; font-size: 13px; }
 .import-report p { margin: 0 0 8px; }
 .import-report p.ok { color: var(--ok); font-weight: 600; }
-.import-report p.warn { padding: 8px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
-.import-report p.muted { color: var(--ink-2); }
+.import-report p.warn, .import-report .cmp.warn { padding: 8px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.import-report p.muted, .import-report .cmp.muted { color: var(--ink-2); }
+/* the comparison with the stored results: a line, then one per quantity */
+.import-report .cmp { margin: 0 0 8px; }
+.import-report .cmp p { margin: 0 0 4px; }
+.import-report .cmp p.head { font-weight: 600; }
+.import-report .cmp.warn li { color: var(--ink); }
 .import-report h4 { margin: 14px 0 4px; font: 600 13.5px var(--f-display); color: var(--ink); }
 .import-report h4.level-missing { color: var(--crit); }
 .import-report ul { margin: 0; padding-left: 20px; }
