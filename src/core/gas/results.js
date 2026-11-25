@@ -65,6 +65,10 @@
         }
         r.choked = !!s0.choked;
         if (r.choked) r.xChoke = s0.dir > 0 ? P.L : 0;
+      } else if (!isolated && l.marched) {
+        const s = Fw.pipeOut(cx, l.d, na, nb, m, true);
+        if (s) { ea = full(s.P1, s.T1, s.M1, Math.abs(m) / A); eb = full(s.P2, s.T2, s.M2, Math.abs(m) / A); f = s.f; Re = s.Re; prof = s.prof || null; }
+        else { const atRest = (nd) => full(nd.P, Fw.tempOf(cx, nd), 0, 0); ea = atRest(na); eb = atRest(nb); }
       } else {
         // no flow (or a link without loss): both ends at the pressure of their node, at rest
         const atRest = (nd) => { const T = Fw.tempOf(cx, nd); return full(nd.P, T, 0, 0); };
@@ -79,7 +83,7 @@
         // the volume flows at the ends of the reference direction, as rhoIn, rhoOut, Vin and Vout: Q·ρ = ṁ at each end
         Q: ea.rho > 0 ? m / ea.rho : NaN, Qout: eb.rho > 0 ? m / eb.rho : NaN,
         Re, f, regime: t('core.solver.regime.' + (Re < env.reLam ? 'laminar' : Re > env.reTurb ? 'turbulent' : 'transition')),
-        profile: prof ? prof.map(([x, Px, Tx, Mx]) => [s0.dir > 0 ? x : P.L - x, Px, Tx, Mx]).sort((u, w) => u[0] - w[0]) : null,
+        profile: prof ? prof.map(([x, Px, Tx, Mx]) => [s0 && s0.dir < 0 ? P.L - x : x, Px, Tx, Mx]).sort((u, w) => u[0] - w[0]) : null,
       });
       r.dP0 = r.P0in - r.P0out;
       // the drop of stagnation pressure split between friction and the K values, in the ratio of f·L/D to ΣK

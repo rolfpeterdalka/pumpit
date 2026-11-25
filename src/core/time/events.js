@@ -17,17 +17,18 @@
   //   tank: a finite tank   reservoir: any reservoir   end: the end of a pipe or the side of a junction
   //   pipeEnd: the end of a pipe   flow: a pipe or a two-port junction   pump, valve: the results of one
   //   opening: a valve that gives its opening   state: a junction whose type has states (pumps, valves, control valves)
+  //   liquid: a quantity of a liquid only (a gas has no grade lines and no free surface), refused in the compressible mode
   const QUANTITIES = {
     time: { cat: 'time' },
     elapsed: { cat: 'time' },
-    tankLevel: { cat: 'length', at: 'tank' },
-    surfaceElev: { cat: 'length', at: 'reservoir' },
-    tankVolume: { cat: 'volume', at: 'tank' },
+    tankLevel: { cat: 'length', at: 'tank', liquid: true },
+    surfaceElev: { cat: 'length', at: 'reservoir', liquid: true },
+    tankVolume: { cat: 'volume', at: 'tank', liquid: true },
     surfP: { cat: 'pressure', at: 'reservoir' },
     pStatic: { cat: 'pressure', at: 'end' },
     pStag: { cat: 'pressure', at: 'end' },
-    hgl: { cat: 'length', at: 'pipeEnd' },
-    egl: { cat: 'length', at: 'pipeEnd' },
+    hgl: { cat: 'length', at: 'pipeEnd', liquid: true },
+    egl: { cat: 'length', at: 'pipeEnd', liquid: true },
     flowVol: { cat: 'volFlow', at: 'flow' },
     flowMass: { cat: 'massFlow', at: 'flow' },
     velocity: { cat: 'velocity', at: 'flow' },
@@ -46,6 +47,8 @@
   const EVENTS = { time: 0, single: 1, dualCyclic: 2, dualSequential: 2, combined: 0 };
   const TABLES = { time: 1, single: 1, dualCyclic: 2, dualSequential: 2, combined: 1 };
   const JOINS = ['and', 'or', 'not'];
+  // does the quantity exist in the regime of the model?
+  const inRegime = (q, eff) => !(QUANTITIES[q] && QUANTITIES[q].liquid && M.isCompressible(eff));
   // a difference of two objects: the quantities read on an object, except a state
   const canDiffer = (q) => !!(QUANTITIES[q] && QUANTITIES[q].at && QUANTITIES[q].at !== 'state');
 
@@ -80,6 +83,7 @@
     if (!c || typeof c !== 'object') return ['quantity'];
     const Q = QUANTITIES[c.q];
     if (!Q) return ['quantity'];
+    if (!inRegime(c.q, eff)) return ['regime'];
     const out = [];
     let ob = null;
     if (Q.at) {
@@ -183,14 +187,17 @@
     return pc.second ? a - read(pc.q, pc.second, S) : a;
   }
 
-  // does the condition hold in the step? (a quantity without a value, as an isolated pipe, never holds). A combined
-  // event holds by its operator: all of its events (and), any of them (or) or none of them (not)
-  function holds(pc, S) {
-    if (pc.node) return holdsNode(pc.node, S);
+  // the truth of a condition in the step: true, false, or null when its quantity has no value (an isolated pipe). A
+  // combined event follows its operator in three values: and is false when one of its events is, true when all are;
+  // or is true when one is, false when all are; not inverts true and false and keeps null; otherwise null. Only true
+  // holds, so negating a quantity without a value never fires
+  function truth(pc, S) {
+    if (pc.node) return truthNode(pc.node, S);
     const x = valueOf(pc, S);
-    if (pc.at === 'state') return pc.op === '=' ? x === pc.s : x !== undefined && x !== pc.s;
-    return Number.isFinite(x) && compare(pc.op, x, pc.v);
+    if (pc.at === 'state') return x === undefined ? null : pc.op === '=' ? x === pc.s : x !== pc.s;
+    return Number.isFinite(x) ? compare(pc.op, x, pc.v) : null;
   }
+  const holds = (pc, S) => truth(pc, S) === true;
   // a number against the value of a condition
   function compare(op, x, v) {
     switch (op) {
@@ -201,11 +208,13 @@
       default: return false;
     }
   }
-  function holdsNode(n, S) {
-    if (n.cond) return holds(n.cond, S);
-    if (n.op === 'and') return n.of.every((x) => holdsNode(x, S));
-    if (n.op === 'or') return n.of.some((x) => holdsNode(x, S));
-    return !n.of.some((x) => holdsNode(x, S));
+  function truthNode(n, S) {
+    if (n.cond) return truth(n.cond, S);
+    const v = n.of.map((x) => truthNode(x, S));
+    const any = v.includes(true), unknown = v.includes(null), all = v.every((x) => x === true);
+    if (n.op === 'and') return v.includes(false) ? false : all ? true : null;
+    const or = any ? true : unknown ? null : false;
+    return n.op === 'or' ? or : or === null ? null : !or;
   }
 
   // ---------- the named events of the model (§5.4): the same in every scenario
@@ -214,7 +223,7 @@
   // what is wrong with one named event on its own (its references aside)
   function namedOwn(e, eff) {
     if (!e || typeof e !== 'object' || typeof e.name !== 'string' || !e.name.trim()) return ['events.name'];
-    if (e.op === undefined) return check(e.cond, eff).length ? ['events.condition'] : [];
+    if (e.op === undefined) { const k = check(e.cond, eff); return k.includes('regime') ? ['events.regime'] : k.length ? ['events.condition'] : []; }
     if (!JOINS.includes(e.op)) return ['events.operator'];
     if (!Array.isArray(e.of) || !e.of.length || (e.op !== 'not' && e.of.length < 2)) return ['events.parts'];
     return e.of.every((n) => findNamed(eff, n)) ? [] : ['events.ref'];
@@ -284,8 +293,8 @@
 
   PumpIt.time = Object.assign(PumpIt.time || {}, {
     events: {
-      QUANTITIES, OPS, NUMERIC_OPS, STATE_OPS, STARTS, EVENTS, TABLES, JOINS, canDiffer, valueCat, needsEnd, fits, objectOf, check,
-      prepare, valueOf, holds, compare, checkNamed, namedOk, prepareNamed, initial, armed, after,
+      QUANTITIES, OPS, NUMERIC_OPS, STATE_OPS, STARTS, EVENTS, TABLES, JOINS, canDiffer, inRegime, valueCat, needsEnd, fits, objectOf, check,
+      prepare, valueOf, truth, holds, compare, checkNamed, namedOk, prepareNamed, initial, armed, after,
     },
   });
 })(typeof window !== 'undefined' ? window : globalThis);

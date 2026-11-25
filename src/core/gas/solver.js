@@ -50,6 +50,7 @@
       return 1e-6;
     };
     const C = new Map(live.map((l) => [l, Cof(l)]));
+    const col2 = (l) => (l.kind === 'pipe' && l.d && l.d.dz ? Math.exp(-2 * cx.g * l.d.dz / ZRT) : 1);
     const mref = new Map(live.map((l) => [l, sc.Mscale]));
     // links that impose a relation between the pressures of their nodes, linear in u: a ratio (u_b = r²·u_a), a set
     // pressure (u = set²) or a tie or set difference (u_a − u_b = 2·P̄·ΔP); their flows are unknowns of the system too
@@ -64,9 +65,9 @@
         const ia = col[l.a], ib = col[l.b];
         if (l.mode === 'fixedFlow') { if (ia >= 0) b[ia] -= l.value || 0; if (ib >= 0) b[ib] += l.value || 0; continue; }
         if (l.mode !== 'loss') continue;
-        const c = C.get(l) / mref.get(l);
-        if (ia >= 0) { A[ia * n + ia] += c; if (ib >= 0) A[ia * n + ib] -= c; else b[ia] += c * uOf(l.b); }
-        if (ib >= 0) { A[ib * n + ib] += c; if (ia >= 0) A[ib * n + ia] -= c; else b[ib] += c * uOf(l.a); }
+        const c = C.get(l) / mref.get(l), r2 = col2(l);
+        if (ia >= 0) { A[ia * n + ia] += c * r2; if (ib >= 0) A[ia * n + ib] -= c; else b[ia] += c * uOf(l.b); }
+        if (ib >= 0) { A[ib * n + ib] += c; if (ia >= 0) A[ib * n + ia] -= c * r2; else b[ib] += c * r2 * uOf(l.a); }
       }
       free.forEach((nd, i) => { if (nd.ext) b[i] += (nd.ext.m || 0) + (nd.ext.Q || 0) * sc.rho; });
       // rows of the relation links
@@ -78,6 +79,7 @@
         if (l.mode === 'ratio') { const g = l.initRatio > 0 ? l.initRatio : 1; put(l.b, 1); put(l.a, -g * g); }
         else if (l.mode === 'pDown') { put(l.b, 1); b[r] += l.value * l.value; }
         else if (l.mode === 'pUp') { put(l.a, 1); b[r] += l.value * l.value; }
+        else if (l.column) { put(l.b, 1); put(l.a, -l.column * l.column); }
         else { put(l.a, 1); put(l.b, -1); b[r] += 2 * sc.Pmean * (l.value || 0); }
         if (!A.subarray(r * n, r * n + n).some((v) => v !== 0)) { A[r * n + r] = 1; b[r] = 0; }
       });
@@ -89,7 +91,7 @@
       mrel = x.slice(nF);
       for (const l of live) {
         if (l.mode !== 'loss') continue;
-        const du = Math.abs(uOf(l.a) - uOf(l.b));
+        const du = Math.abs(col2(l) * uOf(l.a) - uOf(l.b));
         // the flows swing from one pass to the next: the average of the old and the new one damps them
         mref.set(l, Math.max((mref.get(l) + Math.sqrt(C.get(l) * du)) / 2, 1e-6 * sc.Mscale));
       }

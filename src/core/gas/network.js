@@ -124,8 +124,18 @@
         fm: fr.fm, eD: fr.eD, fx: fr.fx, dz: zbEff - zaEff, reLam: env.reLam, reTurb: env.reTurb, nSeg: 100,
       };
       const lk = { kind: 'pipe', pid: p.id, a: na.ix, b: nb.ix, mode: P.closed ? 'closed' : 'loss', fixedClosed: P.closed, rel: 'duct', d, P };
-      // a pipe without friction nor losses ties the pressures of its ends
-      if (!P.closed && d.fm === 'none' && !(d.K[0] > 0) && !(d.K[1] > 0) && na.pk === nb.pk) tie(lk);
+      // a pipe without friction nor losses at one elevation ties the pressures of its ends; a pipe whose losses may
+      // fall below the gravity of its gas or a velocity head between nodes of two kinds takes its flow as an unknown
+      if (!P.closed && !(P.L > 0)) { if (d.fm === 'none' && !(d.K[0] > 0) && !(d.K[1] > 0) && na.pk === nb.pk) tie(lk); }
+      else if (!P.closed) {
+        const Fmin = (fr.fm === 'none' ? 0 : fr.fm === 'explicit' ? fr.fx * P.L / P.Dh : Infinity) + Math.min(d.K[0], d.K[1]);
+        const crit = 4 * g * Math.abs(d.dz) / (cx.ZR * cx.T) + (na.pk !== nb.pk ? 1 : 0);
+        if (Fmin <= crit) {
+          lk.mode = 'dP'; lk.value = 0; lk.conScale = 'P'; lk.marched = true;
+          lk.column = Math.exp(-g * d.dz / (cx.ZR * cx.T));
+          lk.con = (m, na, nb) => { const s = PumpIt.gas.flow.pipeOut(cx, d, na, nb, m); return s ? s.Pb - nb.P : NaN; };
+        }
+      }
       links.push(lk);
       P.link = lk;
     }

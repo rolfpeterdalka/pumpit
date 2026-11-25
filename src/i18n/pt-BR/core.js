@@ -159,6 +159,7 @@ PumpIt.i18n.add('pt-BR', {
           parts: 'eventos do modelo: dois eventos ou mais para juntar (um ou mais no NÃO)',
           ref: 'eventos do modelo: eventos que existam',
           cycle: 'eventos do modelo: nenhum evento dentro dele mesmo',
+          regime: 'eventos do modelo: grandezas que existam para o fluido do modelo (um gás não tem linhas piezométrica e de energia nem superfície livre)',
         },
         data: {
           what: 'dados no tempo: uma grandeza que esta junção aceita no modo atual',
@@ -192,6 +193,7 @@ PumpIt.i18n.add('pt-BR', {
           sides: 'evento: uma diferença através de uma junção pede dois tubos ou mais',
           operator: 'evento: uma comparação que sirva para a grandeza',
           value: 'evento: o valor a comparar',
+          regime: 'evento: uma grandeza que exista para o fluido do modelo (um gás não tem linhas piezométrica e de energia nem superfície livre)',
         },
       },
       tank: {
@@ -384,7 +386,7 @@ PumpIt.i18n.add('pt-BR', {
         timeIgnored: '{objs}: o arquivo marca os dados no tempo como ignorados: eles vieram guardados, fora de uso.',
         timeSpecial: '{objs}: os dados no tempo têm a condição especial de código {code}, que não é conhecida; vieram em uso.',
         timeNotTank: '{objs}: um evento sobre o nível de {id}, que não é um tanque finito; confira o evento.',
-        timeGrade: '{objs}: um evento sobre uma linha piezométrica ou de energia, que o Pump It não dá para um gás, então ele nunca dispara; escolha outra grandeza.',
+        timeGrade: '{objs}: um evento sobre uma linha piezométrica ou de energia, que não existe para um gás; a lista de verificação o deixa pendente até que se escolha outra grandeza.',
         timeTemperature: '{objs}: uma segunda coluna da tabela, a temperatura do gás, que o modelo isotérmico não usa; ela foi deixada de fora.',
         timeGasColumn: '{objs}: uma segunda coluna da tabela, um coeficiente do gás (xT ou uma área sônica) que o Pump It não tem; ela foi deixada de fora.',
         timeLocalVolume: '{objs}: uma tabela de vazões de gás em "{unit}", um volume nas condições do tubo, que uma tabela não pode guardar (o Pump It usa massa ou volume normal); os dados no tempo da junção foram deixados de fora.',

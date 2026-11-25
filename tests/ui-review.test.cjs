@@ -13,7 +13,8 @@
 // (charts/time-chart.js), and a draft of a cell kept in the scenario it was typed in (num-cell.js), and the fixes of the
 // UX script of d5fa5e9: a model the browser does not keep (state.js), what the import report compared
 // (import-report.js), one colour for values that read the same (color-scales.js), keys that a control used
-// (keyboard.js) and the tools of a closed group in a narrow window (responsive.css). The interface files run on a small
+// (keyboard.js) and the tools of a closed group in a narrow window (responsive.css), and the quantities of a condition
+// that exist in the regime of the model (time/data-section.js, review of ab3e0d1). The interface files run on a small
 // stand-in of the DOM: only what these modules use of it.
 // Usage: node tests/ui-review.test.cjs
 const fs = require('fs');
@@ -41,8 +42,9 @@ class Node {
   remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
   querySelector(sel) {
     const m = /^\[id="(.+)"\]$/.exec(sel);
-    const tag = /^[a-z]+$/i.test(sel) ? sel.toUpperCase() : null; // a tag name, or an id
-    const walk = (n) => { for (const c of n.children) { if ((m && c.id === m[1]) || (tag && c.tagName === tag)) return c; const r = walk(c); if (r) return r; } return null; };
+    const tag = /^[a-z]+$/i.test(sel) ? sel.toUpperCase() : null; // a tag name, or an id, or a class
+    const cl = /^\.([\w-]+)$/.exec(sel);
+    const walk = (n) => { for (const c of n.children) { if ((m && c.id === m[1]) || (tag && c.tagName === tag) || (cl && String(c.className || '').split(' ').includes(cl[1]))) return c; const r = walk(c); if (r) return r; } return null; };
     return walk(this);
   }
   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
@@ -618,6 +620,23 @@ console.log('\nA restore, a conversion and a change of basis keep the physics');
   ok('M4 and back to absolute: 90 and 81', abs && abs[0].v.join() === '90,81', abs && abs[0].v.join());
   const stopped = Object.assign(M.clone(j2), { speed: 0 });
   ok('M4 a steady value of zero cannot be a basis: nothing is converted', UI.timeData.rebase(stopped, qt, absolute.tables, 'relative') === null);
+
+  // review of ab3e0d1: the quantities of a condition follow the regime; a stored one outside it shows as '—'
+  const find = (n, id) => (n.id === id ? n : n.children.reduce((o, c) => o || find(c, id), null));
+  const forms0 = UI.forms;
+  UI.forms = Object.assign({}, forms0, { unitOptions: () => '' });
+  const qSelect = (c) => { const box = UI.timeData.conditionBlock('tq', '', c, (n) => { changed.push(n); }); return find(box, 'tq-q'); };
+  const changed = [];
+  const html = (sel) => sel.html || sel.innerHTML || '';
+  app.model = P6.examples.get('air').build();
+  const gasSel = qSelect({ q: 'hgl', obj: 'p:1', end: 'in', op: '>', value: M.q(0, 'm') });
+  ok('ab3e0d1 a gas: no grade line, level or surface among the quantities; the stored grade line shows as —', gasSel && !/value="(hgl|egl|tankLevel|tankVolume|surfaceElev)"/.test(html(gasSel)) && /value="pStatic"/.test(html(gasSel)) && /<option value="" selected[^>]*>—/.test(html(gasSel)), gasSel ? html(gasSel).slice(0, 160) : 'no select');
+  gasSel.value = ''; (gasSel.listeners.change || []).forEach((fn) => fn());
+  ok('ab3e0d1 choosing — changes nothing', changed.length === 0);
+  app.model = P6.examples.get('pump').build();
+  const liqSel = qSelect({ q: 'hgl', obj: 'p:1', end: 'in', op: '>', value: M.q(0, 'm') });
+  ok('ab3e0d1 a liquid keeps every quantity, the grade line selected', liqSel && /value="hgl" selected/.test(html(liqSel)) && /value="tankLevel"/.test(html(liqSel)) && !/>—</.test(html(liqSel)));
+  UI.forms = forms0;
 }
 
 // ------------------------------------------------------------ an input that is not possible

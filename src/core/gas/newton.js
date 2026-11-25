@@ -95,6 +95,8 @@
       }
       for (const l of fix) mL[l.idx] = l.value;
       for (const l of con) mL[l.idx] = xv[l.ci];
+      // the state of a pipe whose flow is an unknown, marched from its end a (the Mach numbers at its ends for the junctions)
+      for (const l of con) if (l.marched) { const sm = Fw.pipeOut(cx, l.d, nodeOf(l.a, Pv), nodeOf(l.b, Pv), xv[l.ci]); st[l.idx] = sm ? { s: sm, dir: 1, G: sm.G, marched: true } : null; }
       for (const l of links) if (l.mode === 'closed' && l.idx >= 0) mL[l.idx] = 0;
       // balances
       for (const l of L) {

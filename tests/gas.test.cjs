@@ -625,5 +625,67 @@ console.log('\nReview of aca2807, case 9 in the compressible mode');
   ok('aca2807-9 a gas with inverted limits: the system is pending', !v.ok && v.items.find((i) => i.key === 'sys').detail.includes(PumpIt.i18n.t('core.checklist.fluid.reynolds')));
 }
 
+console.log('\nReview of ab3e0d1, bug 1: a gas pipe of no friction on a slope');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  // the case of the report: the source of example D, 500 m of pipe and an imposed demand at the elevation z
+  const run = (z, friction, Qkg, mode) => {
+    const m = PumpIt.examples.get('air').build();
+    m.system.gasMode = mode;
+    const source = Object.assign(m.junctions[2], { id: 1 });
+    const demand = Object.assign(M.newJunction('flow', 2, 0, 0), { elevation: q(z, 'm'), Q: q(Qkg, 'kg/s'), dir: 'out' });
+    m.junctions = [source, demand];
+    m.pipes = m.pipes.slice(0, 1);
+    Object.assign(m.pipes[0], { length: q(500, 'm'), friction });
+    const e = M.effective(m, 'base'), s = PumpIt.solver.run(e);
+    const conv = s.ok && !s.warnings.some((w) => /converge/i.test(w.text));
+    return { e, s, r: s.ok ? s.pipes[1] : null, ok: M.validate(e).ok && conv, zs: PumpIt.units.toSI(source.elevation.value, source.elevation.unit, 'length') };
+  };
+  const none = { model: 'frictionless' };
+  for (const mode of ['isothermal', 'adiabatic']) {
+    const h = run(0, none, 0.1, mode), up = run(500, none, 0.1, mode), dn = run(-500, none, 0.1, mode);
+    const all = h.ok && up.ok && dn.ok;
+    ok(`ab3e0d1-1 ${mode}: the three cases solve and converge`, all, all ? '' : [h, up, dn].map((o) => (o.s.errors || []).join('; ')).join(' | '));
+    if (!all) continue;
+    ok(`ab3e0d1-1 ${mode}: the imposed flow is honoured`, [h, up, dn].every((o) => Math.abs(o.r.m - 0.1) < 1e-9));
+    ok(`ab3e0d1-1 ${mode}: a horizontal pipe keeps its pressure`, near(h.r.Pout, h.r.Pin, 1e-9), `${h.r.Pin.toFixed(3)} → ${h.r.Pout.toFixed(3)} Pa`);
+    ok(`ab3e0d1-1 ${mode}: the pressure falls on the rise and grows on the descent`, up.r.Pout < h.r.Pout - 1e4 && dn.r.Pout > h.r.Pout + 1e4,
+      `rise ${up.r.Pout.toFixed(2)}, level ${h.r.Pout.toFixed(2)}, descent ${dn.r.Pout.toFixed(2)} Pa`);
+    // an independent isothermal column of gas at rest: P2/P1 = exp(−g·Δz/(Z·R·T)), with the absolute T and the specific R
+    const fl = PumpIt.fluids.evaluateGas(h.e.system), g = 9.80665 * (h.e.system.gravity || 1), R = 8314.462618 / fl.MW;
+    for (const z of [500, -500]) {
+      const lo = run(z, none, 1e-6, mode);
+      const col = Math.exp(-g * (z - lo.zs) / (fl.Z * R * fl.T));
+      ok(`ab3e0d1-1 ${mode}: at low flow P2/P1 = the gas column (z ${z} m)`, lo.ok && near(lo.r.Pout / lo.r.Pin, col, 1e-7), lo.ok ? `${(lo.r.Pout / lo.r.Pin).toFixed(10)} × ${col.toFixed(10)}` : (lo.s.errors || []).join('; '));
+    }
+    // continuity as the friction tends to zero, on the rise and on the descent
+    for (const [z, o0] of [[500, up], [-500, dn]]) {
+      const fs = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-9].map((f) => run(z, { model: 'explicitF', f }, 0.1, mode));
+      const gaps = fs.map((o) => (o.ok ? Math.abs(o.r.Pout - o0.r.Pout) : NaN));
+      ok(`ab3e0d1-1 ${mode}: the pressure is continuous as f → 0 (z ${z} m)`, gaps.every((d, i) => Number.isFinite(d) && (i === 0 || d < gaps[i - 1])) && gaps[gaps.length - 1] < 1e-3,
+        gaps.map((d) => d.toExponential(1)).join(' '));
+    }
+  }
+  // a compressor at a fixed ratio beside a pipe of no loss on a slope reads the Mach at the end of that pipe
+  for (const mode of ['isothermal', 'adiabatic']) {
+    const m = M.newModel();
+    Object.assign(m.system, { regime: 'compressible', gasMode: mode });
+    m.system.fluidGas = Object.assign(M.newGasFluid(), { gas: 'air', Z: 1, T: q(300, 'K') });
+    const J = (type, id, props) => m.junctions.push(Object.assign(M.newJunction(type, id, 0, 0), { elevation: q(0, 'm') }, props));
+    J('reservoir', 1, { surfP: q(1, 'bar(a)'), liquidElev: q(0, 'm') });
+    J('pump', 2, { mode: 'ratio', ratio: 2, state: 'on' });
+    J('pressure', 3, { P: q(1.5, 'bar(a)'), ptype: 'static', elevation: q(200, 'm') });
+    for (const [id, a, b, L, Dmm, friction] of [[1, 1, 2, 30, 100, { model: 'frictionless' }], [2, 2, 3, 300, 50, { model: 'explicitF', f: 0.02 }]]) {
+      const p = Object.assign(M.newPipe(id, a, b), { material: { kind: 'user', nps: '4', sch: '40' }, length: q(L, 'm'), friction });
+      p.geometry.d = q(Dmm, 'mm');
+      m.pipes.push(p);
+    }
+    m.junctions[0].elevation = q(-100, 'm');
+    const e = M.effective(m, 'base'), r = M.validate(e).ok ? PumpIt.solver.run(e) : { ok: false, errors: ['incomplete model'] };
+    ok(`ab3e0d1-1 ${mode}: a fixed-ratio compressor after a pipe of no loss keeps P0 out = 2·P0 in`, r.ok && r.pumps[2].m > 0 && near(r.junctions[2].P0out / r.junctions[2].P0in, 2, 1e-9),
+      r.ok ? `r = ${(r.junctions[2].P0out / r.junctions[2].P0in).toFixed(10)}, ṁ ${r.pumps[2].m.toFixed(4)} kg/s` : r.errors.join('; '));
+  }
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

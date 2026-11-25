@@ -1387,5 +1387,90 @@ console.log('\nReview of aca2807, case 12: an extrapolated opening within 0 to 1
   check('held: 90 % after 1 h', same(e, [60, 75, 90, 90, 90, 90, 90]) && same(g, e), e.join(' '));
 }
 
+console.log('\nReview of ab3e0d1, bug 2: negating a condition without a value');
+{
+  const t = PumpIt.i18n.t;
+  // the case of the report: example E (compressed air), J5 driven by a named event on a grade line of a pipe
+  function plant(trigger, qn) {
+    const m = PumpIt.examples.get('airPlant').build();
+    m.events = [
+      { name: 'Linha', cond: { q: qn, obj: 'p:1', end: 'in', op: '>', value: q(0, 'm') } },
+      { name: 'Inversa', op: 'not', of: ['Linha'] },
+    ];
+    m.junctions.find((j) => j.id === 5).time = {
+      use: true, what: 'Q', basis: 'absolute', start: 'combined', combined: trigger, when: [], repeat: false, interp: 'step',
+      tables: [{ t: [0, 1], v: [300, 300], tUnit: 'h', vUnit: 'Nm³/h' }],
+    };
+    Object.assign(m.solution.time, { on: true, start: q(0, 'h'), stop: q(1, 'h'), step: q(0.25, 'h') });
+    return m;
+  }
+  const regimeText = t('core.checklist.time.events.regime');
+  for (const qn of ['hgl', 'egl']) {
+    for (const trigger of ['Linha', 'Inversa']) {
+      const m = plant(trigger, qn), eff = M.effective(m, 'base'), v = M.validate(eff);
+      check(`${qn}, ${trigger}: the checklist refuses the event of a gas, with its own item`, !v.ok && TM.events.checkNamed(eff).includes('events.regime') && !TM.events.namedOk(eff, trigger) && JSON.stringify(v.items).includes(regimeText));
+      // a study saved before the review, opened again
+      const saved = JSON.parse(JSON.stringify(m));
+      M.migrate(saved);
+      check(`${qn}, ${trigger}: also in a saved study opened again`, !M.validate(M.effective(saved, 'base')).ok);
+    }
+    // a condition of the junction itself
+    const m = plant('Linha', qn), j5 = m.junctions.find((j) => j.id === 5);
+    Object.assign(j5.time, { start: 'single', when: [m.events[0].cond] });
+    const eff = M.effective(m, 'base');
+    check(`${qn}: a condition of a junction on it is refused too`, TM.events.check(m.events[0].cond, eff).join() === 'regime' && !M.validate(eff).ok && M.checkJunction(eff, eff.junctions.find((j) => j.id === 5)).includes(t('core.checklist.time.condition.regime')));
+  }
+  // run without the checklist, as the report did: the negation of a value that does not exist never fires
+  for (const trigger of ['Linha', 'Inversa']) {
+    const r = TM.run(M.effective(plant(trigger, 'hgl'), 'base'));
+    check(`the run of the report with "${trigger}": no table starts, J5 stays at 0.143585 kg/s`, r.ok && !r.stopped && !events(r, 'core.time.log.table.started').length && [...r.series.junctions[5].m].every((x) => near(x, 0.143585, 5e-7)), [...r.series.junctions[5].m].map(f6).join(' '));
+  }
+  // a liquid: a branch behind a valve closed by the model and opened by a table at 1 h; its pressure has no value
+  // while it is isolated. J5 doubles its demand by "not (the pressure of the branch at or above a limit)"
+  function branch(limit) {
+    const m = base();
+    junction(m, 'reservoir', 1, { elevation: q(0, 'm'), liquidElev: q(10, 'm'), surfP: q(0, 'kPa(g)') });
+    junction(m, 'valve', 2, { elevation: q(0, 'm'), lossModel: 'Cv', Cv: 100, closed: true, time: timeData('Cv', 'time', [], [table([0, 1], [0, 100], 'h', '')], { interp: 'step' }) });
+    junction(m, 'flow', 4, { elevation: q(0, 'm'), Q: q(0, 'm³/h'), dir: 'out' });
+    junction(m, 'flow', 5, { elevation: q(0, 'm'), Q: q(10, 'm³/h'), dir: 'out', time: timeData('Q', 'combined', [], [table([0], [20], 'h', 'm³/h')], { combined: 'notHigh', interp: 'step' }) });
+    pipe(m, 1, 1, 2, 10, 0.1, 0.02); pipe(m, 2, 2, 4, 10, 0.1, 0.02); pipe(m, 3, 1, 5, 10, 0.1, 0.02);
+    m.events = [{ name: 'high', cond: { q: 'pStatic', obj: 'p:2', end: 'out', op: '>=', value: q(limit, 'kPa(g)') } }, { name: 'notHigh', op: 'not', of: ['high'] }];
+    control(m, 2, 0.25, 'h');
+    return simulate(m);
+  }
+  const rb = branch(200), started = events(rb, 'core.time.log.table.started').map((e) => e.t);
+  check('an isolated pressure: its negation keeps the table off while it has no value', [0, 900, 1800, 2700].every((t) => Number.isNaN(at(rb, 'pipes', 2, 'Pout', t)) && near(at(rb, 'pipes', 3, 'Q', t), 10 / 3600, 1e-12)));
+  check('the pressure back below the limit: the same negation starts the table (3600 s)', started.join() === '3600' && near(at(rb, 'pipes', 3, 'Q', 4500), 20 / 3600, 1e-12), started.join());
+  const rh = branch(50);
+  check('the pressure back above the limit: the negation stays false', !events(rh, 'core.time.log.table.started').length);
+  // nested combinations, in three values: gone has no value, low and late as in "Combined events"
+  {
+    const m = t4();
+    m.events = [
+      { name: 'low', cond: { q: 'tankLevel', obj: 'j:3', op: '<=', value: q(2, 'm') } },
+      { name: 'late', cond: { q: 'time', op: '>=', value: q(2000, 's') } },
+      { name: 'gone', cond: { q: 'pStatic', obj: 'p:1', end: 'out', op: '>', value: q(0, 'kPa(g)') } },
+    ];
+    const eff = M.effective(m, 'base'), ctx = { patm: 101325, rho: 1000 };
+    const S = (tt, h) => ({ t: tt, ta: 0, sol: { pipes: {}, junctions: {}, pumps: {}, valves: {} }, model: eff, si: (x, c) => U.toSI(x.value, x.unit, c), tank: () => ({ h, zs: h, V: 8 * h }) });
+    const tv = (ev, st) => { const mm = M.clone(eff); mm.events = eff.events.concat(ev); return TM.events.truth(TM.events.prepareNamed(mm, ev[ev.length - 1].name, ctx), st); };
+    const E = (name, op, of) => ({ name, op, of });
+    const cases = [
+      ['not gone', [E('x', 'not', ['gone'])], S(0, 1), null],
+      ['gone and low (low false)', [E('x', 'and', ['gone', 'low'])], S(0, 3), false],
+      ['gone and low (low true)', [E('x', 'and', ['gone', 'low'])], S(0, 1), null],
+      ['gone or low (low true)', [E('x', 'or', ['gone', 'low'])], S(0, 1), true],
+      ['gone or low (low false)', [E('x', 'or', ['gone', 'low'])], S(0, 3), null],
+      ['not (gone and low), low false', [E('y', 'and', ['gone', 'low']), E('x', 'not', ['y'])], S(0, 3), true],
+      ['not (gone or low), low true', [E('y', 'or', ['gone', 'low']), E('x', 'not', ['y'])], S(0, 1), false],
+      ['not not gone', [E('y', 'not', ['gone']), E('x', 'not', ['y'])], S(0, 1), null],
+      ['(not low) and late, both true', [E('y', 'not', ['low']), E('x', 'and', ['y', 'late'])], S(2500, 3), true],
+      ['not (low or late), both false', [E('y', 'or', ['low', 'late']), E('x', 'not', ['y'])], S(0, 3), true],
+    ];
+    const bad = cases.filter(([, ev, st, want]) => tv(ev, st) !== want).map(([n, ev, st]) => n + ' → ' + tv(ev, st));
+    check('nested and, or and not in three values; only true holds', !bad.length, bad.join('; '));
+  }
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

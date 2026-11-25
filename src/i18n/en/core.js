@@ -160,6 +160,7 @@ PumpIt.i18n.add('en', {
           parts: 'events of the model: two events or more to join (one or more for not)',
           ref: 'events of the model: events that exist',
           cycle: 'events of the model: no event inside itself',
+          regime: 'events of the model: quantities that exist for the fluid of the model (a gas has no grade lines and no free surface)',
         },
         data: {
           what: 'time data: a quantity this junction takes in its current mode',
@@ -193,6 +194,7 @@ PumpIt.i18n.add('en', {
           sides: 'event: a difference across a junction with two pipes or more',
           operator: 'event: a comparison that fits the quantity',
           value: 'event: the value to compare with',
+          regime: 'event: a quantity that exists for the fluid of the model (a gas has no grade lines and no free surface)',
         },
       },
       tank: {
@@ -385,7 +387,7 @@ PumpIt.i18n.add('en', {
         timeIgnored: '{objs}: the file marks the time data as ignored: they came in kept, not in use.',
         timeSpecial: '{objs}: the time data have the special condition of code {code}, which is not known; they came in, in use.',
         timeNotTank: '{objs}: an event on the level of {id}, which is not a finite tank; check the event.',
-        timeGrade: '{objs}: an event on a grade line, which Pump It does not give for a gas, so it never fires; choose another quantity.',
+        timeGrade: '{objs}: an event on a grade line, which does not exist for a gas; the checklist keeps it pending until another quantity is chosen.',
         timeTemperature: '{objs}: a second column of the table, the temperature of the gas, which the isothermal model does not take; it was left out.',
         timeGasColumn: '{objs}: a second column of the table, a coefficient of the gas (xT or a sonic area) that Pump It does not have; it was left out.',
         timeLocalVolume: '{objs}: a table of flows of a gas in "{unit}", a volume at the conditions of the pipe, which a table cannot hold (Pump It takes a mass or a normal volume); the time data of the junction were left out.',

@@ -158,6 +158,7 @@ PumpIt.i18n.add('es', {
           parts: 'eventos del modelo: dos eventos o más para unir (uno o más en el NO)',
           ref: 'eventos del modelo: eventos que existan',
           cycle: 'eventos del modelo: ningún evento dentro de sí mismo',
+          regime: 'eventos del modelo: magnitudes que existan para el fluido del modelo (un gas no tiene líneas piezométrica y de energía ni superficie libre)',
         },
         data: {
           what: 'datos en el tiempo: una magnitud que esta unión acepta en su modo actual',
@@ -191,6 +192,7 @@ PumpIt.i18n.add('es', {
           sides: 'evento: una diferencia a través de una junta pide dos tuberías o más',
           operator: 'evento: una comparación que sirva para la magnitud',
           value: 'evento: el valor con el que comparar',
+          regime: 'evento: una magnitud que exista para el fluido del modelo (un gas no tiene líneas piezométrica y de energía ni superficie libre)',
         },
       },
       tank: {
@@ -383,7 +385,7 @@ PumpIt.i18n.add('es', {
         timeIgnored: '{objs}: el archivo marca los datos en el tiempo como ignorados: vinieron guardados, fuera de uso.',
         timeSpecial: '{objs}: los datos en el tiempo tienen la condición especial de código {code}, que no se conoce; vinieron en uso.',
         timeNotTank: '{objs}: un evento sobre el nivel de {id}, que no es un tanque finito; revise el evento.',
-        timeGrade: '{objs}: un evento sobre una línea piezométrica o de energía, que Pump It no da para un gas, así que nunca se dispara; elija otra magnitud.',
+        timeGrade: '{objs}: un evento sobre una línea piezométrica o de energía, que no existe para un gas; la lista de verificación lo deja pendiente hasta que se elija otra magnitud.',
         timeTemperature: '{objs}: una segunda columna de la tabla, la temperatura del gas, que el modelo isotérmico no usa; se dejó fuera.',
         timeGasColumn: '{objs}: una segunda columna de la tabla, un coeficiente del gas (xT o un área sónica) que Pump It no tiene; se dejó fuera.',
         timeLocalVolume: '{objs}: una tabla de caudales de gas en "{unit}", un volumen en las condiciones de la tubería, que una tabla no puede guardar (Pump It usa masa o volumen normal); los datos en el tiempo de la junta se dejaron fuera.',

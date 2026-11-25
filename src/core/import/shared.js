@@ -716,8 +716,8 @@
       else if (E.at === 'sides') Object.assign(c, { obj: 'j:' + ev.obj, end: 'in', obj2: 'j:' + ev.obj, end2: 'out' });
       // the order of a difference is not described: the first place less the second one
       if (c.obj2) later.push(() => note('assumed', 'timeDifference', obj));
-      // a gas has no grade lines in Pump It: such an event never fires
-      if (gas && (E.q === 'hgl' || E.q === 'egl')) later.push(() => note('assumed', 'timeGrade', obj));
+      // a gas has no grade lines: the checklist refuses such an event until the user chooses another quantity
+      if (gas && (E.q === 'hgl' || E.q === 'egl')) later.push(() => note('missing', 'timeGrade', obj));
       return Object.assign(c, { op, value });
     }
 

@@ -310,6 +310,28 @@
     return { m: slope * drive, choked: false, dir: 0, G: abs(drive) / tiny * r.G, s: r.s, dPa: wantDer ? slope * restB / na.P : 0, dPb: wantDer ? -slope : 0 };
   }
 
+  // a pipe whose flow m (a → b positive) is an unknown: the state at b, marched from a whatever the direction. Against
+  // the flow the losses change sign (the march runs from the outlet back to the inlet); the gas is at the T0 of the node
+  // it comes from, blended across a band of tiny flows so that the relation stays continuous through zero
+  function pipeOut(cx, d, na, nb, m, keep = false) {
+    const fwd = m >= 0, i = fwd ? 0 : 1, A = d.A[i] * d.N, D = d.D[i], G = abs(m) / A;
+    let T0 = fwd ? na.T0 : nb.T0;
+    if (!cx.iso && na.T0 !== nb.T0) {
+      const band = 1e-9 * A * na.P / sqrt(cx.ZR * na.T0);
+      const w = m >= band ? 1 : m <= -band ? 0 : (m + band) / (2 * band);
+      T0 = w * na.T0 + (1 - w) * nb.T0;
+    }
+    const Re = G * D / cx.mu;
+    // no flow, no loss (the factors of a laminar flow are not defined at zero)
+    const f = G > 0 && d.L > 0 ? friction(d, Re) : 0;
+    const K = G > 0 && d.K[i] > 0 ? d.K[i] * kFactor(d.lam[i], Re) : 0;
+    const s = inlet(cx, { P: na.P, pk: na.pk, T0 }, G);
+    if (!s) return null;
+    const r = march(cx, s.P1, s.T1, G, d.L, D, (fwd ? 1 : -1) * (f + K * D / d.L), d.dz, d.nSeg || 100, keep);
+    if (r.choked) return null;
+    return Object.assign({ G, f, Re, K, P2: r.P2, T2: r.T2, M2: r.M2, prof: r.prof, Pb: outEq(cx, r, nb.pk) }, s);
+  }
+
   // ------------------------------------------------------------------ nozzle
   // mass flow through an effective area CdA from the node `up` to an outside static pressure Pext (isentropic; the
   // node is taken as the stagnation state ahead of the nozzle). Negative when the outside pressure is the higher one.
@@ -325,6 +347,6 @@
   }
 
   Object.assign(PumpIt.gas, {
-    flow: { context, fac, machOf, rhoOf, p0Of, tempOf, inlet, isoClosed, fannoK, march, friction, kFactor, ductOut, outEq, restPressure, solveFlux, ductFlow, nozzleFlow },
+    flow: { context, fac, machOf, rhoOf, p0Of, tempOf, inlet, isoClosed, fannoK, march, friction, kFactor, ductOut, outEq, restPressure, solveFlux, ductFlow, pipeOut, nozzleFlow },
   });
 })(typeof window !== 'undefined' ? window : globalThis);

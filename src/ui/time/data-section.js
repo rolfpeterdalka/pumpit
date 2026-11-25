@@ -243,7 +243,9 @@
     };
     const objectsFor = (nq) => eff.pipes.map((p) => ['p:' + p.id]).concat(eff.junctions.map((j) => ['j:' + j.id]))
       .filter(([k]) => { const ob = E().objectOf(eff, k); return ob && E().fits(nq.at, ob); });
-    box.appendChild(lab(tx('cond.q'), select('q', Object.keys(Q).map((k) => [k, qLabel(k, eff)]), c.q, (v) => onChange(fresh(v)))));
+    // only the quantities of the regime of the model; a stored one outside it (a grade line of a gas) shows as '—'
+    const qs = Object.keys(Q).filter((k) => E().inRegime(k, eff)).map((k) => [k, qLabel(k, eff)]);
+    box.appendChild(lab(tx('cond.q'), select('q', (qs.some(([k]) => k === c.q) ? [] : [['', '—']]).concat(qs), qs.some(([k]) => k === c.q) ? c.q : '', (v) => { if (v) onChange(fresh(v)); })));
     if (q.at) {
       const obs = objects();
       box.appendChild(lab(tx('cond.obj'), select('obj', (obs.some(([k]) => k === c.obj) ? [] : [['', '—']]).concat(obs), c.obj || '', (v) => {
