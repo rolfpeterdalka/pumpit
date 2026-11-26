@@ -80,7 +80,24 @@ lang('pt-BR');
   const r = (s, o) => JSON.stringify(NC.read(s, o));
   ok('C1 an empty cell is refused', r('') === '{"error":"empty"}' && r('   ') === '{"error":"empty"}');
   ok('C1 a text that is not a number is refused', r('abc') === '{"error":"invalid"}' && r('4,5,6x') === '{"error":"invalid"}');
-  ok('C2 a decimal comma and a decimal point', NC.read('45,5').value === 45.5 && NC.read('45.5').value === 45.5 && NC.read('1.234,5').value === 1234.5);
+  ok('C2 the decimal comma of Portuguese, a point grouping the thousands', NC.read('45,5').value === 45.5 && NC.read('1.234,5').value === 1234.5 && NC.read('12.000').value === 12000);
+  ok('C2 a point anywhere else is not a number with a decimal comma (no guess)', r('45.5') === '{"error":"invalid"}' && r('12.00') === '{"error":"invalid"}' && r('1.5e3') === '{"error":"invalid"}');
+  // review of d05430d: the decimal mark of the Options menu, and the typographic minus of the exponent (TODO c)
+  const F = PumpIt.ui.format;
+  const nums = (list) => list.map((x) => F.parseNum(x)).join(' ');
+  ok('C2 every typographic minus sign is a minus sign: −1,0000e−5 reads back', F.parseNum('−1,0000e−5') === -1e-5 && F.parseNum(F.fmt(-1e-5, 5)) === -1e-5, F.fmt(-1e-5, 5));
+  ok('C2 the text of a table reads back to its number', F.parseNum(F.fmt(12000, 5)) === 12000 && F.parseNum(F.fixed(1234.5, 2)) === 1234.5, F.fmt(12000, 5));
+  F.setDecimal('.');
+  ok('C2 a decimal point chosen in Portuguese: 12,000 and 1.5, and 1,5 refused', nums(['12,000', '1.5', '1,234.5']) === '12000 1.5 1234.5' && Number.isNaN(F.parseNum('1,5')) && F.fmt(12000, 5) === '12,000' && F.fixed(1234.5, 1) === '1,234.5', F.fmt(12000, 5));
+  lang('en');
+  ok('C2 English keeps the chosen point', F.decimalSep() === '.' && F.fmt(1234.5, 5) === '1,234.5');
+  F.setDecimal(',');
+  ok('C2 a decimal comma chosen in English', F.fmt(1234.5, 5) === '1.234,5' && F.parseNum('1.234,5') === 1234.5 && Number.isNaN(F.parseNum('1.5')));
+  F.setDecimal(null);
+  ok('C2 without a choice, English has the point', F.decimalSep() === '.' && F.parseNum('1.5') === 1.5 && Number.isNaN(F.parseNum('1,5')));
+  lang('es');
+  ok('C2 and Spanish the comma', F.decimalSep() === ',' && F.parseNum('1,5') === 1.5);
+  lang('pt-BR');
   ok('C2 a zero typed is a number', NC.read('0').value === 0 && NC.read('0,0').value === 0);
   ok('C3 an empty cell that stands for a value (the bottom of a reservoir)', NC.read('', { empty: null }).value === null);
   const where = NC.where(NC.row(2), 'Altura', 'm');
@@ -119,7 +136,7 @@ console.log('\nThe cell keeps the value before');
   inp.value = '45,5'; inp.fire('change');
   ok('T6 a number is written once', commits.length === 1 && commits[0] === 45.5);
   inp = mk(46.5);
-  inp.value = '46.5'; inp.fire('change');
+  inp.value = '46,50'; inp.fire('change');
   ok('T6 the same number written another way writes nothing', commits.length === 1 && inp.value === '46,5');
   const z = []; const zc = NC.input({ id: 'tf-table-x-0', aria: 't', value: 5, errs: NC.errors(), where: 'w', onCommit: (n) => z.push(n) });
   zc.value = '0'; zc.fire('change');
@@ -171,7 +188,10 @@ console.log('\nA paste checks every line first');
   r = P('0;0,5\n8;');
   ok('P8 semicolons keep an empty cell too', r.error && r.error.line === 2 && r.error.col === 1);
   ok('P9 numbers between spaces', cols(P('0 0,5\n8   0,8')) === '[[0,8],[0.5,0.8]]');
-  ok('P9 a comma between numbers with a point', cols(P('0,0.5\n8,0.8')) === '[[0,8],[0.5,0.8]]');
+  ok('P9 a comma between numbers with a point is refused with a decimal comma', P('0,0.5\n8,0.8').error && P('0,0.5\n8,0.8').error.kind === 'invalid');
+  PumpIt.ui.format.setDecimal('.');
+  ok('P9 … and read with a decimal point', cols(P('0,0.5\n8,0.8')) === '[[0,8],[0.5,0.8]]');
+  PumpIt.ui.format.setDecimal(null);
   r = P('0 0,5\n8');
   ok('P9 a line short of a number, between spaces', r.error && r.error.line === 2 && r.error.col === 1);
   ok('P10 blank lines in the middle are skipped, and the lines keep their numbers', P('0\t1\n\n2\tx').error.line === 3);
@@ -575,6 +595,42 @@ console.log('\nA restore, a conversion and a change of basis keep the physics');
   app.setVal('p:1', 'material.nps', '2');
   app.clearOv('p:1', 'material.nps');
   ok('M1 a change of the child on its own stays', own() === 'p:1|length' && pipe().length.value === 30 && near(dmm(), 154.05), own());
+
+  // review of d05430d, item 14: P3 of the pump example (NPS 5 Sch 40). A child picks Sch 80, then the base goes to
+  // NPS 10: the child calculates NPS 10 Sch 80 (242.87 mm), as the same pipe chosen in one scenario does
+  {
+    fresh('base');
+    const child = M.addScenario(app.model, 'base', 'child').id;
+    const grand = M.addScenario(app.model, child, 'grandchild').id;
+    const p3 = (sid) => M.getObj(M.effective(app.model, sid), 'p:3');
+    const q3 = (m, sid) => P6.solver.run(M.effective(m, sid)).pipes[3].Q * 1000;
+    app.model.scenarios.current = child;
+    app.setVal('p:3', 'material.sch', '80');
+    ok('M14 Sch 80 in the child: 122.25 mm and 29.0063 L/s', p3(child).geometry.d.value === 122.25 && near(q3(app.model, child), 29.0063, 1e-5), String(q3(app.model, child)));
+    app.model.scenarios.current = 'base';
+    app.setVal('p:3', 'material.nps', '10');
+    const ctl = P6.examples.get('pump').build();
+    // the control: NPS 10 Sch 80 typed in a single scenario (the bore of the catalogue, P-05)
+    Object.assign(M.getObj(ctl, 'p:3'), { material: { kind: 'steel', nps: '10', sch: '80' }, geometry: { kind: 'circular', d: M.q(+P6.data.pipeDims({ kind: 'steel', nps: '10', sch: '80' }).id.toFixed(2), 'mm') } });
+    const direct = q3(ctl, 'base');
+    const saved = JSON.parse(JSON.stringify(app.model));
+    ok('M14 NPS 10 in the base: the child calculates NPS 10 Sch 80, 242.87 mm and 43.0443 L/s, as the direct choice',
+      p3(child).material.nps === '10' && p3(child).material.sch === '80' && p3(child).geometry.d.value === 242.87 && near(q3(app.model, child), direct, 1e-12) && near(direct, 43.0443, 1e-5),
+      `${p3(child).geometry.d.value} mm ${q3(app.model, child)}`);
+    ok('M14 … and so does the scenario below it, which inherits from the child', p3(grand).geometry.d.value === 242.87);
+    ok('M14 the base keeps Sch 40: 254.51 mm and 43.2264 L/s', p3('base').material.sch === '40' && p3('base').geometry.d.value === 254.51 && near(q3(app.model, 'base'), 43.2264, 1e-5));
+    ok('M14 saved and opened again: the same pair in the child', M.getObj(M.effective(saved, child), 'p:3').geometry.d.value === 242.87 && near(q3(saved, child), direct, 1e-12));
+    app.undo();
+    ok('M14 one undo brings back NPS 5 in both (122.25 mm in the child)', p3('base').material.nps === '5' && p3(child).geometry.d.value === 122.25);
+    app.redo();
+    // a child with a user-defined material keeps its geometry
+    app.model.scenarios.current = child;
+    app.setVal('p:3', 'material.kind', 'user');
+    app.setVal('p:3', 'geometry.d', { value: 50, unit: 'mm' });
+    app.model.scenarios.current = 'base';
+    app.setVal('p:3', 'material.nps', '8');
+    ok('M14 a child with a user-defined material keeps its own 50 mm', p3(child).material.kind === 'user' && p3(child).geometry.d.value === 50);
+  }
 
   // item 2: the ambient pressure converted to a gauge unit keeps its value
   fresh('base');
@@ -1623,6 +1679,83 @@ console.log('\nReview of 6043c80: the cells of the fittings and a friction model
   err = '';
   try { app.replaceModel(JSON.parse(text((m) => { m.junctions.push(Object.assign(JSON.parse(JSON.stringify(m.junctions[0])), { id: m.junctions[2].id })); })), { fit: false }); } catch (e) { err = e.message; }
   ok('319654f-4 a file with a junction id twice is refused, naming it', err.includes(P.i18n.t('core.model.duplicate.junction', { id: 3 })) && JSON.stringify(app.model) === kept, err);
+}
+
+console.log('\nReview of d05430d: a point added to a curve, the count of fittings and the chart of a stopped pump');
+{
+  const cb = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P = cb.PumpIt, UI = P.ui, M = P.model;
+  P.i18n.setLanguage('pt-BR');
+  const app = P.app || (P.app = {});
+  const run = (file) => vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), cb, { filename: file });
+  UI.forms = { el: UI.dom.el, section: () => new Node('div'), hint: (h) => { const n = new Node('p'); n.html = h; return n; }, remember() {}, unitOptions: () => '' };
+  run('src/ui/inspector/curve-editor.js');
+  const find = (n, id) => { if (n.id === id) return n; for (const c of n.children || []) { const r = find(c, id); if (r) return r; } return null; };
+  const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+  let curve = null;
+  app.getVal = () => curve;
+  app.setVal = (k, pth, v) => { curve = v; };
+  const editor = () => UI.curveEditor.build('j:2', 'curve', 'Altura', { xCat: 'volFlow', yCat: 'head', yName: 'Altura' });
+  const addPoint = (box) => all(box).find((n) => n.tagName === 'BUTTON' && n.html === P.i18n.t('inspector.curve.addPoint')).fire('click');
+  // item 15: a flow of 0.0002 m³/s, then a point added: a quarter above, not 0
+  curve = { x: [0, 0.0002], y: [30, 25], xUnit: 'm³/s', yUnit: 'm', fit: '2' };
+  addPoint(editor());
+  ok('15 a point added after 0.0002 m³/s is at 0.00025 m³/s (it was 0, the flow of the first point)', curve.x[2] === 0.00025 && curve.y[2] === 25, JSON.stringify(curve.x));
+  addPoint(editor());
+  ok('15 ... and the next at 0.0003125 (four significant digits)', curve.x[3] === 0.0003125, JSON.stringify(curve.x));
+  curve = { x: [0, 120, 60], y: [30, 20, 26], xUnit: 'm³/h', yUnit: 'm', fit: '2' };
+  addPoint(editor());
+  ok('15 the point added goes above the highest flow, not the last row, with the head of that point', curve.x[3] === 150 && curve.y[3] === 20, JSON.stringify(curve.x));
+  curve = { x: [], y: [], xUnit: 'm³/h', yUnit: 'm', fit: '2' };
+  addPoint(editor());
+  ok('15 the first point is at zero flow', curve.x.length === 1 && curve.x[0] === 0);
+  // a flow that another point has: the row is marked, and a typed one is not taken
+  curve = { x: [0, 50, 50], y: [30, 26, 25], xUnit: 'm³/h', yUnit: 'm', fit: '2' };
+  let box = editor();
+  const c1 = find(box, 'cv-j:2-curve-x-1'), c2 = find(box, 'cv-j:2-curve-x-2'), c0 = find(box, 'cv-j:2-curve-x-0');
+  const e2 = find(box, 'cv-j:2-curve-x-2-err');
+  ok('15 two points at 50 m³/h: both rows are marked, with the reason', c1.getAttribute('aria-invalid') === 'true' && c2.getAttribute('aria-invalid') === 'true' && !c0.hasAttribute('aria-invalid')
+    && e2 && e2.textContent.includes('outro ponto tem esta vazão') && e2.textContent.startsWith('Linha 3 · Vazão'), e2 && e2.textContent);
+  curve = { x: [0, 50, 100], y: [30, 26, 20], xUnit: 'm³/h', yUnit: 'm', fit: '2' };
+  const before = JSON.stringify(curve);
+  box = editor();
+  const c = find(box, 'cv-j:2-curve-x-2');
+  c.value = '50'; c.fire('change');
+  ok('15 a flow typed that another point has is not taken: the cell is marked', JSON.stringify(curve) === before && c.getAttribute('aria-invalid') === 'true');
+  c.value = '80'; c.fire('change');
+  ok('15 ... and another flow is', curve.x[2] === 80);
+  // TODO b: a fitting saved without a quantity counts one, as the core reads it
+  for (const f of ['src/ui/model-data/model-data.js', 'src/ui/network/info-card.js']) {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    ok(`TODO b ${f}: a fitting without a quantity counts one`, /f\.qty \?\? 1/.test(src) && !/f\.qty \|\| 0/.test(src));
+  }
+  // TODO d: the chart of a stopped pump
+  let drawn = null;
+  UI.lineChart = { lineChart: (o) => { drawn = o; return ''; } };
+  let m = null, res = null;
+  Object.assign(app, {
+    version: 1, prefs: {}, outUnit: (k, cat) => (cat === 'volFlow' ? 'm³/h' : 'm'), validation: () => ({ ok: true }),
+    timeRun: () => null, currentResults: () => res, scenario: () => ({ id: 'base', name: 'Base' }),
+    eff: () => M.effective(m, 'base'),
+  });
+  run('src/ui/charts/pump-chart.js');
+  const setUp = (fields) => { m = P.examples.get('pump').build(); Object.assign(m.junctions[1], fields); app.version++; res = P.solver.run(M.effective(m, 'base')); };
+  const draw = () => { drawn = null; const notes = new Node('p'); UI.pumpChart.render(new Node('div'), new Node('div'), notes); return { d: drawn, notes: notes.html || '' }; };
+  setUp({ state: 'offClosed', speed: 90 });
+  let r = draw();
+  ok('TODO d a stopped pump: its curve is the nominal one, as a reference, dashed and grey',
+    r.d.series[0].name === 'Curva nominal a 90% (só referência)' && r.d.series[0].dash && r.d.series[0].color === 'var(--ink-3)', r.d.series[0].name);
+  ok('TODO d ... its point is that of the stopped pump, at no flow', r.d.points.length === 1 && r.d.points[0].label.startsWith('Bomba parada: 0 m³/h') && !r.d.points[0].label.startsWith('Operação'), r.d.points[0] && r.d.points[0].label);
+  ok('TODO d ... and the note says it blocks the flow', r.notes.includes('está parada e bloqueia o escoamento'), r.notes);
+  setUp({ state: 'offOpen' });
+  r = draw();
+  ok('TODO d a stopped pump that lets the flow through says so', r.notes.includes('deixa o escoamento passar') && r.d.points[0].label.startsWith('Bomba parada'), r.notes);
+  setUp({ state: 'offClosed', mode: 'controlFlow', setQ: M.q(80, 'm³/h') });
+  r = draw();
+  ok('TODO d a stopped pump its control drives: the nominal curve at 100 %', r.d.series[0].name === 'Curva nominal a 100% (só referência)', r.d.series[0].name);
+  setUp({ state: 'on', speed: 90 });
+  r = draw();
+  ok('TODO d a running pump keeps its legend and point', r.d.series[0].name === 'Bomba a 90%' && r.d.points[0].label.startsWith('Operação') && !r.notes.includes('parada'), r.d.series[0].name);
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

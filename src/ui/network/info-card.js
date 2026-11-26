@@ -66,7 +66,7 @@
         add(tx('fittingsK'), F.fmt(r.K, 4));
         if (r.m < 0) add(tx('direction'), tx('reversed'));
       } else {
-        add(tx('fittings'), String((o.fittings || []).reduce((s, f) => s + (f.qty || 0), 0)));
+        add(tx('fittings'), String((o.fittings || []).reduce((s, f) => s + (f.qty ?? 1), 0)));
       }
       return { title, sub, rows };
     }

@@ -44,6 +44,9 @@
         const inp = NC.input({
           id: `cv-${key}-${path}-${sfx}-${i}`, aria, value: arr[i], errs,
           where: NC.where(NC.row(i + 1), x ? tx('flow') : o.yName, x ? F.unit(c.xUnit) : unitOf(c.yUnit)),
+          // two points at the same flow: the row is marked, and a flow typed that another point has is not taken
+          check: x ? (n) => (c.x.some((v, k) => k !== i && v === n) ? tx('duplicateFlow') : '') : undefined,
+          markStored: x,
           onCommit: (n) => { arr[i] = n; save(); },
         });
         const td = el('td'); td.appendChild(inp); return td;
@@ -59,9 +62,13 @@
     const row = el('div', { class: 'btn-row' });
     const add = el('button', { class: 'btn small', type: 'button' }, tx('addPoint'));
     add.addEventListener('click', () => {
+      // the next flow is a quarter above the highest one, to four significant digits in any unit (a fixed count of
+      // decimals turned a small flow into 0, the flow of another point), with the value of the point at that flow
       const n = c.x.length;
-      c.x.push(n ? +(c.x[n - 1] * 1.25 || 1).toFixed(3) : 0);
-      c.y.push(n ? c.y[n - 1] : 0);
+      const top = n ? Math.max(...c.x.filter(Number.isFinite)) : NaN;
+      const iTop = c.x.indexOf(top);
+      c.x.push(!n ? 0 : top > 0 ? +(top * 1.25).toPrecision(4) : 1);
+      c.y.push(n ? c.y[iTop >= 0 ? iTop : n - 1] : 0);
       save();
     });
     const fit = el('select', { id: `cv-fit-${key}-${path}`, 'aria-label': tx('fitType') },

@@ -86,11 +86,30 @@
       }
       return pairs;
     }
+    // A scenario below this one that takes the reference from it keeps each of its connections where it was: one whose
+    // connection would move (a value of its own in the old reference, or a level of its own) gets the value of its own
+    // in the new reference, from its own level (switchTo only sees the scenario that is open).
+    function switchKeeping(to) {
+      const def = PumpIt.junctionTypes.get(j.type);
+      const zAt = (jj, pid) => {
+        const z = def.pipeEndElevation(jj, jj.pipeK && jj.pipeK[pid], (x) => toM(x));
+        return z !== undefined ? z : fin(jj.elevation) ? toM(jj.elevation) : NaN;
+      };
+      const measure = (jj) => pipes.map((p) => zAt(jj, p.id));
+      const keep = (jj, i, z) => {
+        const pid = pipes[i].id, uu = (jj.liquidElev && jj.liquidElev.unit) || 'm';
+        if (jj.connBy !== 'depth') return [['pipeK.' + pid + '.elev', { value: inUnit(z, uu), unit: uu }]];
+        return fin(jj.liquidElev) ? [['pipeK.' + pid + '.depth', { value: inUnit(toM(jj.liquidElev) - z, uu), unit: uu }]] : [];
+      };
+      app.pushUndo();
+      M.setKeeping(app.model, app.model.scenarios.current, key, switchTo(to), measure, keep);
+      app.changed();
+    }
     const g = el('div', { class: 'seg', role: 'radiogroup', id: idOf(key, 'connBy'), 'aria-label': tx('connBy') });
     for (const [val, lab] of [['elevation', tx('byElevation')], ['depth', tx('byDepth')]]) {
       const on = (val === 'depth') === depth;
       const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: on ? 'on' : null }, F.esc(lab));
-      b.addEventListener('click', () => { if (!on) app.setVals(key, switchTo(val)); });
+      b.addEventListener('click', () => { if (!on) switchKeeping(val); });
       g.appendChild(b);
     }
     s.appendChild(wrap(key, 'connBy', tx('connBy'), g, { wide: true, info: tx(gas ? 'connHintGas' : 'connHint') }));

@@ -139,7 +139,7 @@
     },
 
     summary: (j, q) => {
-      const values = { speed: F.fmt(j.speed, 4), flow: q(j.mode === 'controlFlow' ? j.setQ : j.fixedFlow), pressure: q(j.setP), ratio: F.fmt(j.ratio, 4) };
+      const values = { speed: F.inputStr(j.speed), flow: q(j.mode === 'controlFlow' ? j.setQ : j.fixedFlow), pressure: q(j.setP), ratio: F.inputStr(j.ratio) };
       return tx('summary.' + j.mode, values) + (j.state !== 'on' ? tx('summary.off') : '');
     },
 

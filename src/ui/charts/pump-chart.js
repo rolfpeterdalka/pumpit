@@ -51,22 +51,34 @@
     const pr = res && res.ok && res.pumps[pid];
     const j = model.junctions.find((p) => p.id === pid);
     const controlled = CONTROLLED.includes(j.mode);
-    const speed = controlled ? (pr && Number.isFinite(pr.speed) ? pr.speed : NaN) : j.speed;
+    // a stopped pump (off, or a fixed flow of zero) has no speed and no operating point on its curve: its curve is drawn
+    // at the speed typed (100 % for one its control drives) as a reference, and its point is that of the stopped pump
+    const stopped = j.state !== 'on' || (j.mode === 'fixedFlow' && !(j.fixedFlow && j.fixedFlow.value > 0));
+    const checkShut = !stopped && pr && pr.checkClosed;
+    const speed = stopped ? (!controlled && j.speed > 0 ? j.speed : 100)
+      : controlled ? (pr && Number.isFinite(pr.speed) ? pr.speed : NaN) : j.speed;
     const d = curvesOf(model, pid, step, run, speed);
     if (!d || !d.sys.length) { box.innerHTML = `<div class="empty">${tx('failed')}</div>`; return; }
     const cq = (Q) => U.fromSI(Q, qu, 'volFlow'), ch = (h) => U.fromSI(h, hu, 'head');
-    const op = pr ? [{ x: cq(pr.Q), y: ch(pr.dH), color: 'var(--sel)', label: tx('operation', { q: F.fmt(cq(pr.Q), 4), qu: F.unit(qu), h: F.fmt(ch(pr.dH), 4), hu: F.unit(hu) }) }] : [];
+    const opKey = stopped ? 'operationStopped' : checkShut ? 'operationCheck' : 'operation';
+    const op = pr ? [{ x: cq(pr.Q), y: ch(pr.dH), color: stopped ? 'var(--ink-3)' : 'var(--sel)', label: tx(opKey, { q: F.fmt(cq(pr.Q), 4), qu: F.unit(qu), h: F.fmt(ch(pr.dH), 4), hu: F.unit(hu) }) }] : [];
+    const speedText = controlled && !stopped ? F.fmt(speed, 5) : F.inputStr(speed);
     box.innerHTML = lineChart({
       title: tx('title'), xLabel: tx('xLabel', { u: F.unit(qu) }), yLabel: tx('yLabel', { u: F.unit(hu) }), xMin: 0, yMin: 0,
       series: (d.pump.length ? [
-        { name: tx('pumpSeries', { speed: controlled ? F.fmt(speed, 5) : F.inputStr(speed) }) + (j.nPumps > 1 ? tx('parallel', { n: j.nPumps }) : ''), pts: d.pump.map(([q, h]) => [cq(q), ch(h)]), color: 'var(--accent)' },
+        stopped
+          ? { name: tx('pumpReference', { speed: speedText }) + (j.nPumps > 1 ? tx('parallel', { n: j.nPumps }) : ''), pts: d.pump.map(([q, h]) => [cq(q), ch(h)]), color: 'var(--ink-3)', dash: '3 4', width: 1.6 }
+          : { name: tx('pumpSeries', { speed: speedText }) + (j.nPumps > 1 ? tx('parallel', { n: j.nPumps }) : ''), pts: d.pump.map(([q, h]) => [cq(q), ch(h)]), color: 'var(--accent)' },
       ] : []).concat([
         { name: j.mode === 'fixedFlow' ? tx('systemRequired') : tx('system'), pts: d.sys.map(([q, h]) => [cq(q), ch(h)]), color: '#c0612b', dash: '7 5' },
       ]),
       points: op,
     });
     notes.innerHTML = tx('notes', { n: d.sys.length, name: F.esc(app.scenario().name) }) + (pr ? '' : tx('notesNoPoint'))
-      + (controlled && pr && !Number.isFinite(speed) ? tx('notesNoSpeed') : '');
+      + (controlled && pr && !Number.isFinite(speed) ? tx('notesNoSpeed') : '')
+      + (!stopped ? (checkShut ? tx('notesCheck') : '')
+        : j.mode === 'fixedFlow' ? tx('notesStoppedFixed')
+          : tx(j.state === 'offOpen' ? 'notesStoppedOpen' : 'notesStoppedClosed', { speed: speedText }));
   }
 
   PumpIt.ui.pumpChart = { render: pumpChart };

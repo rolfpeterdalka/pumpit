@@ -76,6 +76,11 @@
             <span class="theme-text">Switch to dark mode</span>
           </button>
           <div class="menu-sep"></div>
+          <!-- the decimal mark of the numbers shown and typed (src/ui/topbar/options.js), by default the language's -->
+          <div class="menu-label" data-i18n="app.menu.decimal">Decimal mark</div>
+          <button data-act="decimal" data-value="," aria-pressed="false" data-i18n="app.menu.decimalComma">Comma (1.234,5)</button>
+          <button data-act="decimal" data-value="." aria-pressed="false" data-i18n="app.menu.decimalPoint">Point (1,234.5)</button>
+          <div class="menu-sep"></div>
           <div class="menu-label" data-i18n="app.menu.grid3d">3D grid</div>
           <button data-act="grid-step" data-value="0.5" aria-pressed="false" title="Fine grid: 0.5 du" data-i18n="network.view3.density.fine" data-i18n-title="network.view3.densityTitle.fine">Fine</button>
           <button data-act="grid-step" data-value="1" aria-pressed="false" title="Medium grid: 1 du" data-i18n="network.view3.density.medium" data-i18n-title="network.view3.densityTitle.medium">Medium</button>
@@ -314,6 +319,14 @@
       <div class="modal-actions" id="modal-actions"></div>
     </div>
   </div>
+  <div class="modal-back tab-lock" id="tab-lock" hidden>
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="tab-lock-title" aria-describedby="tab-lock-text">
+      <h3 id="tab-lock-title"></h3>
+      <p id="tab-lock-text"></p>
+      <p class="muted" id="tab-lock-hint"></p>
+      <div class="modal-actions"><button type="button" class="btn primary" id="tab-lock-use"></button></div>
+    </div>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <input type="file" id="file-input" accept=".json,.fth,.aro,.imp,application/json" hidden>
 </div>
@@ -507,6 +520,7 @@
 <script src="src/ui/app/import-report.js" charset="utf-8"></script>
 <script src="src/ui/app/layout.js" charset="utf-8"></script>
 <script src="src/ui/app/keyboard.js" charset="utf-8"></script>
+<script src="src/ui/app/single-tab.js" charset="utf-8"></script>
 <!-- Top bar -->
 <script src="src/ui/topbar/shortcuts.js" charset="utf-8"></script>
 <script src="src/ui/topbar/menus.js" charset="utf-8"></script>

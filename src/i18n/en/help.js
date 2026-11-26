@@ -162,6 +162,7 @@ PumpIt.i18n.add('en', {
           saving: {
             title: 'Your work is saved',
             body: `<p>Every change is stored automatically in the browser: when you open Pump It again on the same computer and in the same browser, the last model comes back. If the browser refuses to keep it (no room left, or storage blocked), a warning beside the title says that the changes are only in this tab, with [[t:app.saving.download]] to keep them in a file; it goes away once the browser keeps the model again.</p>
+<p>Only one tab edits the study at a time, so that one tab never overwrites what another saved. A second tab opens locked; [[t:app.tabLock.use]] makes it the one that edits, with the study as last saved, and locks the other. A number typed in a field and not yet confirmed is kept when the page is reloaded or closed.</p>
 <p class="warn"><b>Note:</b> this automatic copy lives only in this browser, and clearing the browsing data erases it. To really keep your work, use [[t:app.menu.file]] → [[t:app.menu.save]] and keep the <code>.json</code> file.</p>
 <ul>
 <li><b>Undo and redo:</b> <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>, or the [[t:app.menu.edit]] menu. The app keeps the last 80 changes. Moving the camera of the 3D view does not enter the undo history.</li>
@@ -223,7 +224,7 @@ PumpIt.i18n.add('en', {
 <p>A pipe or a junction shows two tabs under its title: [[t:inspector.tabs.props]], with the fields above, the curves and whatever the object still lacks, and [[t:inspector.tabs.results]], with the main values of the last calculation (flow, pressures, the head of a pump). A newly selected object opens on [[t:inspector.tabs.props]]; while it stays selected, the tab you chose stays through every new calculation. The arrow keys move from one tab to the other.</p>
 <h4>Fields</h4>
 <ul>
-<li>Type the value and confirm with <kbd>Enter</kbd> or by leaving the field. A comma or a point works as the decimal separator.</li>
+<li>Type the value and confirm with <kbd>Enter</kbd> or by leaving the field. The decimal mark is the one chosen in [[t:app.menu.options]] → [[t:app.menu.decimal]]; the other mark is read only as the grouping of the thousands ("12.000" is twelve thousand with a decimal comma). A text that is not a number keeps the previous value, with a message.</li>
 <li>In a table of points (a curve, a table over time, the fittings of a pipe), a cell left empty or with a text that is not a number is marked in red, with a message under the table that tells the row, the quantity and the unit: the model keeps the value before, and nothing is calculated, until a number comes. <kbd>Esc</kbd> in the cell brings the value before back.</li>
 <li>Next to each quantity there is a list of units. <b>Changing the unit does not convert the number</b>: the value is read in the new unit. Pick the unit first and type the value in it. To convert a value already typed, use the button with two arrows next to the unit ([[t:inspector.fields.convert]]).</li>
 <li>In a child scenario, a coloured dot next to the label marks a value changed in this scenario. Click the dot to inherit the parent's value again.</li>
@@ -243,7 +244,7 @@ PumpIt.i18n.add('en', {
 <p>Pressure differences (pressure drop, set ΔP) carry neither (g) nor (a).</p>
 <h4>Units of the results</h4>
 <p>In the result tables and charts, every numeric column has its own list of units in the header. There, changing the unit <b>converts</b> the values shown, without recalculating, and the choice is remembered. The column window of the result tables ([[go:results.tables|Results tab]]) sets the unit of each column too, apart for liquids and gases.</p>
-<p>Numbers follow the language: decimal comma in Portuguese and Spanish, decimal point in English. When typing, either one is accepted.</p>`,
+<p>The decimal mark is a choice of [[t:app.menu.options]] → [[t:app.menu.decimal]]: a comma or a point. Without a choice it follows the language (a comma in Portuguese and Spanish, a point in English). The other mark groups the thousands, on screen and when typing. The values of [[t:app.tabs.data]] are shown as they are stored, without grouping, so that one can be typed again as it is.</p>`,
           },
         },
       },
@@ -373,7 +374,7 @@ PumpIt.i18n.add('en', {
 <li>[[t:junctions.reservoir.form.liquidElev]]: the elevation of the liquid surface, on the same datum as the bottom (not the height of liquid above the bottom).</li>
 <li>[[t:junctions.reservoir.form.surfP]]: 0 kgf/cm²(g) for an open tank; another value for a pressurised vessel.</li>
 <li>[[t:inspector.pipeLosses.title]]: the K leaving the tank into each pipe (a sharp-edged entrance, for instance, has 0.5), the K arriving from the pipe into the tank (an exit into the tank, 1.0) and where each pipe connects (blank means the bottom).</li>
-<li>[[t:inspector.pipeLosses.connBy]]: as an elevation, a connection stays where it is; as a depth below the liquid surface, it follows the surface when the level changes (in a scenario, for instance). Switching from one to the other keeps every connection where it is.</li>
+<li>[[t:inspector.pipeLosses.connBy]]: as an elevation, a connection stays where it is; as a depth below the liquid surface, it follows the surface when the level changes (in a scenario, for instance). Switching from one to the other keeps every connection where it is, in this scenario and in the scenarios below it.</li>
 </ul>
 <p>At the top of the data, a drawing of the tank cut through shows these elevations on one scale: the liquid level and the bottom on the left, the surface pressure above, and each pipe on the right wall where it connects, with its elevation, or with its depth as a dimension from the surface. The field being edited, or under the pointer, lights its part of the drawing.</p>
 <h4>How it is calculated</h4>
@@ -897,7 +898,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
             title: 'Language and numbers',
             body: `<p>The language selector, in the [[t:app.menu.options]] menu, switches the whole interface between <b>Português</b>, <b>English</b> and <b>Español</b>, without reloading the page: menus, panels, tables, charts, warnings and this help. The choice is remembered, and on the first visit the app follows the browser's language.</p>
 <ul>
-<li>Numbers follow the language (decimal comma or point); when typing, both work.</li>
+<li>Numbers follow the language (decimal comma or point), unless [[t:app.menu.options]] → [[t:app.menu.decimal]] chooses the other mark.</li>
 <li>The names you type — title, objects, scenarios — are never translated.</li>
 <li>An example not yet changed is rebuilt in the new language.</li>
 </ul>`,

@@ -262,6 +262,7 @@ PumpIt.i18n.add('pt-BR', {
       pointFlow: 'Vazão do ponto {n}',
       pointValue: '{name} do ponto {n}',
       removePoint: 'Remover ponto',
+      duplicateFlow: 'outro ponto tem esta vazão',
       addPoint: 'Adicionar ponto',
       fitType: 'Tipo de ajuste',
       poly: 'Polinômio de ordem {n}',

@@ -34,7 +34,7 @@
     const sid = app.model.scenarios.current;
     const before = key.startsWith('p:') && path.startsWith('material') ? M.getObj(M.effective(app.model, sid), key) : null;
     M.setField(app.model, sid, key, path, value);
-    if (before) fitPipe(sid, key, path, before);
+    if (before) { fitPipe(sid, key, path, before); fitBelow(sid, key); }
     app.changed();
   };
   // A pipe of a catalogue (src/core/data/pipe-library.js): its nominal size and series define the inner diameter. A new
@@ -72,6 +72,20 @@
     // the friction of the material field by field: a field equal to the parent's stays inherited
     if (newKind && !restore) for (const [f, v] of Object.entries(defaultFriction(mat.kind))) M.setField(app.model, sid, key, 'friction.' + f, v);
   }
+  // The scenarios below sid whose pipe holds a diameter of its own take the bore of the material they now see: a series
+  // chosen in a child stays and a size changed in its parent reaches it (decision P-09 of docs/pipe-library.md). The
+  // diameter field is disabled for a catalogue material, so that diameter is always the one the catalogue gave.
+  function fitBelow(sid, key) {
+    for (const d of M.descendants(app.model, sid)) {
+      if (!M.isOverridden(app.model, d, key, 'geometry.d') && !M.isOverridden(app.model, d, key, 'geometry')) continue;
+      const p = M.getObj(M.effective(app.model, d), key);
+      if (!p || !D.PIPE_KINDS.includes(p.material.kind)) continue;
+      const fit = D.fitMaterial(p.material);
+      for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && String(fit[f]) !== String(p.material[f])) M.setField(app.model, d, key, 'material.' + f, fit[f]);
+      const dims = D.pipeDims(fit);
+      if (dims) M.setField(app.model, d, key, 'geometry.d', { value: +dims.id.toFixed(2), unit: 'mm' });
+    }
+  }
   const defaultFriction = (kind) => ({ model: 'roughness', eps: { value: D.pipeEps(kind), unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
   // several fields of one object in a single step (one undo snapshot, one recalculation): [[path, value], ...]
   app.setVals = (key, pairs) => {
@@ -87,7 +101,7 @@
     const sid = app.model.scenarios.current;
     const before = key.startsWith('p:') && (path === 'material' || path.startsWith('material.')) ? M.getObj(M.effective(app.model, sid), key) : null;
     M.clearOverride(app.model, sid, key, path);
-    if (before) fitPipe(sid, key, path, before, true);
+    if (before) { fitPipe(sid, key, path, before, true); fitBelow(sid, key); }
     app.changed();
   };
 

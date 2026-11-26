@@ -277,7 +277,7 @@
       const v = c.value && typeof c.value === 'object' ? c.value : { value: NaN, unit: unitFor(vcat, 'absolute') };
       const inp = el('input', { type: 'text', inputmode: 'decimal', id: `${pfx}-v`, autocomplete: 'off' });
       inp.value = F.inputStr(v.value);
-      inp.addEventListener('change', () => { const n = F.parseNum(inp.value); onChange(Object.assign({}, c, { value: { value: Number.isFinite(n) ? n : null, unit: v.unit } })); });
+      inp.addEventListener('change', () => { if (PumpIt.ui.forms.badNumber(inp)) return; const n = F.parseNum(inp.value); onChange(Object.assign({}, c, { value: { value: Number.isFinite(n) ? n : null, unit: v.unit } })); });
       const f = lab(tx('cond.value'), inp);
       if (vcat !== 'none' && vcat !== 'percent') {
         const label = tx('cond.value');

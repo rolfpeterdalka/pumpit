@@ -73,7 +73,7 @@
   // a time of the water hammer on the screen: seconds with up to six significant digits ("2,35 s")
   function time(sec) {
     if (!Number.isFinite(sec)) return '—';
-    return `${(+sec.toPrecision(6)).toLocaleString(PumpIt.i18n.numberLocale(), { maximumFractionDigits: 6 }).replace('-', '−')} s`;
+    return `${PumpIt.ui.format.num(+sec.toPrecision(6), { maximumFractionDigits: 6 })} s`;
   }
 
   UI.surgeFormat = { time };

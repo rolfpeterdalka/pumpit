@@ -12,13 +12,15 @@
   const tx = (key, params) => t('modelData.' + key, params);
 
   // an input quantity as typed
-  function q(v) { return v && Number.isFinite(v.value) ? `${F.fmt(v.value, 5)} ${F.unit(v.unit)}` : '—'; }
+  // an input value as it is stored, with the decimal mark in use and without grouping: typed again into its field, it
+  // gives the same value (review of d05430d, item 13)
+  function q(v) { return v && Number.isFinite(v.value) ? `${F.inputStr(v.value)} ${F.unit(v.unit)}` : '—'; }
 
   function pipeSummary(p) {
     const g = p.geometry;
     const geo = g.kind === 'circular' ? `⌀ ${q(g.d)}` : g.kind === 'annulus' ? tx('annulus', { outer: q(g.dOuter), inner: q(g.dInner) }) : g.kind === 'rectangular' ? `${q(g.width)} × ${q(g.height)}` : `A ${q(g.area)}`;
     const f = p.friction && typeof p.friction === 'object' ? p.friction : {};
-    const fr = PumpIt.model.FRICTION_MODELS.includes(f.model) ? { roughness: `ε ${q(f.eps)}`, relRoughness: `ε/D ${F.fmt(f.rel, 3)}`, smooth: tx('smooth'), explicitF: `f ${F.fmt(f.f, 4)}`, hw: `HW C ${F.fmt(f.C, 4)}`, frictionless: tx('frictionless') }[f.model]
+    const fr = PumpIt.model.FRICTION_MODELS.includes(f.model) ? { roughness: `ε ${q(f.eps)}`, relRoughness: `ε/D ${F.inputStr(f.rel)}`, smooth: tx('smooth'), explicitF: `f ${F.inputStr(f.f)}`, hw: `HW C ${F.inputStr(f.C)}`, frictionless: tx('frictionless') }[f.model]
       : f.model === undefined || f.model === null || f.model === '' ? t('inspector.pipe.models.missing') : t('inspector.pipe.models.unknown', { model: String(f.model) });
     const L = UI.pipeLabels;
     return { geo, fr, mat: L.isCatalog(p.material) ? `${L.material(p.material.kind)} ${L.full(p.material)}` : tx('userMaterial') };
@@ -38,7 +40,7 @@
       const k = 'p:' + p.id, s = pipeSummary(p);
       return `<tr data-key="${k}"><td class="txt num">${F.objId('P' + p.id)}${und.has(k) ? ` <span class="pill crit">${tx('undefinedPipe')}</span>` : ''}</td><td class="txt${ov(k, 'name')}">${F.esc(p.name)}</td><td class="txt">${F.esc(UI.pipeLabels.ends(p))}</td>
         <td class="num${ov(k, 'length')}">${F.esc(q(p.length))}</td><td class="txt${ov(k, 'material')}">${F.esc(s.mat)}</td><td class="txt${ov(k, 'geometry')}">${F.esc(s.geo)}</td><td class="txt${ov(k, 'friction')}">${F.esc(s.fr)}</td>
-        <td class="num${ov(k, 'fittings')}">${(p.fittings || []).reduce((a, f) => a + (f.qty || 0), 0)}</td><td class="num${ov(k, 'nParallel')}">${p.nParallel}</td><td class="txt${ov(k, 'closed')}">${p.closed ? tx('closed') : ''}</td></tr>`;
+        <td class="num${ov(k, 'fittings')}">${(p.fittings || []).reduce((a, f) => a + (f.qty ?? 1), 0)}</td><td class="num${ov(k, 'nParallel')}">${p.nParallel}</td><td class="txt${ov(k, 'closed')}">${p.closed ? tx('closed') : ''}</td></tr>`;
     }).join('');
     const jRows = eff.junctions.map((j) => {
       const k = 'j:' + j.id;

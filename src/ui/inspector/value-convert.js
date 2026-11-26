@@ -35,7 +35,7 @@
   function show(v) {
     const a = Math.abs(v);
     if (a !== 0 && (a >= 1e9 || a < 1e-6)) return F.fmt(v, 8);
-    return v.toLocaleString(F.locale(), { maximumSignificantDigits: 8 }).replace('-', '−');
+    return F.num(v, { maximumSignificantDigits: 8 });
   }
 
   // why the conversion cannot be done, or '' when it can

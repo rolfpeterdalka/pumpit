@@ -28,6 +28,6 @@
       if (j.orModel === 'K') s.appendChild(f.num(key, 'K', tx('form.KField')));
     },
 
-    summary: (j, q) => (j.orModel === 'K' ? `K ${F.fmt(j.K, 4)}` : `⌀ ${q(j.dO)} · ${j.orModel === 'Cd' ? 'Cd ' + F.fmt(j.Cd, 3) : tx(j.orModel === 'sharp' ? 'summary.sharp' : 'summary.rounded')}`),
+    summary: (j, q) => (j.orModel === 'K' ? `K ${F.inputStr(j.K)}` : `⌀ ${q(j.dO)} · ${j.orModel === 'Cd' ? 'Cd ' + F.inputStr(j.Cd) : tx(j.orModel === 'sharp' ? 'summary.sharp' : 'summary.rounded')}`),
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -154,7 +154,7 @@
   function short(v) {
     if (!Number.isFinite(v) || v === 0 || Math.abs(v) >= 1e7 || Math.abs(v) < 1e-4) return F.fmt(v, 5);
     const dec = Math.max(0, Math.min(6, 4 - Math.floor(Math.log10(Math.abs(v)))));
-    return v.toLocaleString(PumpIt.i18n.numberLocale(), { maximumFractionDigits: dec }).replace('-', '−');
+    return PumpIt.ui.format.num(v, { maximumFractionDigits: dec });
   }
   function fmtEvent(v, cat) {
     const ctx = ctxOf();

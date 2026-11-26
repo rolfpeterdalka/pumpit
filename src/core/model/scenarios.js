@@ -148,6 +148,26 @@
     walk(sid);
     return out;
   }
+  // Fields set in a scenario while every descendant keeps what it sees: measure(obj) gives, for the object as a
+  // scenario sees it, the values that must not move (NaN where unknown); keep(obj, i, v) gives the [path, value] pairs
+  // that put value i back to v in a descendant whose value moved. A descendant that inherits everything follows the
+  // scenario as before, since its values move with it only when they were the scenario's own.
+  function setKeeping(m, sid, objKey, pairs, measure, keep) {
+    const desc = descendants(m, sid);
+    const seen = (id) => { const o = M.getObj(effective(m, id), objKey); return o ? measure(o) : []; };
+    const before = desc.map(seen);
+    for (const [path, v] of pairs) setField(m, sid, objKey, path, v);
+    desc.forEach((id, n) => {
+      const o = M.getObj(effective(m, id), objKey);
+      if (!o) return;
+      measure(o).forEach((v, i) => {
+        const was = before[n][i];
+        if (Number.isFinite(was) && !(Math.abs(v - was) <= 1e-9 * Math.max(1, Math.abs(was)))) {
+          for (const [path, value] of keep(o, i, was)) setField(m, id, objKey, path, value);
+        }
+      });
+    });
+  }
   function deleteScenario(m, sid) {
     const s = scen(m, sid);
     if (!s || !s.parent) return false;
@@ -159,6 +179,6 @@
 
   Object.assign(M, {
     chain, effective, effValue, setField, isOverridden, clearOverride, splitBlocksOnLoad, removeObjectOverrides,
-    addScenario, deleteScenario, descendants,
+    addScenario, deleteScenario, descendants, setKeeping,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

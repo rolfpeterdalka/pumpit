@@ -106,7 +106,7 @@
     const v = U.fromSI(sec, unit, 'time');
     if (!Number.isFinite(v) || v === 0) return F.fmt(v);
     const dec = Math.max(0, Math.min(6, 5 - Math.floor(Math.log10(Math.abs(v)))));
-    return v.toLocaleString(PumpIt.i18n.numberLocale(), { maximumFractionDigits: dec }).replace('-', '−');
+    return PumpIt.ui.format.num(v, { maximumFractionDigits: dec });
   }
   const inUnit = (sec, unit) => `${num(sec, unit)} ${F.unit(unit)}`;
   // the unit of time that reads best for a span (s, min, h or d)

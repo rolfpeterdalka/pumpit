@@ -1114,5 +1114,36 @@ console.log('\nReview of a952425, items 10 and 11 and the static pressure: contr
   }
 }
 
+console.log('\nScenarios that change a reservoir connection');
+{
+  // pump example, J4 bottom 22 m, level 25 m, P3 at 23 m in the base. c1 sets 40 m (free discharge), g1 below c1
+  // inherits it, c2 inherits everything, c3 has a level of its own (30 m). The base switches to depths, as the button
+  // of the inspector does: every scenario keeps its connection, flow and end pressure
+  const m = PumpIt.examples.get('pump').build();
+  M.setField(m, 'base', 'j:4', 'pipeK.3.elev', q(23, 'm'));
+  const c1 = M.addScenario(m, 'base', 'c1'), g1 = M.addScenario(m, c1.id, 'g1'), c2 = M.addScenario(m, 'base', 'c2'), c3 = M.addScenario(m, 'base', 'c3');
+  M.setField(m, c1.id, 'j:4', 'pipeK.3.elev', q(40, 'm'));
+  M.setField(m, c3.id, 'j:4', 'liquidElev', q(30, 'm'));
+  const toM = (x) => U.toSI(x.value, x.unit, 'length'), def = PumpIt.junctionTypes.get('reservoir');
+  const zAt = (jj) => { const z = def.pipeEndElevation(jj, jj.pipeK && jj.pipeK[3], toM); return z !== undefined ? z : toM(jj.elevation); };
+  const keep = (jj, i, z) => (jj.connBy !== 'depth' ? [['pipeK.3.elev', q(z, 'm')]] : [['pipeK.3.depth', q(toM(jj.liquidElev) - z, 'm')]]);
+  const look = (mm) => mm.scenarios.list.map((s) => { const e = M.effective(mm, s.id), r = S.run(e); return { z: zAt(M.getObj(e, 'j:4')), Q: r.pipes[3].Q, P: r.pipes[3].Pout, by: M.getObj(e, 'j:4').connBy }; });
+  const before = look(m);
+  M.setKeeping(m, 'base', 'j:4', [['connBy', 'depth'], ['pipeK.3.depth', q(2, 'm')]], (jj) => [zAt(jj)], keep);
+  const after = look(JSON.parse(JSON.stringify(m)));
+  const sameAll = before.every((b, i) => Math.abs(b.z - after[i].z) < 1e-12 && rel(after[i].Q, b.Q) < 1e-12 && rel(after[i].P, b.P) < 1e-12);
+  const i1 = m.scenarios.list.findIndex((s) => s.id === c1.id);
+  check('switching the base to depths keeps every scenario where it was (connection, flow, end pressure)', sameAll && after.every((a) => a.by === 'depth'),
+    after.map((a) => `${a.z}:${(a.Q * 1000).toFixed(4)}`).join(' '));
+  check('… the child with the free discharge keeps 40 m, 19.9124 L/s and the atmosphere at the end (101.325 kPa)',
+    after[i1].z === 40 && Math.abs(after[i1].Q * 1000 - 19.9124) < 1e-4 && rel(after[i1].P, 101325) < 1e-5, `${(after[i1].Q * 1000).toFixed(4)} L/s ${after[i1].P} Pa`);
+  const ov = (sid) => Object.keys(m.scenarios.list.find((s) => s.id === sid).overrides);
+  check('… only the scenarios whose connection would move get a value of their own (c1 and c3, not g1 nor c2)',
+    ov(c1.id).includes('j:4|pipeK.3.depth') && ov(c3.id).includes('j:4|pipeK.3.depth') && !ov(g1.id).length && !ov(c2.id).length);
+  // the inherited child follows the base afterwards
+  M.setField(m, 'base', 'j:4', 'pipeK.3.depth', q(1, 'm'));
+  check('… a child that inherits everything still follows the base (24 m)', zAt(M.getObj(M.effective(m, c2.id), 'j:4')) === 24);
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

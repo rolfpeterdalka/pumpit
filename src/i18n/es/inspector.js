@@ -262,6 +262,7 @@ PumpIt.i18n.add('es', {
       pointFlow: 'Caudal del punto {n}',
       pointValue: '{name} del punto {n}',
       removePoint: 'Quitar punto',
+      duplicateFlow: 'otro punto tiene este caudal',
       addPoint: 'Añadir punto',
       fitType: 'Tipo de ajuste',
       poly: 'Polinomio de orden {n}',

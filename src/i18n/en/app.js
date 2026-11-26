@@ -6,6 +6,15 @@ PumpIt.i18n.add('en', {
     welcome: 'Example loaded: pumping between tanks. The calculation runs again after every change.',
     exampleLoaded: 'Example loaded: {name}.',
     // a model the browser could not keep (src/ui/topbar/header.js)
+    numberInvalid: 'Not a number: "{text}". Decimal mark in use: {mark}; the other mark only groups the thousands (Options menu). The value was kept.',
+    tabLock: {
+      busyTitle: 'Pump It is already open in another tab',
+      busyText: 'Only one tab edits the study at a time, so that one tab never overwrites the work of the other. This tab is locked and saves nothing.',
+      lostTitle: 'Pump It was opened in another tab',
+      lostText: 'The other tab now edits the study. This tab is locked and saves nothing more; what was saved here stays in the study.',
+      use: 'Use here',
+      useHint: 'This tab opens the study as last saved and edits it; the other tab is locked.',
+    },
     saving: { short: 'Saving failed', failed: 'Saving failed. The changes are only in this tab.', download: 'Download a copy', again: 'The model is saved in the browser again.' },
     page: {
       description: 'Pipe network simulator, in steady state and over time, written as a clean-room implementation from public methods.',
@@ -23,6 +32,9 @@ PumpIt.i18n.add('en', {
       examples: 'Examples',
       options: 'Options',
       theme: 'Theme',
+      decimal: 'Decimal mark',
+      decimalComma: 'Comma (1.234,5)',
+      decimalPoint: 'Point (1,234.5)',
       grid3d: '3D grid',
       projection3d: '3D projection',
       viewCube: 'View cube',

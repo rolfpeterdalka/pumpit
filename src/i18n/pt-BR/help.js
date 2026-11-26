@@ -162,6 +162,7 @@ PumpIt.i18n.add('pt-BR', {
           saving: {
             title: 'Seu trabalho fica salvo',
             body: `<p>Cada alteração é gravada automaticamente no navegador: ao reabrir o Pump It no mesmo computador e no mesmo navegador, o último modelo volta à tela. Se o navegador se recusar a guardá-lo (sem espaço, ou com o armazenamento bloqueado), um aviso ao lado do título diz que as alterações estão só nesta aba, com [[t:app.saving.download]] para guardá-las num arquivo; ele some quando o navegador volta a guardar o modelo.</p>
+<p>Só uma aba edita o estudo por vez, para que uma aba nunca apague o que outra salvou. Uma segunda aba abre bloqueada; [[t:app.tabLock.use]] faz dela a aba que edita, com o estudo como foi salvo por último, e bloqueia a outra. Um número digitado num campo e ainda não confirmado é guardado quando a página é recarregada ou fechada.</p>
 <p class="warn"><b>Atenção:</b> essa cópia automática fica só neste navegador, e limpar os dados de navegação a apaga. Para guardar o trabalho de verdade, use [[t:app.menu.file]] → [[t:app.menu.save]] e guarde o arquivo <code>.json</code>.</p>
 <ul>
 <li><b>Desfazer e refazer:</b> <kbd>Ctrl</kbd>+<kbd>Z</kbd> e <kbd>Ctrl</kbd>+<kbd>Y</kbd>, ou o menu [[t:app.menu.edit]]. O app guarda as últimas 80 alterações. Mexer na câmera da vista 3D não entra no desfazer.</li>
@@ -223,7 +224,7 @@ PumpIt.i18n.add('pt-BR', {
 <p>Um tubo ou uma junção mostra duas abas sob o título: [[t:inspector.tabs.props]], com os campos acima, as curvas e o que ainda falta ao objeto, e [[t:inspector.tabs.results]], com os principais valores do último cálculo (vazão, pressões, a altura de uma bomba). Um objeto recém-selecionado abre em [[t:inspector.tabs.props]]; enquanto ele continua selecionado, a aba escolhida se mantém a cada novo cálculo. As setas do teclado passam de uma aba à outra.</p>
 <h4>Campos</h4>
 <ul>
-<li>Digite o valor e confirme com <kbd>Enter</kbd> ou saindo do campo. Vírgula ou ponto servem como separador decimal.</li>
+<li>Digite o valor e confirme com <kbd>Enter</kbd> ou saindo do campo. O separador decimal é o escolhido em [[t:app.menu.options]] → [[t:app.menu.decimal]]; o outro sinal só é lido como separador de milhar ("12.000" é doze mil com vírgula decimal). Um texto que não é número mantém o valor anterior, com uma mensagem.</li>
 <li>Numa tabela de pontos (uma curva, uma tabela no tempo, os acessórios de um tubo), uma célula deixada vazia ou com um texto que não é número fica marcada em vermelho, com uma mensagem sob a tabela que diz a linha, a grandeza e a unidade: o modelo mantém o valor anterior, e nada é calculado, até chegar um número. <kbd>Esc</kbd> na célula traz de volta o valor anterior.</li>
 <li>Ao lado de cada grandeza há uma lista de unidades. <b>Trocar a unidade não converte o número</b>: o valor passa a ser lido na nova unidade. Escolha a unidade primeiro e digite o valor nela. Para converter um valor já digitado, use o botão de duas setas ao lado da unidade ([[t:inspector.fields.convert]]).</li>
 <li>Num cenário filho, um ponto colorido ao lado do rótulo indica um valor alterado neste cenário. Clique no ponto para voltar a herdar o valor do pai.</li>
@@ -243,7 +244,7 @@ PumpIt.i18n.add('pt-BR', {
 <p>Diferenças de pressão (queda de pressão, ΔP de ajuste) não levam (g) nem (a).</p>
 <h4>Unidades dos resultados</h4>
 <p>Nas tabelas de resultados e nos gráficos, cada coluna numérica tem a própria lista de unidades no cabeçalho. Ali, trocar a unidade <b>converte</b> os valores mostrados, sem recalcular, e a escolha fica guardada para as próximas vezes. A janela de colunas das tabelas de resultados ([[go:results.tables|Aba Resultados]]) também escolhe a unidade de cada coluna, à parte para líquidos e gases.</p>
-<p>Os números seguem o idioma: vírgula decimal em português e espanhol, ponto em inglês. Ao digitar, qualquer um dos dois é aceito.</p>`,
+<p>O separador decimal é uma escolha de [[t:app.menu.options]] → [[t:app.menu.decimal]]: vírgula ou ponto. Sem escolha, ele segue o idioma (vírgula em português e espanhol, ponto em inglês). O outro sinal separa os milhares, na tela e ao digitar. Os valores de [[t:app.tabs.data]] aparecem como estão guardados, sem separador de milhar, para que possam ser digitados de novo como estão.</p>`,
           },
         },
       },
@@ -373,7 +374,7 @@ PumpIt.i18n.add('pt-BR', {
 <li>[[t:junctions.reservoir.form.liquidElev]]: a cota da superfície do líquido, na mesma referência do fundo (não a altura de líquido acima do fundo).</li>
 <li>[[t:junctions.reservoir.form.surfP]]: 0 kgf/cm²(g) para um tanque aberto; outro valor para um vaso pressurizado.</li>
 <li>[[t:inspector.pipeLosses.title]]: o K de saída do tanque para cada tubo (uma entrada de borda viva, por exemplo, tem 0,5), o K de chegada do tubo ao tanque (uma saída para o tanque, 1,0) e onde cada tubo se liga (em branco, o fundo).</li>
-<li>[[t:inspector.pipeLosses.connBy]]: por cota, a ligação fica onde está; por profundidade abaixo da superfície do líquido, ela acompanha a superfície quando o nível muda (num cenário, por exemplo). Trocar de uma para a outra mantém cada ligação onde está.</li>
+<li>[[t:inspector.pipeLosses.connBy]]: por cota, a ligação fica onde está; por profundidade abaixo da superfície do líquido, ela acompanha a superfície quando o nível muda (num cenário, por exemplo). Trocar de uma para a outra mantém cada ligação onde está, neste cenário e nos cenários abaixo dele.</li>
 </ul>
 <p>No alto dos dados, um desenho do tanque em corte mostra essas cotas numa mesma escala: o nível do líquido e o fundo à esquerda, a pressão na superfície em cima e cada tubo na parede da direita, onde se liga, com a sua cota, ou com a sua profundidade cotada a partir da superfície. O campo em edição, ou sob o ponteiro, acende a sua parte do desenho.</p>
 <h4>Como é calculado</h4>
@@ -897,7 +898,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
             title: 'Idioma e números',
             body: `<p>O seletor de idioma, no menu [[t:app.menu.options]], troca a interface inteira entre <b>Português</b>, <b>English</b> e <b>Español</b>, sem recarregar a página: menus, painéis, tabelas, gráficos, avisos e esta ajuda. A escolha fica guardada, e na primeira visita o app segue o idioma do navegador.</p>
 <ul>
-<li>Os números seguem o idioma (vírgula ou ponto decimal); ao digitar, os dois servem.</li>
+<li>Os números seguem o idioma (vírgula ou ponto decimal), a menos que [[t:app.menu.options]] → [[t:app.menu.decimal]] escolha o outro sinal.</li>
 <li>Os nomes digitados por você — título, objetos, cenários — nunca são traduzidos.</li>
 <li>Um exemplo ainda não alterado é refeito no novo idioma.</li>
 </ul>`,

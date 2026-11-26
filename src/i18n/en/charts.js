@@ -27,6 +27,13 @@ PumpIt.i18n.add('en', {
       notes: 'System curve obtained by running the solver with a fixed flow in the pump at {n} points (the rest of the model as it is in scenario {name}).',
       notesNoPoint: ' Run the model to mark the operating point.',
       notesNoSpeed: ' The control found no speed for its set point, so the pump curve is not drawn.',
+      operationStopped: 'Pump stopped: {q} {qu} · {h} {hu}',
+      operationCheck: 'Check valve closed: {q} {qu} · {h} {hu}',
+      pumpReference: 'Nominal curve at {speed}% (reference only)',
+      notesStoppedClosed: ' The pump is stopped and blocks the flow: its curve at {speed}% is drawn only as a reference, and the point is that of the stopped pump.',
+      notesStoppedOpen: ' The pump is stopped and lets the flow through: its curve at {speed}% is drawn only as a reference, and the point is that of the stopped pump.',
+      notesStoppedFixed: ' The pump is stopped (a fixed flow of zero): the point is that of the stopped pump.',
+      notesCheck: ' The check valve of the pump is closed: the pump runs against it without flow.',
     },
     profile: {
       needsTwo: 'Draw at least two junctions connected by pipes.',

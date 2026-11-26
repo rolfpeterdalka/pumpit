@@ -262,6 +262,7 @@ PumpIt.i18n.add('en', {
       pointFlow: 'Flow of point {n}',
       pointValue: '{name} of point {n}',
       removePoint: 'Remove point',
+      duplicateFlow: 'another point has this flow',
       addPoint: 'Add point',
       fitType: 'Fit type',
       poly: 'Polynomial of order {n}',

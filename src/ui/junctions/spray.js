@@ -34,7 +34,7 @@
       s.appendChild(f.qty(key, 'Pext', tx('form.Pext'), 'pressure'));
     },
 
-    summary: (j, q) => (j.sprayModel === 'K' ? `K ${q(j.Kf)}` : `Cd ${F.fmt(j.Cd, 3)} · ${j.nHoles} × ⌀ ${q(j.dHole)}`),
+    summary: (j, q) => (j.sprayModel === 'K' ? `K ${q(j.Kf)}` : `Cd ${F.inputStr(j.Cd)} · ${j.nHoles} × ⌀ ${q(j.dHole)}`),
 
     quickResults(row, r, c) {
       row(t('network.info.discharged'), c.out(r.Q, 'volFlow'));

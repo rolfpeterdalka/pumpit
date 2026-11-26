@@ -103,11 +103,12 @@
       id: id + '-u', disabled: opts.disabled,
     }, unitOptions(cat, v.unit));
     inp.addEventListener('change', () => {
+      if (badNumber(inp)) return;
       const n = F.parseNum(inp.value);
       app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value });
     });
     // the number in the field, which a click on the selector may have just confirmed
-    us.addEventListener('change', () => { const n = F.parseNum(inp.value); app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
+    us.addEventListener('change', () => { if (badNumber(inp)) { us.value = v.unit; return; } const n = F.parseNum(inp.value); app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
     return wrap(objKey, path, label, inp, Object.assign({}, opts, { after: unitCtl(objKey, path, label, cat, inp, us, opts.disabled) }));
   }
 
@@ -142,6 +143,17 @@
     return id;
   }
 
+  // A text typed in a number field that is not a number (one with the decimal mark not in use, as "1.5" with a decimal
+  // comma) changes nothing: the field keeps the text, is marked invalid and a message says which mark is in use. The
+  // model keeps its value, shown again when the field is drawn again. An empty field still clears the value.
+  function badNumber(inp) {
+    const text = String(inp.value).trim();
+    if (text === '' || Number.isFinite(F.parseNum(text))) { inp.removeAttribute('aria-invalid'); return false; }
+    inp.setAttribute('aria-invalid', 'true');
+    app.toast(t('app.numberInvalid', { text, mark: t(F.decimalSep() === ',' ? 'app.menu.decimalComma' : 'app.menu.decimalPoint') }));
+    return true;
+  }
+
   // plain number
   function num(objKey, path, label, opts = {}) {
     remember(objKey, path, { suffix: opts.suffix });
@@ -150,6 +162,7 @@
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
     inp.value = F.inputStr(v);
     inp.addEventListener('change', () => {
+      if (badNumber(inp)) return;
       let n = F.parseNum(inp.value);
       if (opts.int && Number.isFinite(n)) n = Math.round(n);
       app.setVal(objKey, path, Number.isFinite(n) ? n : null);
@@ -216,5 +229,5 @@
   // a line of text that stays in sight: a state (an isolated pipe, the fitted curve) or an error; notes go in info()
   function hint(t) { return el('p', { class: 'hint' }, t); }
 
-  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, unitCtl, unitTip, idOf, wrap, remember, describe };
+  PumpIt.ui.forms = { el, section, qty, num, sel, seg, chk, text, readout, hint, info, note, unitOptions, unitCtl, unitTip, idOf, badNumber, wrap, remember, describe };
 })(typeof window !== 'undefined' ? window : globalThis);

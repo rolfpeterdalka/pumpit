@@ -162,6 +162,7 @@ PumpIt.i18n.add('es', {
           saving: {
             title: 'Su trabajo queda guardado',
             body: `<p>Cada cambio se graba automáticamente en el navegador: al abrir de nuevo Pump It en la misma computadora y en el mismo navegador, el último modelo vuelve a la pantalla. Si el navegador se niega a guardarlo (sin espacio, o con el almacenamiento bloqueado), un aviso junto al título dice que los cambios están solo en esta pestaña, con [[t:app.saving.download]] para guardarlos en un archivo; desaparece cuando el navegador vuelve a guardar el modelo.</p>
+<p>Solo una pestaña edita el estudio a la vez, para que una pestaña nunca borre lo que otra guardó. Una segunda pestaña se abre bloqueada; [[t:app.tabLock.use]] la convierte en la pestaña que edita, con el estudio como se guardó por última vez, y bloquea la otra. Un número escrito en un campo y aún no confirmado se guarda cuando la página se recarga o se cierra.</p>
 <p class="warn"><b>Atención:</b> esa copia automática vive solo en este navegador, y borrar los datos de navegación la elimina. Para guardar el trabajo de verdad, use [[t:app.menu.file]] → [[t:app.menu.save]] y guarde el archivo <code>.json</code>.</p>
 <ul>
 <li><b>Deshacer y rehacer:</b> <kbd>Ctrl</kbd>+<kbd>Z</kbd> y <kbd>Ctrl</kbd>+<kbd>Y</kbd>, o el menú [[t:app.menu.edit]]. La aplicación guarda los últimos 80 cambios. Mover la cámara de la vista 3D no entra en el historial.</li>
@@ -223,7 +224,7 @@ PumpIt.i18n.add('es', {
 <p>Una tubería o una unión muestra dos pestañas bajo su título: [[t:inspector.tabs.props]], con los campos de arriba, las curvas y lo que aún le falta al objeto, y [[t:inspector.tabs.results]], con los valores principales del último cálculo (caudal, presiones, la altura de una bomba). Un objeto recién seleccionado se abre en [[t:inspector.tabs.props]]; mientras siga seleccionado, la pestaña elegida se mantiene en cada nuevo cálculo. Las flechas del teclado pasan de una pestaña a otra.</p>
 <h4>Campos</h4>
 <ul>
-<li>Escriba el valor y confirme con <kbd>Enter</kbd> o saliendo del campo. La coma o el punto sirven como separador decimal.</li>
+<li>Escriba el valor y confirme con <kbd>Enter</kbd> o saliendo del campo. El separador decimal es el elegido en [[t:app.menu.options]] → [[t:app.menu.decimal]]; el otro signo solo se lee como separador de miles ("12.000" es doce mil con coma decimal). Un texto que no es un número mantiene el valor anterior, con un mensaje.</li>
 <li>En una tabla de puntos (una curva, una tabla en el tiempo, los accesorios de una tubería), una celda dejada vacía o con un texto que no es un número queda marcada en rojo, con un mensaje bajo la tabla que indica la fila, la magnitud y la unidad: el modelo mantiene el valor anterior, y no se calcula nada, hasta que llega un número. <kbd>Esc</kbd> en la celda devuelve el valor anterior.</li>
 <li>Junto a cada magnitud hay una lista de unidades. <b>Cambiar la unidad no convierte el número</b>: el valor pasa a leerse en la nueva unidad. Elija primero la unidad y escriba el valor en ella. Para convertir un valor ya escrito, use el botón de dos flechas junto a la unidad ([[t:inspector.fields.convert]]).</li>
 <li>En un escenario hijo, un punto de color junto a la etiqueta indica un valor cambiado en este escenario. Haga clic en el punto para volver a heredar el valor del padre.</li>
@@ -243,7 +244,7 @@ PumpIt.i18n.add('es', {
 <p>Las diferencias de presión (caída de presión, ΔP de ajuste) no llevan (g) ni (a).</p>
 <h4>Unidades de los resultados</h4>
 <p>En las tablas de resultados y en los gráficos, cada columna numérica tiene su propia lista de unidades en el encabezado. Allí, cambiar la unidad <b>convierte</b> los valores mostrados, sin recalcular, y la elección queda guardada. La ventana de columnas de las tablas de resultados ([[go:results.tables|Pestaña Resultados]]) también elige la unidad de cada columna, aparte para líquidos y gases.</p>
-<p>Los números siguen el idioma: coma decimal en portugués y español, punto en inglés. Al escribir, se acepta cualquiera de los dos.</p>`,
+<p>El separador decimal es una elección de [[t:app.menu.options]] → [[t:app.menu.decimal]]: coma o punto. Sin elección, sigue el idioma (coma en portugués y español, punto en inglés). El otro signo separa los miles, en pantalla y al escribir. Los valores de [[t:app.tabs.data]] se muestran como están guardados, sin separador de miles, para que puedan escribirse de nuevo tal cual.</p>`,
           },
         },
       },
@@ -373,7 +374,7 @@ PumpIt.i18n.add('es', {
 <li>[[t:junctions.reservoir.form.liquidElev]]: la cota de la superficie del líquido, en la misma referencia que el fondo (no la altura de líquido sobre el fondo).</li>
 <li>[[t:junctions.reservoir.form.surfP]]: 0 kgf/cm²(g) para un tanque abierto; otro valor para un recipiente presurizado.</li>
 <li>[[t:inspector.pipeLosses.title]]: el K de salida del tanque hacia cada tubería (una entrada de borde vivo, por ejemplo, tiene 0,5), el K de llegada de la tubería al tanque (una salida al tanque, 1,0) y dónde se une cada tubería (en blanco, el fondo).</li>
-<li>[[t:inspector.pipeLosses.connBy]]: por cota, la conexión queda donde está; por profundidad bajo la superficie del líquido, acompaña la superficie cuando el nivel cambia (en un escenario, por ejemplo). Pasar de una a otra mantiene cada conexión donde está.</li>
+<li>[[t:inspector.pipeLosses.connBy]]: por cota, la conexión queda donde está; por profundidad bajo la superficie del líquido, acompaña la superficie cuando el nivel cambia (en un escenario, por ejemplo). Pasar de una a otra mantiene cada conexión donde está, en este escenario y en los escenarios debajo de él.</li>
 </ul>
 <p>En lo alto de los datos, un dibujo del tanque en corte muestra estas cotas en una misma escala: el nivel del líquido y el fondo a la izquierda, la presión en la superficie arriba y cada tubería en la pared derecha, donde se une, con su cota, o con su profundidad acotada desde la superficie. El campo en edición, o bajo el puntero, ilumina su parte del dibujo.</p>
 <h4>Cómo se calcula</h4>
@@ -897,7 +898,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
             title: 'Idioma y números',
             body: `<p>El selector de idioma, en el menú [[t:app.menu.options]], cambia toda la interfaz entre <b>Português</b>, <b>English</b> y <b>Español</b>, sin recargar la página: menús, paneles, tablas, gráficos, avisos y esta ayuda. La elección queda guardada, y en la primera visita la aplicación sigue el idioma del navegador.</p>
 <ul>
-<li>Los números siguen el idioma (coma o punto decimal); al escribir, los dos sirven.</li>
+<li>Los números siguen el idioma (coma o punto decimal), a menos que [[t:app.menu.options]] → [[t:app.menu.decimal]] elija el otro signo.</li>
 <li>Los nombres que usted escribe — título, objetos, escenarios — nunca se traducen.</li>
 <li>Un ejemplo todavía no modificado se rehace en el nuevo idioma.</li>
 </ul>`,

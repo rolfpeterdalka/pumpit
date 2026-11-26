@@ -23,6 +23,6 @@
       return [curveEditor(key, 'curve', tx('curves.loss'), { xCat: 'volFlow', yCat: 'dp', yName: 'ΔP', min: 2 })];
     },
 
-    summary: (j) => (j.genModel === 'K' ? `K ${F.fmt(j.K, 4)}` : tx('summary.curve', { n: j.curve.x.length })),
+    summary: (j) => (j.genModel === 'K' ? `K ${F.inputStr(j.K)}` : tx('summary.curve', { n: j.curve.x.length })),
   });
 })(typeof window !== 'undefined' ? window : globalThis);

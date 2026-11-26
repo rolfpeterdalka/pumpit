@@ -26,6 +26,13 @@ PumpIt.i18n.add('pt-BR', {
       notes: 'Curva do sistema obtida rodando o solver com vazão fixa na bomba em {n} pontos (o restante do modelo como está no cenário {name}).',
       notesNoPoint: ' Execute o modelo para marcar o ponto de operação.',
       notesNoSpeed: ' O controle não encontrou rotação para o ponto de ajuste, por isso a curva da bomba não é traçada.',
+      operationStopped: 'Bomba parada: {q} {qu} · {h} {hu}',
+      operationCheck: 'Válvula de retenção fechada: {q} {qu} · {h} {hu}',
+      pumpReference: 'Curva nominal a {speed}% (só referência)',
+      notesStoppedClosed: ' A bomba está parada e bloqueia o escoamento: a curva a {speed}% aparece só como referência, e o ponto é o da bomba parada.',
+      notesStoppedOpen: ' A bomba está parada e deixa o escoamento passar: a curva a {speed}% aparece só como referência, e o ponto é o da bomba parada.',
+      notesStoppedFixed: ' A bomba está parada (vazão fixa zero): o ponto é o da bomba parada.',
+      notesCheck: ' A válvula de retenção da bomba está fechada: a bomba gira contra ela, sem vazão.',
     },
     profile: {
       needsTwo: 'Desenhe pelo menos duas junções ligadas por tubos.',

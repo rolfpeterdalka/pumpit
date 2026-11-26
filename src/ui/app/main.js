@@ -28,13 +28,15 @@
     UI.tips.bind();
     UI.language.bind();
     UI.theme.bind();
+    // one tab edits the study at a time (single-tab.js)
+    UI.singleTab.start();
     // the model kept in the browser, or the first example when there is none or it no longer opens
     let m = app.storedModel();
     try { if (m) app.loadModel(m); } catch (e) { m = null; }
     if (!m) app.loadModel(PumpIt.examples.get('pump').build());
     if (!m) app.toast(PumpIt.i18n.t('app.welcome'));
-    // the guided tour, offered once
-    setTimeout(() => UI.tour.offer(), 600);
+    // the guided tour, offered once, and not in a tab that another one locks (its answer comes within 700 ms)
+    setTimeout(() => { if (!UI.singleTab.state()) UI.tour.offer(); }, 800);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
