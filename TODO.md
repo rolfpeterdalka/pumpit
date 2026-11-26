@@ -30,5 +30,4 @@
 
 ## Calculation (from the review of 319654f)
 
-- [ ] Laminar flow in a rectangular duct: the friction is 64/Re on the hydraulic diameter, while f·Re goes from about 57 (a square) to 96 (flat plates). Use the factor of the aspect ratio (Shah and London), as the annulus does now. Four imported models have rectangular pipes; check them against their reference results first.
 - [ ] Pump: an efficiency curve that cannot be fitted (for example, its points at one flow) stops the whole calculation. Leave the efficiency and the shaft power unknown with a warning, as the NPSH required curve does now; in the compressible mode the compressor needs a fallback for its discharge temperature.

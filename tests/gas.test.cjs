@@ -844,5 +844,168 @@ console.log('\nReview of 319654f, bugs 5 and 6: results of a gas that depend on 
     && Math.abs(X1.Qmax.v * 3600 - 1203.6649) < 1e-3 && X1.Qmax.end === 'out' && X1.Vmax.end === 'out', JSON.stringify(X1));
 }
 
+console.log('\nReview of a952425, items 1, 4 and 5: a rectangular duct, the Cd of a nozzle and the edge radius in the compressible mode');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q, H = PumpIt.hyd, Fw = PumpIt.gas.flow;
+  // item 1: the gas friction and the duct of a rectangular pipe carry the factor of its sides
+  const phi = H.rectLaminar(0.1), d = { fm: 'darcy', eD: 0, fx: 0, reLam: 2300, reTurb: 4000 };
+  ok('a952425-1 the gas friction of a rectangle 1:10 is phi·64/Re in laminar flow (f·Re 84.68)', Math.abs(Fw.friction(Object.assign({ phiLam: phi }, d), 1000) - phi * 0.064) < 1e-15 && Math.abs(64 * phi - 84.676) < 1e-3);
+  const m = PumpIt.examples.get('air').build();
+  m.pipes[0].geometry = { kind: 'rectangular', width: q(100, 'mm'), height: q(10, 'mm') };
+  const prep = PumpIt.gas.prepare(M.effective(m, 'base'));
+  const lk = prep && prep.links && prep.links.find((l) => l.kind === 'pipe' && l.pid === m.pipes[0].id);
+  ok('a952425-1 the duct of a rectangular pipe in a gas model carries its laminar factor', !!lk && Math.abs(lk.d.phiLam - phi) < 1e-12, JSON.stringify(lk && lk.d.phiLam));
+  // the air example with an orifice between pipe P1 and a new pipe to J2, or its end J3 as a nozzle
+  const look = (m) => {
+    const e = M.effective(m, 'base'), v = M.validate(e), s = PumpIt.solver.run(e);
+    const msgs = [...v.undef.values()].flat();
+    return { v, s, msgs, text: msgs.join(' | ') + ' || ' + (s.ok ? 'solved' : s.errors.join('; ')) };
+  };
+  const withOrifice = (rmm) => {
+    const m = PumpIt.examples.get('air').build();
+    const p = m.pipes[0], nx = M.clone(p);
+    m.junctions.push(Object.assign(M.newJunction('orifice', 9, 0, 0), { elevation: q(0, 'm'), orModel: 'rounded', dO: q(30, 'mm'), rEdge: q(rmm, 'mm') }));
+    Object.assign(nx, { id: 9, up: 9, down: p.down }); p.down = 9; m.pipes.push(nx);
+    return look(m);
+  };
+  const neg = withOrifice(-10), zero = withOrifice(0), pos = withOrifice(3);
+  ok('a952425-5 gas: a negative edge radius is refused by the checklist and by the solver (its choking area uses it too)',
+    !neg.v.ok && neg.msgs.includes(PumpIt.i18n.t('junctions.orifice.check.rEdge')) && !neg.s.ok && neg.s.errors[0] === PumpIt.i18n.t('junctions.orifice.error.rEdge', { id: 9 }), neg.text);
+  ok('a952425-5 gas: radii of 0 and 3 mm calculate', zero.v.ok && zero.s.ok && pos.v.ok && pos.s.ok, zero.text + ' ' + pos.text);
+  const nozzle = (Cd) => {
+    const m = PumpIt.examples.get('air').build();
+    const old = m.junctions.find((j) => j.id === 3);
+    m.junctions[m.junctions.indexOf(old)] = Object.assign(M.newJunction('spray', 3, old.x, old.y), { elevation: old.elevation, sprayModel: 'CdA', Cd, nHoles: 1, dHole: q(20, 'mm'), Pext: old.P });
+    return look(m);
+  };
+  const n62 = nozzle(62), n08 = nozzle(0.8);
+  ok('a952425-4 gas: a nozzle with Cd 62 is refused by the checklist and by the solver; Cd 0.8 calculates',
+    !n62.v.ok && n62.msgs.includes(PumpIt.i18n.t('junctions.spray.check.Cd')) && !n62.s.ok && /J3/.test(n62.s.errors[0]) && n08.v.ok && n08.s.ok, n62.text + ' ' + n08.text);
+}
+
+console.log('\nReview of a952425, items 2, 8 and 9 in the compressible mode: an exit valve drawn either way, a PDCV beyond what it passes fully open, a static pressure with an end K');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q, t = PumpIt.i18n.t, { KGF, fmtSI } = PumpIt.solver.util;
+  // item 2: J3 of the air example as an exit valve of K 5 at its old pressure, the pipe to it drawn towards it or from it,
+  // with a table that takes its K to 20 when its Cv reaches `limit`
+  const exitAt = (flip, limit, extra = {}) => {
+    const m = PumpIt.examples.get('air').build();
+    const old = m.junctions.find((j) => j.id === 3);
+    const v = Object.assign(M.newJunction('exitvalve', 3, old.x, old.y), { elevation: old.elevation, Pout: old.P, lossModel: 'K', K: 5 }, extra);
+    m.junctions[m.junctions.indexOf(old)] = v;
+    const p = m.pipes.find((x) => x.down === 3);
+    if (flip) [p.up, p.down] = [p.down, p.up];
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(60, 's'), step: q(30, 's') });
+    v.time = { use: true, what: 'K', basis: 'absolute', start: 'single', when: [{ q: 'cv', obj: 'j:3', op: '>=', value: q(limit, '') }], tables: [{ t: [0], v: [20], tUnit: 's', vUnit: '' }], interp: 'step', repeat: false };
+    return m;
+  };
+  const steady = (m) => PumpIt.solver.run(M.effective(m, 'base'));
+  const [a, b] = [false, true].map((flip) => steady(exitAt(flip, 140))).map((s) => s.ok && s.valves[3]);
+  ok('a952425-2 gas exit valve: the same K and Cv (129.774) whichever way its pipe is drawn (145.25 drawn from the valve before)',
+    !!a && !!b && Math.abs(a.Cv - 129.7741) < 1e-3 && Math.abs(b.Cv - a.Cv) < 1e-9 * a.Cv && Math.abs(b.K - a.K) < 1e-9 * a.K && Math.abs(b.m - a.m) < 1e-12, `${a && a.Cv} ${b && b.Cv}`);
+  const runs = (limit) => [false, true].map((flip) => PumpIt.time.run(M.effective(exitAt(flip, limit), 'base')));
+  const series = (r) => (r.ok ? [...r.series.valves[3].m] : []);
+  const started = (r) => (r.ok ? r.events.filter((e) => e.key === 'core.time.log.table.started').length : -1);
+  const r140 = runs(140), r120 = runs(120);
+  ok('a952425-2 gas exit valve over time: an event at a Cv of 140 fires in neither drawing, the discharge 0.81473 kg/s throughout',
+    r140.every((r) => started(r) === 0 && series(r).length === 3 && series(r).every((x) => Math.abs(x - 0.8147286) < 1e-6)), JSON.stringify(r140.map(series)));
+  ok('a952425-2 … at a Cv of 120 it fires once in each drawing, with the same discharge (0.81473, then 0.72627 kg/s)',
+    r120.every((r) => started(r) === 1) && series(r120[0]).length === 3 && series(r120[0]).every((x, i) => Math.abs(x - series(r120[1])[i]) < 1e-12)
+      && Math.abs(series(r120[0])[1] - 0.7262712) < 1e-6, JSON.stringify(r120.map(series)));
+  // closed, and at rest (J4 and its pipe removed, the residual pressure that of J1): no K nor Cv, in both drawings
+  const none = (s) => s.ok && s.valves[3].m === 0 && Number.isNaN(s.valves[3].K) && Number.isNaN(s.valves[3].Cv);
+  const closed = [false, true].map((flip) => steady(exitAt(flip, 140, { closed: true })));
+  const still = [false, true].map((flip) => {
+    const m = exitAt(flip, 140, { Pout: q(5, 'bar(g)') });
+    m.junctions = m.junctions.filter((j) => j.id !== 4); m.pipes = m.pipes.filter((p) => p.id !== 3);
+    return steady(m);
+  });
+  ok('a952425-2 a closed gas exit valve, and one without flow: no K nor Cv, in both drawings', closed.every(none) && still.every(none),
+    JSON.stringify(closed.concat(still).map((s) => s.ok && [s.valves[3].m, s.valves[3].K, s.valves[3].Cv])));
+  // an inflow (a residual pressure of 6 bar(g), above the network): the same end in both drawings, K about −5 as for a
+  // liquid, no Cv, and the warning
+  const inflow = [false, true].map((flip) => steady(exitAt(flip, 140, { Pout: q(6, 'bar(g)') })));
+  const [ia, ib] = inflow.map((s) => s.ok && s.valves[3]);
+  ok('a952425-2 an inflow through a gas exit valve: the same K (about −5) in both drawings, no Cv, and its warning',
+    !!ia && !!ib && ia.m < 0 && Math.abs(ia.K + 5) < 0.05 && Math.abs(ib.K - ia.K) < 1e-9 && Number.isNaN(ia.Cv) && Number.isNaN(ib.Cv)
+      && inflow.every((s) => s.warnings.some((w) => w.text === t('junctions.exitvalve.warn.inflow', { id: 3 }))), `${ia && ia.K} ${ib && ib.K}`);
+
+  // item 8: a PDCV between pipe P1 and a new pipe to J2 in the air example (as the valve of 319654f)
+  const pdcv = (setDP, kOpen, special = 'none') => {
+    const m = PumpIt.examples.get('air').build();
+    m.junctions.push(Object.assign(M.newJunction('control', 9, 0, 0), { elevation: q(0, 'm'), ctype: 'PDCV', setDP: q(setDP, 'kPa'), kOpen, alwaysControl: false, special }));
+    const p = m.pipes[0], next = M.clone(p);
+    p.down = 9; Object.assign(next, { id: 9, up: 9, down: 2 });
+    m.pipes.push(next);
+    return steady(m);
+  };
+  const head = t('junctions.control.warn.beyondOpen', { id: 9, open: '', dp: '' }).split(':')[0];
+  const beyond = (s) => s.ok && s.warnings.filter((w) => w.obj === 'j:9' && w.level === 'warning' && w.text.startsWith(head)).map((w) => w.text);
+  const p5 = pdcv(5, 5), p100 = pdcv(100, 5), pOpen = pdcv(5, 50, 'open'), pChoke = pdcv(5, 5000), p0 = pdcv(5, 0);
+  ok('a952425-8 gas PDCV: holding 5 kPa beyond what its fully open K of 5 passes, it keeps controlling and warns with the loss of the open valve',
+    p5.ok && p5.states[9] === 'control' && beyond(p5).length === 1 && /kgf\/cm², /.test(beyond(p5)[0]), (beyond(p5) || []).join(' | '));
+  ok('a952425-8 … with a set drop of 100 kPa, within what it passes, and forced fully open, no such warning',
+    p100.ok && p100.states[9] === 'control' && !beyond(p100).length && pOpen.ok && pOpen.states[9] === 'open' && !beyond(pOpen).length);
+  ok('a952425-8 … a fully open valve that would choke at the flow says so; a fully open K of 0 never warns',
+    pChoke.ok && beyond(pChoke).join() === t('junctions.control.warn.beyondChoke', { id: 9, dp: fmtSI(5e3 / KGF) }) && p0.ok && !beyond(p0).length, (beyond(pChoke) || []).join(' | '));
+
+  // item 9: J3 of the air example, a static pressure, with K in 4 at its pipe or none, in both models of the gas: the
+  // same flow and the end of the pipe at its pressure, the K left out with a caution; a stagnation pressure keeps its K
+  for (const mode of ['isothermal', 'adiabatic']) {
+    const at3 = (ptype, kIn) => {
+      const m = PumpIt.examples.get('air').build();
+      m.system.gasMode = mode;
+      Object.assign(m.junctions.find((j) => j.id === 3), { ptype, pipeK: { 2: { kIn, kOut: 0 } } });
+      return steady(m);
+    };
+    const caution = (s) => s.ok && s.warnings.some((w) => w.text === t('core.solver.endKLeftOut', { id: 3, pipe: 2 }));
+    const s4 = at3('static', 4), s0 = at3('static', 0), g4 = at3('stagnation', 4), g0 = at3('stagnation', 0);
+    // 2.5 bar(g) over the atmospheric pressure of the model
+    const P3 = s4.ok ? 2.5e5 + s4.patm : NaN;
+    ok(`a952425-9 gas (${mode}): a static pressure with K in 4 gives the flow without it, the end of the pipe at its 351.325 kPa(a), and a caution`,
+      s4.ok && s0.ok && Math.abs(s4.pipes[2].m - s0.pipes[2].m) < 1e-12 && Math.abs(s4.pipes[2].Pout - P3) < 1e-9 * P3 && caution(s4) && !caution(s0),
+      `${s4.ok && s4.pipes[2].m} ${s0.ok && s0.pipes[2].m}, ${s4.ok && s4.pipes[2].Pout} Pa(a)`);
+    ok(`a952425-9 gas (${mode}): a stagnation pressure keeps its K in 4 (a smaller flow), without the caution`,
+      g4.ok && g0.ok && g4.pipes[2].m < g0.pipes[2].m - 1e-3 && !caution(g4), `${g4.ok && g4.pipes[2].m} ${g0.ok && g0.pipes[2].m}`);
+  }
+}
+
+console.log('\nReview of a952425, items 10 and 11 in the compressible mode: an FCV closed by a failure, a PRV and a PSV against a reverse flow');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  // a control valve J9 between pipe P1 and a new pipe to J2 in the air example (fully open K 5), the surface pressure of
+  // J1 following the steps of vals (bar(g)), one every 30 s, the first that of the steady state
+  const net = (mode, props, vals) => {
+    const m = PumpIt.examples.get('air').build();
+    m.system.gasMode = mode;
+    m.junctions.push(Object.assign(M.newJunction('control', 9, 0, 0), { elevation: q(0, 'm'), setP: q(4.5, 'bar(g)'), setQ: q(1, 'kg/s'), basis: 'static', kOpen: 5, alwaysControl: false, failAction: 'closed', special: 'none' }, props));
+    const p = m.pipes[0], next = M.clone(p);
+    p.down = 9; Object.assign(next, { id: 9, up: 9, down: 2 });
+    m.pipes.push(next);
+    const j1 = m.junctions.find((j) => j.id === 1);
+    j1.surfP = q(vals[0], 'bar(g)');
+    j1.time = { use: true, what: 'surfP', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: vals.map((_, i) => 30 * i), v: vals, tUnit: 's', vUnit: 'bar(g)' }] };
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(30 * (vals.length - 1), 's'), step: q(30, 's') });
+    return PumpIt.time.run(M.effective(m, 'base'));
+  };
+  const series = (r) => (r.ok ? [...r.series.valves[9].m] : []);
+  const events = (r) => (r.ok ? r.events.filter((e) => e.obj === 'j:9').map((e) => e.t + ':' + e.key.split('.').pop()).join(' ') : '');
+  const show = (r) => (r.ok ? `${series(r).map((x) => x.toFixed(5)).join(', ')} kg/s; ${events(r)}` : r.errors.join('; '));
+  for (const mode of ['isothermal', 'adiabatic']) {
+    // an FCV of 1 kg/s cannot pass it from 3 bar(g), and can from 5 bar(g)
+    const f = net(mode, { ctype: 'FCV' }, [3, 5, 3, 5]), xs = series(f);
+    ok(`a952425-10 gas (${mode}): an FCV closed for lack of pressure controls again when the supply recovers, and closes again when it falls (0, 1, 0, 1 kg/s)`,
+      xs.length === 4 && xs[0] === 0 && xs[2] === 0 && Math.abs(xs[1] - 1) < 1e-9 && Math.abs(xs[3] - 1) < 1e-9 && events(f) === '30:control 60:closed 90:control', show(f));
+    // a PRV of 4.5 bar(g), fully open from 5 bar(g); at 1 bar(g) the flow would turn back from J3 and J4
+    const p = net(mode, { ctype: 'PRV' }, [5, 1, 5]), ys = series(p);
+    ok(`a952425-11 gas (${mode}): a fully open PRV closes against the reverse flow, and opens again when the supply is back`,
+      ys.length === 3 && ys[0] > 1.3 && ys[1] === 0 && Math.abs(ys[2] - ys[0]) < 1e-9 * ys[0] && events(p) === '30:closed 60:open', show(p));
+    const o = net(mode, { ctype: 'PRV', special: 'open' }, [5, 1]), zs = series(o);
+    ok(`a952425-11 gas (${mode}): forced fully open by its special condition, it lets the reverse flow through`, zs.length === 2 && zs[1] < -0.6, show(o));
+    const s = net(mode, { ctype: 'PSV', setP: q(1, 'bar(g)') }, [5, 1, 1]), ws = series(s);
+    ok(`a952425-11 gas (${mode}): a fully open PSV closes against a reverse flow too`, ws.length === 3 && ws[0] > 1.3 && ws[1] === 0 && ws[2] === 0 && events(s) === '30:closed', show(s));
+  }
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

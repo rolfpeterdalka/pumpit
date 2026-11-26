@@ -3,7 +3,8 @@
 //   repeated until the device states settle → postprocess (results.js)
 // Options (all optional): guess (mass flows to start from, by pipe and element), states (device states to start from),
 // dropUnsupplied (a part with an imposed flow and no pressure reference is left without flow instead of being an error:
-// the time simulation, docs/time-simulation.md)
+// the time simulation, docs/time-simulation.md), logsDry (the caller logs the pipes that a reservoir connection above
+// the liquid closes, as the time simulation does: no warning for them)
 (function (root) {
   const PumpIt = root.PumpIt;
   const S = PumpIt.solver;
@@ -77,8 +78,22 @@
     for (pass = 0; pass < 50; pass++) {
       S.configure(prep, st);
       const errs = S.analyze(prep, opts);
-      if (errs.length) return { ok: false, errors: errs, warnings: prep.warnings };
+      // a part left without a reference once a pipe could not draw through a dry connection: the solution asked for
+      // is impossible, and those pipes say why
+      if (errs.length) return { ok: false, errors: errs.concat(dryTexts(prep, st)), warnings: prep.warnings };
       seen.add(JSON.stringify(st));
+      // a static imposed pressure with the flow coming out of its pipe: P − ½ρV² = value has a second root, the flow
+      // driven the other way by the velocity head itself, where the friction and the K of the pipe are below 1 (and none
+      // at 1, a singular system). A first solution with that pressure taken as fixed starts the flows in the direction
+      // the pressures drive, and so takes the root of that direction, as the water hammer does (§5.4 of
+      // docs/water-hammer.md); without one, the guess of 1 m/s in the drawn direction could take either
+      if (pass === 0 && !opts.guess && nodes.some((nd) => nd.kind === 'fixedStatic' && !nd.isolated)) {
+        const first = S.newton(prep, guess, sc, { staticAsFixed: true });
+        if (first.ok && first.converged) {
+          first.L.forEach((l, k) => guess.m.set(l, first.m[k]));
+          first.N.forEach((nd) => guess.P.set(nd, first.P[nd.ix]));
+        }
+      }
       res = S.newton(prep, guess, sc);
       if (!res.ok) return { ok: false, errors: [res.error], warnings: prep.warnings, history: res.hist };
       totalIt += res.it;
@@ -99,7 +114,18 @@
       res.L.forEach((l, k) => guess.m.set(l, res.m[k]));
       res.N.forEach((nd) => guess.P.set(nd, res.P[nd.ix]));
     }
-    return S.postprocess(prep, res, st, { cycling, passes: pass + 1, totalIt, hist: allHist });
+    return S.postprocess(prep, res, st, { cycling, passes: pass + 1, totalIt, hist: allHist, logsDry: !!opts.logsDry });
+  }
+
+  // the texts of the pipes closed by a reservoir connection above the liquid, one per dry end (network.js)
+  function dryTexts(prep, st) {
+    const out = [];
+    for (const l of prep.links) {
+      if (!l.dry || st[l.stateKey] !== 'dry') continue;
+      if (l.dry.a) out.push(t('core.solver.dryClosed', { id: l.pid, res: l.dry.ja }));
+      if (l.dry.b) out.push(t('core.solver.dryClosed', { id: l.pid, res: l.dry.jb }));
+    }
+    return out;
   }
 
   PumpIt.solver = Object.assign(PumpIt.solver || {}, { run, solveNetwork });

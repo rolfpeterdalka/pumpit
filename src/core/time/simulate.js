@@ -112,7 +112,10 @@
 
   // ---------- one steady state at the time t, with the rules of the tanks (§6.4): a pipe whose connection is above the
   // surface may not take liquid out of the tank, so it closes and the same step is solved again; a closed one opens again
-  // when the surface covers it, or when the network would push liquid into the tank through it (decision T-09)
+  // when the surface covers it, or when the network would push liquid into the tank through it (decision T-09). The
+  // steady solver itself applies that rule to every reservoir whose connection is more than 1e-9 m above its surface
+  // (review of a952425); this loop adds the finite tanks with a connection at the surface, an empty tank at its bottom
+  // among them, and the log takes the pipes closed either way
   // trial: the pressure and the temperature of each gas vessel in the solution (the state of the vessels by default; the
   // implicit method tries others)
   function solveStep(P, st, k, t, levels, prev, sink, trial) {
@@ -131,7 +134,7 @@
       // start the next one (a gas starts from its own first pressures)
       if (prev && prev.json === json) sol = prev.sol;
       else {
-        sol = PumpIt.solver.run(model, { guess: prev && !P.gas ? guessOf(prev.sol) : undefined, states: prev ? prev.sol.states : undefined, dropUnsupplied: true });
+        sol = PumpIt.solver.run(model, { guess: prev && !P.gas ? guessOf(prev.sol) : undefined, states: prev ? prev.sol.states : undefined, dropUnsupplied: true, logsDry: true });
         if (!sol.ok) return { ok: false, errors: sol.errors };
       }
       let changed = false;
@@ -399,7 +402,8 @@
   }
 
   // the states of a step that the log follows: of the junctions with states, of the pumps under control and of the check
-  // valves, the pipes the tanks closed and the junctions without supply
+  // valves, the pipes the tanks closed (by this simulation or by the steady solver, sol.dry) and the junctions without
+  // supply
   function infoOf(P, st, out) {
     const states = new Map(), control = new Map(), check = new Map();
     for (const j of out.model.junctions) {
@@ -409,7 +413,7 @@
       const pr = out.sol.pumps[j.id];
       if (pr && pr.control) control.set(j.id, pr.control);
     }
-    return { states, control, check, closed: new Set(st.closed), unsup: new Set((out.sol.unsupplied || []).map((u) => u.jid)) };
+    return { states, control, check, closed: new Set([...st.closed, ...(out.sol.dry || [])]), unsup: new Set((out.sol.unsupplied || []).map((u) => u.jid)) };
   }
   function logChanges(P, R, tk, was, now, model) {
     const L = (obj, kind, key, params) => TM.record.log(R, tk, obj, kind, key, params);
@@ -655,7 +659,7 @@
         const s = R.snaps[i];
         const model = run.modelAt(i);
         if (!model) return null;
-        const sol = PumpIt.solver.run(model, { states: s.states, dropUnsupplied: true });
+        const sol = PumpIt.solver.run(model, { states: s.states, dropUnsupplied: true, logsDry: true });
         sol.time = { k: s.k, sub: s.sub, t: s.t, tanks: s.tanks };
         cache.set(i, sol);
         if (cache.size > 8) cache.delete(cache.keys().next().value);

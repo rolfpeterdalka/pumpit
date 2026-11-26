@@ -39,7 +39,7 @@
     const H = PumpIt.hyd, rho = env.rho, mu = env.mu;
     if (P.fm === 'darcy') {
       const k = P.L / P.Dh / (2 * rho * A * A) / n, reD = P.Dh / (mu * A), eD = P.eD;
-      // phi: the laminar factor of the section, as in pipeLoss (an annulus)
+      // phi: the laminar factor of the section, as in pipeLoss (an annulus or a rectangle)
       const phi = P.phiLam || 1, reLam = env.reLam, reTurb = env.reTurb, fLam = phi * 64 / reLam, fTurb = H.colebrook(reTurb, eD);
       let x = 1 / Math.sqrt(fTurb); // 1/√f of the last call, where the next one starts
       return (m) => {
@@ -179,6 +179,8 @@
     // the friction that varies, also the quasi-steady part of that of Brunone (decision G3-09)
     const variable = c.friction === 'variable' || c.friction === 'brunone';
     const brunone = c.friction === 'brunone';
+    // the pipes the steady state closed at a dry end of a reservoir (a connection above its liquid), by id
+    const dryLinks = new Map(prep.links.filter((l) => l.dry && res.states && res.states[l.stateKey] === 'dry').map((l) => [l.pid, l]));
     for (const x of active) {
       const s = byId.get(x.p.id), P = x.P, A = P.A * P.N, m0 = x.r.m;
       let R, Rk; // of the whole pipe, and of its fittings alone
@@ -193,7 +195,15 @@
       }
       if (!(R >= 0) || !Number.isFinite(R)) R = 0;
       if (!(Rk >= 0) || !Number.isFinite(Rk)) Rk = 0;
-      const pipe = SG().moc.makePipe({ id: x.p.id, n: s.n, L: P.L, a: s.aAdj, A, R, zUp: P.zUp, zDown: P.zDown, rho: env.rho, g: env.g, P0: x.r.P0in, m0 });
+      // a pipe the steady state closed at a dry end stands still with the pressure of its other end, the dry end giving no
+      // liquid, so that the steady state holds (with both ends dry, the lower of the two)
+      let P0 = x.r.P0in;
+      const dl = dryLinks.get(x.p.id);
+      if (dl) {
+        const fromB = x.r.P0out + env.rho * env.g * (P.zDown - P.zUp);
+        P0 = dl.dry.a && dl.dry.b ? Math.min(x.r.P0in, fromB) : dl.dry.a ? fromB : x.r.P0in;
+      }
+      const pipe = SG().moc.makePipe({ id: x.p.id, n: s.n, L: P.L, a: s.aAdj, A, R, zUp: P.zUp, zDown: P.zDown, rho: env.rho, g: env.g, P0, m0 });
       Object.assign(pipe, { a0: x.a, variance: s.variance, c1: x.c1, thin: x.thin, plastic: x.plastic, given: x.given, effPipe: x.p });
       // the friction that varies with the Reynolds number (§2.7): the friction of the steady correlation at the flow of
       // each station, per section, with the fittings of the steady state; it starts as the R of the steady state. A

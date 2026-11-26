@@ -34,7 +34,8 @@
         s.appendChild(f.qty(key, 'setQ', tx('form.setQ'), 'flow'));
         s.appendChild(f.sel(key, 'failAction', tx('form.failAction'), [['open', tx('form.failOpen')], ['closed', tx('form.failClosed')]]));
       }
-      if (j.ctype === 'PDCV') s.appendChild(f.qty(key, 'setDP', tx('form.setDP'), 'dp'));
+      // the PDCV is ideal (it never fails): its note tells what its fully open K and "always control" do (review of a952425)
+      if (j.ctype === 'PDCV') s.appendChild(f.qty(key, 'setDP', tx('form.setDP'), 'dp', { info: tx('form.pdcvHint') }));
       s.appendChild(f.chk(key, 'alwaysControl', tx('form.alwaysControl')));
       s.appendChild(f.num(key, 'kOpen', tx('form.kOpen')));
       s.appendChild(f.sel(key, 'special', tx('form.special'), [['none', tx('form.specialNone')], ['closed', tx('form.specialClosed')], ['open', tx('form.specialOpen')]]));

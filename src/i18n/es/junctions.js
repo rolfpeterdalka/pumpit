@@ -79,13 +79,15 @@ PumpIt.i18n.add('es', {
 
     spray: {
       label: 'Boquilla / aspersor',
-      check: { holes: 'Cd, diámetro y número de orificios', Kf: 'factor K del aspersor', Pext: 'presión externa' },
+      check: { Cd: 'Cd mayor que 0 y como máximo 1 (un coeficiente, no un porcentaje)', holes: 'diámetro y número de orificios', Kf: 'factor K del aspersor', Pext: 'presión externa' },
+      error: { Cd: 'Boquilla J{id}: Cd = {Cd}; un coeficiente de descarga es mayor que 0 y como máximo 1.' },
       form: {
         model: 'Modelo',
         CdA: 'Coeficiente de descarga (Cd·A)',
         K: 'Factor K del aspersor',
         Kf: 'Factor K (Q = K·√ΔP)',
         KfHint: 'El factor K supone agua; para otro fluido se usa Cd·A = √(ρ<sub>agua</sub>/2)·K.',
+        CdHint: 'Coeficiente de descarga de cada orificio, mayor que 0 y como máximo 1 (0,62 para un orificio de arista viva, cerca de 1 para una boquilla bien redondeada). Escriba 0,62, no 62 %.',
         dHole: 'Diámetro del orificio',
         nHoles: 'Número de orificios',
         Pext: 'Presión externa',
@@ -232,6 +234,8 @@ PumpIt.i18n.add('es', {
       warn: {
         addingPressure: 'La válvula de control J{id} está añadiendo {dp} kgf/cm² para mantener el ajuste (actúa como bomba).',
         notControlling: 'Válvula {ctype} J{id} sin control ({state}).',
+        beyondOpen: 'La PDCV J{id} deja pasar más caudal del que puede totalmente abierta: con este caudal la válvula totalmente abierta pierde {open} kgf/cm², más que su caída de ajuste de {dp} kgf/cm² (la PDCV es ideal y siempre mantiene su caída).',
+        beyondChoke: 'La PDCV J{id} deja pasar más caudal del que puede totalmente abierta: la válvula totalmente abierta quedaría bloqueada con este caudal, sea cual sea la caída (la PDCV es ideal y siempre mantiene su caída de {dp} kgf/cm²).',
       },
       form: {
         ctype: 'Tipo',
@@ -251,6 +255,7 @@ PumpIt.i18n.add('es', {
         failOpen: 'Abrir totalmente',
         failClosed: 'Cerrar',
         setDP: 'Caída de presión de ajuste',
+        pdcvHint: 'La PDCV es ideal: mantiene esta caída con cualquier caudal y nunca se abre totalmente ni se cierra por sí sola, así que "Controlar siempre" no cambia nada en ella. La K totalmente abierta vale en la condición especial Totalmente abierta; un aviso indica cuando el caudal supera lo que la válvula totalmente abierta deja pasar con esta caída.',
         alwaysControl: 'Controlar siempre (puede añadir presión, con aviso)',
         kOpen: 'K totalmente abierta',
         char: 'Característica (para la apertura)',
@@ -281,8 +286,12 @@ PumpIt.i18n.add('es', {
 
     orifice: {
       label: 'Orificio',
-      check: { dO: 'diámetro del orificio' },
-      error: { tooLarge: 'Orificio J{id}: el área del orificio debe ser menor que la de las tuberías.' },
+      check: { dO: 'diámetro del orificio', rEdge: 'radio del borde (cero o más)', Cd: 'Cd mayor que 0 y como máximo 1', K: 'K (cero o más)' },
+      error: {
+        tooLarge: 'Orificio J{id}: el área del orificio debe ser menor que la de las tuberías.',
+        rEdge: 'Orificio J{id}: el radio del borde debe indicarse, cero o más.',
+        Cd: 'Orificio J{id}: Cd = {Cd}; un coeficiente de descarga es mayor que 0 y como máximo 1.',
+      },
       form: {
         model: 'Modelo',
         sharp: 'Borde vivo (Idelchik)',

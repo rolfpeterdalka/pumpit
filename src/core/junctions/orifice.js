@@ -13,8 +13,11 @@
 
     validate(j, miss, { pos }) {
       if (j.orModel !== 'K' && !pos(j.dO)) miss.push(t('junctions.orifice.check.dO'));
-      if (j.orModel === 'Cd' && !(j.Cd > 0 && j.Cd <= 1)) miss.push('Cd');
-      if (j.orModel === 'K' && !(j.K >= 0)) miss.push('K');
+      // the edge radius only counts in the rounded model (an old value in another model is left alone): a negative one
+      // would turn the sign of the exponent of the edge loss; zero is the sharp edge (review of a952425)
+      if (j.orModel === 'rounded' && !radiusOk(j)) miss.push(t('junctions.orifice.check.rEdge'));
+      if (j.orModel === 'Cd' && !(j.Cd > 0 && j.Cd <= 1)) miss.push(t('junctions.orifice.check.Cd'));
+      if (j.orModel === 'K' && !(j.K >= 0)) miss.push(t('junctions.orifice.check.K'));
     },
 
     buildElement(j, lk, net) {
@@ -43,7 +46,11 @@
     },
   });
 
-  // K of the orifice in each direction (referred to the pipe the flow comes from) and the area of its hole
+  // a rounded edge has a radius that is given, finite and not negative
+  const radiusOk = (j) => !!(j.rEdge && Number.isFinite(j.rEdge.value) && j.rEdge.value >= 0);
+
+  // K of the orifice in each direction (referred to the pipe the flow comes from) and the area of its hole. The solver
+  // refuses the data the checklist refuses: a radius of the rounded edge, a Cd outside 0 to 1
   function orificeKs(j, net) {
     const { si, Ain, Aout } = net;
     let Kf, Kr, Ao = NaN;
@@ -52,6 +59,8 @@
       const dO = si(j.dO, 'length');
       Ao = Math.PI * dO * dO / 4;
       if (Ao >= Math.min(Ain, Aout)) net.errors.push(t('junctions.orifice.error.tooLarge', { id: j.id }));
+      if (j.orModel === 'rounded' && !radiusOk(j)) net.errors.push(t('junctions.orifice.error.rEdge', { id: j.id }));
+      if (j.orModel === 'Cd' && !(j.Cd > 0 && j.Cd <= 1)) net.errors.push(t('junctions.orifice.error.Cd', { id: j.id, Cd: String(j.Cd) }));
       if (j.orModel === 'Cd') {
         Kf = (1 - (Ao / Ain) ** 2) / (j.Cd * j.Cd) * (Ain / Ao) ** 2;
         Kr = (1 - (Ao / Aout) ** 2) / (j.Cd * j.Cd) * (Aout / Ao) ** 2;

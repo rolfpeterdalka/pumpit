@@ -148,9 +148,12 @@
       if (jn.main) return jn.main;
       return pid === jn.pin ? jn.in : jn.out;
     }
+    // the K of the end of pipe pid at junction j; a static imposed pressure has none, its K values left out with a caution
+    // (as in the incompressible mode)
     function pipeKs(j, pid) {
-      const pk = j.pipeK && j.pipeK[pid];
-      return { out: pk?.kOut || 0, in: pk?.kIn || 0 };
+      const k = PumpIt.junctionTypes.shared.pipeEndK(j, pid);
+      if (k.leftOut) warnings.push({ level: 'caution', text: t('core.solver.endKLeftOut', { id: j.id, pipe: pid }), obj: 'j:' + j.id });
+      return k;
     }
     // reservoir: a pipe that connects above the reference level keeps its own elevation (as in the incompressible mode)
     function effZ(nd, zEnd) { return nd.isRes && zEnd > nd.z ? zEnd : nd.z; }

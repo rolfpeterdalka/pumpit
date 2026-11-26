@@ -343,6 +343,8 @@ PumpIt.i18n.add('es', {
       vaporOutlet: 'Presión estática por debajo de la presión de vapor en la salida de la tubería P{id}.',
       shortPipe: 'Tubería P{id}: longitud menor que la diferencia de cota.',
       aboveLevel: 'Tubería P{id} por encima del nivel del reservorio J{res} tomando fluido de él.',
+      dryClosed: 'Tubería P{id} cerrada: tomaría líquido del reservorio J{res} por una conexión por encima del nivel del líquido.',
+      endKLeftOut: 'La presión impuesta J{id} es una presión estática en el extremo de la tubería P{pipe}: el K saliendo y el K llegando de esa tubería se dejan fuera.',
       reverseFlow: 'Flujo contra el sentido de referencia en la unión J{id}: los K pueden no aplicarse.',
       massImbalance: 'Masa desbalanceada en la unión J{id} ({err} kg/s).',
       massCheckOff: 'La verificación del balance de masa está desactivada.',

@@ -377,14 +377,14 @@ PumpIt.i18n.add('en', {
 </ul>
 <p>At the top of the data, a drawing of the tank cut through shows these elevations on one scale: the liquid level and the bottom on the left, the surface pressure above, and each pipe on the right wall where it connects, with its elevation, or with its depth as a dimension from the surface. The field being edited, or under the pointer, lights its part of the drawing.</p>
 <h4>How it is calculated</h4>
-<p>The reservoir is a node whose stagnation pressure equals the surface pressure, at the elevation of the level. Without any K, the stagnation pressure is continuous between the tank and the end of the pipe. A pipe connected above the liquid level discharges in free fall; if it tries to draw liquid from the tank, a warning appears.</p>
+<p>The reservoir is a node whose stagnation pressure equals the surface pressure, at the elevation of the level. Without any K, the stagnation pressure is continuous between the tank and the end of the pipe. A pipe connected above the liquid level discharges in free fall: its jet leaves at the pressure of the gas over the liquid, as a static pressure, so the loss of that end is at least the kinetic energy of the jet ([[t:inspector.pipeLosses.kIn]] below 1 counts as 1, without the laminar correction). It cannot take liquid out of the tank: when the network would draw through it, the pipe closes, with a warning, and the network is solved again; it opens again when the network pushes liquid into the tank. A connection at the level itself still supplies.</p>
 <p>In the results, each reservoir appears under [[t:results.boundaries.title]], with the flow that enters or leaves the network through it.</p>`,
           },
           pressure: {
             title: 'Imposed pressure',
             body: `<p>[[icon:pressure]] A point of known pressure, such as the connection to a public network or a header held at constant pressure.</p>
 <ul>
-<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (the total pressure at the node, the usual choice) or [[t:junctions.pressure.form.static]], which applies to the single connected pipe: the static pressure is the stagnation pressure minus ½ρV² of that pipe.</li>
+<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (the total pressure at the node, the usual choice) or [[t:junctions.pressure.form.static]], which applies to the single connected pipe: the static pressure is the stagnation pressure minus ½ρV² of that pipe. It is the static pressure at the end of the pipe itself, where the results of the pipe show it, so the K values of the loss table are left out for that pipe, with a caution when they are not zero.</li>
 <li>[[t:junctions.pressure.form.P]]: the imposed value.</li>
 </ul>
 <p>It takes up to 25 pipes (only 1 with the static type) and has the per-pipe loss table. It works as a pressure reference.</p>`,
@@ -466,9 +466,9 @@ PumpIt.i18n.add('en', {
 </table>
 <ul>
 <li>[[t:junctions.control.form.basis]] (PRV and PSV): static pressure (the usual one) or stagnation pressure.</li>
-<li>[[t:junctions.control.form.alwaysControl]]: when on, the valve holds its setting even when it would have to add pressure, and the result warns, because a real valve cannot do that. When off, it may open fully or close when it cannot control.</li>
-<li>[[t:junctions.control.form.kOpen]]: the loss of the fully open valve.</li>
-<li>[[t:junctions.control.form.failAction]] (FCV): open fully or close.</li>
+<li>[[t:junctions.control.form.alwaysControl]]: when on, the valve holds its setting even when it would have to add pressure, and the result warns, because a real valve cannot do that. When off, it may open fully or close when it cannot control. A PDCV never leaves its control, so the option changes nothing for it.</li>
+<li>[[t:junctions.control.form.kOpen]]: the loss of the fully open valve. A PDCV takes it only in the special condition [[t:junctions.control.form.specialOpen]]: controlling, it is an ideal valve that holds its drop at any flow, and the result warns when the flow is more than the fully open valve passes at that drop.</li>
+<li>[[t:junctions.control.form.failAction]] (FCV): open fully or close. A closed valve tries to control again at every step of the time simulation; no manual reset is needed.</li>
 <li>[[t:junctions.control.form.special]]: forces the valve closed or fully open, ignoring the setting.</li>
 </ul>
 <p>The resulting state — controlling, fully open or closed — appears in the panel and in the valves table. Details in [[go:tech.valves|Valves, orifices and nozzles]].</p>`,
@@ -1002,6 +1002,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <h4>Non-circular sections</h4>
 <p>Every formula uses the hydraulic diameter — for the circular section, the annulus, the rectangle with sides <i>a</i> and <i>b</i>, or the given area and perimeter:</p>
 [[eq:hydraulicDiameter]]
+<p>In laminar flow the annulus and the rectangle have their exact loss on that diameter, f = 64·φ/Re, and the transition starts from it. For an annulus of diameter ratio κ = inner/outer, φ = (1 − κ)²/(1 + κ² + (1 − κ²)/ln κ): 1 without an inner pipe, up to 1.5 for a thin gap. For a rectangle of side ratio α = short/long, φ = 1.5/((1 + α)²·(1 − (192α/π⁵)·Σ tanh(nπ/(2α))/n⁵)) over the odd n: 0.889 for a square, up to 1.5 for flat plates. A section given by its area and perimeter keeps 64/Re.</p>
 <p>Fouling reduces the hydraulic diameter and the area (<i>r</i> is the reduction as a fraction):</p>
 [[eq:fouling]]`,
           },
@@ -1056,8 +1057,9 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <p>While controlling, the link has no loss and imposes instead the downstream pressure (PRV) or the upstream pressure (PSV), static or stagnation, the flow (FCV) or the pressure drop (PDCV). Fully open, the loss with the open-valve K applies; closed, ṁ = 0. After each convergence the states are reviewed:</p>
 <ul>
 <li>a controlling PRV or PSV becomes <b>closed</b> if its flow turns negative, and <b>fully open</b> if the drop it needs is smaller than the loss of the open valve (except with [[t:junctions.control.form.alwaysControl]]);</li>
-<li>fully open, it controls again when the downstream pressure exceeds the setting (PRV), when the upstream pressure falls below it (PSV) or when the flow exceeds the setting (FCV);</li>
-<li>an FCV that cannot control follows the choice [[t:junctions.control.form.failAction]].</li>
+<li>fully open, a PRV or PSV becomes <b>closed</b> if its flow turns negative, and the valve controls again when the downstream pressure exceeds the setting (PRV), when the upstream pressure falls below it (PSV) or when the flow exceeds the setting (FCV);</li>
+<li>an FCV that cannot control follows the choice [[t:junctions.control.form.failAction]]; closed in this way, it tries to control again at every step of the time simulation, so that it controls once the network lets it;</li>
+<li>a PDCV never leaves its control: it is an ideal valve that holds its drop at any flow, and when the loss of its fully open K at that flow is above the drop, the result warns that it passes more than it can fully open.</li>
 </ul>
 <h4>Exit valve</h4>
 [[eq:exitValve]]
@@ -1080,8 +1082,8 @@ Choosing a catalogue also sets the roughness of its material, which can still be
           boundaries: {
             title: 'Boundaries',
             body: `<ul>
-<li><b>Reservoir</b>: a fixed-pressure node equal to the surface pressure, at the elevation of the liquid level. Each pipe connects at the bottom elevation or at its own connection, given as an elevation or as a depth below the level (elevation = level − depth); if the connection is above the level, the pipe discharges in free fall, and the boundary pressure applies at the end of the pipe.</li>
-<li><b>Imposed pressure</b>: a node of fixed stagnation pressure; with the static type, p = P<sub>0</sub> − ½ρV² of the single pipe is fixed.</li>
+<li><b>Reservoir</b>: a fixed-pressure node equal to the surface pressure, at the elevation of the liquid level. Each pipe connects at the bottom elevation or at its own connection, given as an elevation or as a depth below the level (elevation = level − depth); if the connection is above the level, the pipe discharges in free fall: the boundary pressure applies at the end of the pipe as the static pressure of the jet, whose exit loss is at least its kinetic energy, and the pipe cannot draw liquid from the tank (it closes, and opens again when the network pushes liquid in).</li>
+<li><b>Imposed pressure</b>: a node of fixed stagnation pressure; with the static type, p = P<sub>0</sub> − ½ρV² of the single pipe is fixed, at the end of the pipe itself: the K values of that end are left out.</li>
 <li><b>Imposed flow</b> and the <b>source of a branch</b>: they enter continuity as a demand (positive leaves, negative enters).</li>
 <li><b>Nozzle</b> and <b>exit valve</b>: an external node of fixed pressure (the external or the residual pressure), joined by a discharge link.</li>
 </ul>
@@ -1111,7 +1113,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li><b>Pumps</b>: ΔH, powers, efficiency and NPSH, as in [[go:tech.pumps|Pumps]].</li>
 <li><b>K in the pipes table</b>: the sum of the fitting K values, on the pipe area, without the laminar correction.</li>
 </ul>
-<p>Warnings also come out for cavitation (static pressure below the vapour pressure), for a pipe shorter than the height difference it climbs, for a pipe above the level drawing liquid from a reservoir and for flow against the reference direction in a component, besides the warnings of pumps, valves and convergence.</p>
+<p>Warnings also come out for cavitation (static pressure below the vapour pressure), for a pipe shorter than the height difference it climbs, for a pipe closed because it would draw liquid from a reservoir through a connection above the level, for the K values left out at a static imposed pressure and for flow against the reference direction in a component, besides the warnings of pumps, valves and convergence.</p>
 <h4>Outputs of the column window</h4>
 <ul>
 <li><b>Losses of a pipe</b>: friction, fittings and the ends (the K of the junction at each end) add up to the head loss h<sub>L</sub>. The stagnation drop is the drop due to elevation, ρ·g·(z<sub>out</sub> − z<sub>in</sub>), plus friction and fittings, since P<sub>0</sub> at the inlet and at the outlet already account for the ends. The head loss gradient is h<sub>L</sub>/L; the pressure loss per length, ρ·g·h<sub>L</sub>/L.</li>
@@ -1195,7 +1197,7 @@ Choosing a catalogue also sets the roughness of its material, which can still be
 <li>[[icon:valve]] <b>Valve</b>, [[icon:generic]] <b>generic component</b> and [[icon:orifice]] <b>orifice</b>: local losses count as an equivalent length of friction. Cv and Kv become the equivalent K at the area of the inlet pipe. The orifice also caps the flow at the critical flow of its hole: a restriction orifice chokes long before the pipe does.</li>
 <li>[[icon:control]] <b>Control valve</b>: reducing, sustaining, flow and ΔP, with the states of the liquid.</li>
 <li>[[icon:spray]] <b>Nozzle</b>: isentropic flow through the effective area, which chokes when the outside pressure falls below the critical ratio (about 0.53 of the upstream pressure, for air).</li>
-<li>[[icon:exitvalve]] <b>Exit valve</b>: the loss of the valve down to the outside pressure, where the static pressure of the jet is the residual one.</li>
+<li>[[icon:exitvalve]] <b>Exit valve</b>: the loss of the valve down to the outside pressure, where the static pressure of the jet is the residual one. Its K and Cv in the results take the density and the velocity of the end of its pipe at the valve, whichever way the pipe is drawn.</li>
 <li>[[icon:pump]] <b>Pump</b>: with a gas, a compressor or a blower, as in [[go:gas.compressor]].</li>
 </ul>
 <p>The Hazen-Williams model has no meaning for a gas: such pipes are calculated with Darcy and the roughness stored in the pipe, and a warning lists them.</p>`,

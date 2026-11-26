@@ -80,13 +80,15 @@ PumpIt.i18n.add('pt-BR', {
 
     spray: {
       label: 'Bocal / aspersor',
-      check: { holes: 'Cd, diâmetro e número de furos', Kf: 'fator K do aspersor', Pext: 'pressão externa' },
+      check: { Cd: 'Cd maior que 0 e no máximo 1 (um coeficiente, não uma porcentagem)', holes: 'diâmetro e número de furos', Kf: 'fator K do aspersor', Pext: 'pressão externa' },
+      error: { Cd: 'Bocal J{id}: Cd = {Cd}; um coeficiente de descarga é maior que 0 e no máximo 1.' },
       form: {
         model: 'Modelo',
         CdA: 'Coeficiente de descarga (Cd·A)',
         K: 'Fator K do aspersor',
         Kf: 'Fator K (Q = K·√ΔP)',
         KfHint: 'O fator K pressupõe água; para outro fluido usa-se Cd·A = √(ρ<sub>água</sub>/2)·K.',
+        CdHint: 'Coeficiente de descarga de cada furo, acima de 0 e no máximo 1 (0,62 para um furo de borda viva, perto de 1 para um bocal bem arredondado). Digite 0,62, não 62 %.',
         dHole: 'Diâmetro do furo',
         nHoles: 'Número de furos',
         Pext: 'Pressão externa',
@@ -233,6 +235,8 @@ PumpIt.i18n.add('pt-BR', {
       warn: {
         addingPressure: 'Válvula de controle J{id} está adicionando {dp} kgf/cm² para manter o ajuste (age como bomba).',
         notControlling: 'Válvula {ctype} J{id} sem controle ({state}).',
+        beyondOpen: 'A PDCV J{id} passa mais vazão do que consegue totalmente aberta: com essa vazão a válvula totalmente aberta perde {open} kgf/cm², acima da queda de ajuste de {dp} kgf/cm² (a PDCV é ideal e sempre mantém a queda).',
+        beyondChoke: 'A PDCV J{id} passa mais vazão do que consegue totalmente aberta: a válvula totalmente aberta ficaria bloqueada com essa vazão, qualquer que fosse a queda (a PDCV é ideal e sempre mantém a queda de {dp} kgf/cm²).',
       },
       form: {
         ctype: 'Tipo',
@@ -252,6 +256,7 @@ PumpIt.i18n.add('pt-BR', {
         failOpen: 'Abrir totalmente',
         failClosed: 'Fechar',
         setDP: 'Queda de pressão de ajuste',
+        pdcvHint: 'A PDCV é ideal: ela mantém essa queda com qualquer vazão e nunca abre totalmente nem fecha sozinha, por isso "Sempre controlar" não muda nada nela. O K da válvula totalmente aberta vale na condição especial Totalmente aberta; um aviso indica quando a vazão passa do que a válvula totalmente aberta deixa passar com essa queda.',
         alwaysControl: 'Sempre controlar (pode adicionar pressão, com aviso)',
         kOpen: 'K totalmente aberta',
         char: 'Característica (para a abertura)',
@@ -282,8 +287,12 @@ PumpIt.i18n.add('pt-BR', {
 
     orifice: {
       label: 'Orifício',
-      check: { dO: 'diâmetro do orifício' },
-      error: { tooLarge: 'Orifício J{id}: a área do orifício deve ser menor que a dos tubos.' },
+      check: { dO: 'diâmetro do orifício', rEdge: 'raio da borda (zero ou mais)', Cd: 'Cd maior que 0 e no máximo 1', K: 'K (zero ou mais)' },
+      error: {
+        tooLarge: 'Orifício J{id}: a área do orifício deve ser menor que a dos tubos.',
+        rEdge: 'Orifício J{id}: o raio da borda deve ser informado, zero ou mais.',
+        Cd: 'Orifício J{id}: Cd = {Cd}; um coeficiente de descarga é maior que 0 e no máximo 1.',
+      },
       form: {
         model: 'Modelo',
         sharp: 'Canto vivo (Idelchik)',

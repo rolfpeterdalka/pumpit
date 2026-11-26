@@ -27,7 +27,7 @@
       if (j.sprayModel === 'K') {
         s.appendChild(f.qty(key, 'Kf', tx('form.Kf'), 'kfactor', { info: tx('form.KfHint') }));
       } else {
-        s.appendChild(f.num(key, 'Cd', 'Cd'));
+        s.appendChild(f.num(key, 'Cd', 'Cd', { info: tx('form.CdHint') }));
         s.appendChild(f.qty(key, 'dHole', tx('form.dHole'), 'length'));
         s.appendChild(f.num(key, 'nHoles', tx('form.nHoles'), { int: true }));
       }

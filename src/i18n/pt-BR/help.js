@@ -377,14 +377,14 @@ PumpIt.i18n.add('pt-BR', {
 </ul>
 <p>No alto dos dados, um desenho do tanque em corte mostra essas cotas numa mesma escala: o nível do líquido e o fundo à esquerda, a pressão na superfície em cima e cada tubo na parede da direita, onde se liga, com a sua cota, ou com a sua profundidade cotada a partir da superfície. O campo em edição, ou sob o ponteiro, acende a sua parte do desenho.</p>
 <h4>Como é calculado</h4>
-<p>O reservatório é um nó de pressão de estagnação igual à pressão na superfície, na cota do nível. Sem K informado, a pressão de estagnação é contínua entre o tanque e a ponta do tubo. Um tubo ligado acima do nível do líquido descarrega em queda livre; se ele tentar puxar líquido do tanque, aparece um aviso.</p>
+<p>O reservatório é um nó de pressão de estagnação igual à pressão na superfície, na cota do nível. Sem K informado, a pressão de estagnação é contínua entre o tanque e a ponta do tubo. Um tubo ligado acima do nível do líquido descarrega em queda livre: o jato sai na pressão do gás sobre o líquido, como pressão estática, e por isso a perda dessa ponta é no mínimo a energia cinética do jato ([[t:inspector.pipeLosses.kIn]] abaixo de 1 conta como 1, sem a correção laminar). Ele não tira líquido do tanque: quando a rede puxaria líquido por ele, o tubo fecha, com um aviso, e a rede é calculada de novo; ele reabre quando a rede empurra líquido para dentro do tanque. Uma ligação no próprio nível continua alimentando.</p>
 <p>Nos resultados, cada reservatório aparece em [[t:results.boundaries.title]], com a vazão que entra na rede ou sai dela por ali.</p>`,
           },
           pressure: {
             title: 'Pressão imposta',
             body: `<p>[[icon:pressure]] Um ponto de pressão conhecida, como a ligação com uma rede pública ou um coletor mantido a pressão constante.</p>
 <ul>
-<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (a pressão total no nó, a escolha usual) ou [[t:junctions.pressure.form.static]], que vale para o único tubo ligado: a pressão estática é a de estagnação menos ½ρV² desse tubo.</li>
+<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (a pressão total no nó, a escolha usual) ou [[t:junctions.pressure.form.static]], que vale para o único tubo ligado: a pressão estática é a de estagnação menos ½ρV² desse tubo. É a pressão estática na ponta do próprio tubo, onde os resultados do tubo a mostram, por isso os K da tabela de perdas ficam fora do cálculo para esse tubo, com uma precaução quando não são zero.</li>
 <li>[[t:junctions.pressure.form.P]]: o valor imposto.</li>
 </ul>
 <p>Aceita até 25 tubos (no tipo estático, só 1) e tem a tabela de perdas por tubo. Serve como referência de pressão.</p>`,
@@ -466,9 +466,9 @@ PumpIt.i18n.add('pt-BR', {
 </table>
 <ul>
 <li>[[t:junctions.control.form.basis]] (PRV e PSV): pressão estática (a usual) ou de estagnação.</li>
-<li>[[t:junctions.control.form.alwaysControl]]: ligado, a válvula mantém o ajuste mesmo quando precisaria adicionar pressão, e o resultado avisa, porque uma válvula real não faz isso. Desligado, ela pode abrir totalmente ou fechar quando não consegue controlar.</li>
-<li>[[t:junctions.control.form.kOpen]]: a perda da válvula totalmente aberta.</li>
-<li>[[t:junctions.control.form.failAction]] (FCV): abrir totalmente ou fechar.</li>
+<li>[[t:junctions.control.form.alwaysControl]]: ligado, a válvula mantém o ajuste mesmo quando precisaria adicionar pressão, e o resultado avisa, porque uma válvula real não faz isso. Desligado, ela pode abrir totalmente ou fechar quando não consegue controlar. Uma PDCV nunca deixa de controlar, por isso a opção não muda nada nela.</li>
+<li>[[t:junctions.control.form.kOpen]]: a perda da válvula totalmente aberta. Uma PDCV só a usa na condição especial [[t:junctions.control.form.specialOpen]]: controlando, ela é uma válvula ideal que mantém a queda com qualquer vazão, e o resultado avisa quando a vazão passa do que a válvula totalmente aberta deixa passar com essa queda.</li>
+<li>[[t:junctions.control.form.failAction]] (FCV): abrir totalmente ou fechar. Fechada, a válvula tenta controlar de novo a cada passo da simulação no tempo; não é preciso rearme manual.</li>
 <li>[[t:junctions.control.form.special]]: força a válvula fechada ou totalmente aberta, ignorando o ajuste.</li>
 </ul>
 <p>O estado resultante — controlando, totalmente aberta ou fechada — aparece no painel e na tabela de válvulas. Detalhes em [[go:tech.valves|Válvulas, orifícios e bocais]].</p>`,
@@ -1002,6 +1002,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <h4>Seções não circulares</h4>
 <p>Todas as fórmulas usam o diâmetro hidráulico — para a seção circular, o anel, o retângulo de lados <i>a</i> e <i>b</i> ou a área e o perímetro informados:</p>
 [[eq:hydraulicDiameter]]
+<p>No regime laminar, o anel e o retângulo têm a perda exata sobre esse diâmetro, f = 64·φ/Re, e a transição parte dela. No anel de razão de diâmetros κ = interno/externo, φ = (1 − κ)²/(1 + κ² + (1 − κ²)/ln κ): 1 sem tubo interno, até 1,5 numa folga estreita. No retângulo de razão de lados α = menor/maior, φ = 1,5/((1 + α)²·(1 − (192α/π⁵)·Σ tanh(nπ/(2α))/n⁵)) nos n ímpares: 0,889 no quadrado, até 1,5 em placas planas. Uma seção dada por área e perímetro mantém 64/Re.</p>
 <p>A incrustação reduz o diâmetro hidráulico e a área (<i>r</i> é a redução em fração):</p>
 [[eq:fouling]]`,
           },
@@ -1056,8 +1057,9 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <p>Controlando, a ligação deixa de ter perda e passa a impor a pressão a jusante (PRV) ou a montante (PSV), estática ou de estagnação, a vazão (FCV) ou a queda de pressão (PDCV). Totalmente aberta, vale a perda com o K de válvula aberta; fechada, ṁ = 0. Depois de cada convergência, os estados são revistos:</p>
 <ul>
 <li>uma PRV ou PSV controlando passa a <b>fechada</b> se a vazão ficar negativa, e a <b>totalmente aberta</b> se a queda exigida for menor que a perda com a válvula aberta (exceto com [[t:junctions.control.form.alwaysControl]]);</li>
-<li>totalmente aberta, ela volta a controlar quando a pressão a jusante passa do ajuste (PRV), quando a de montante fica abaixo dele (PSV) ou quando a vazão passa do ajuste (FCV);</li>
-<li>uma FCV que não consegue controlar segue a escolha [[t:junctions.control.form.failAction]].</li>
+<li>totalmente aberta, uma PRV ou PSV passa a <b>fechada</b> se a vazão ficar negativa, e a válvula volta a controlar quando a pressão a jusante passa do ajuste (PRV), quando a de montante fica abaixo dele (PSV) ou quando a vazão passa do ajuste (FCV);</li>
+<li>uma FCV que não consegue controlar segue a escolha [[t:junctions.control.form.failAction]]; fechada desse modo, ela tenta controlar de novo a cada passo da simulação no tempo, e controla assim que a rede permitir;</li>
+<li>uma PDCV nunca deixa de controlar: ela é uma válvula ideal que mantém a queda com qualquer vazão, e quando a perda do seu K totalmente aberta com essa vazão passa da queda, o resultado avisa que ela passa mais do que consegue totalmente aberta.</li>
 </ul>
 <h4>Válvula de saída</h4>
 [[eq:exitValve]]
@@ -1080,8 +1082,8 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
           boundaries: {
             title: 'Contornos',
             body: `<ul>
-<li><b>Reservatório</b>: um nó de pressão fixa igual à pressão na superfície, na cota do nível do líquido. Cada tubo se liga na cota do fundo ou na sua própria ligação, dada como cota ou como profundidade abaixo do nível (cota = nível − profundidade); se a ligação estiver acima do nível, o tubo descarrega em queda livre, e a pressão de contorno vale na ponta do tubo.</li>
-<li><b>Pressão imposta</b>: um nó de pressão de estagnação fixa; no tipo estático, fixa-se p = P<sub>0</sub> − ½ρV² do tubo único.</li>
+<li><b>Reservatório</b>: um nó de pressão fixa igual à pressão na superfície, na cota do nível do líquido. Cada tubo se liga na cota do fundo ou na sua própria ligação, dada como cota ou como profundidade abaixo do nível (cota = nível − profundidade); se a ligação estiver acima do nível, o tubo descarrega em queda livre: a pressão de contorno vale na ponta do tubo como pressão estática do jato, cuja perda de saída é no mínimo a energia cinética dele, e o tubo não pode tirar líquido do tanque (ele fecha, e reabre quando a rede empurra líquido para dentro).</li>
+<li><b>Pressão imposta</b>: um nó de pressão de estagnação fixa; no tipo estático, fixa-se p = P<sub>0</sub> − ½ρV² do tubo único, na ponta do próprio tubo: os K dessa ponta ficam fora do cálculo.</li>
 <li><b>Vazão imposta</b> e <b>fonte de um nó</b>: entram na continuidade como demanda (positiva sai, negativa entra).</li>
 <li><b>Bocal</b> e <b>válvula de saída</b>: um nó externo de pressão fixa (a externa ou a residual), ligado por uma ligação de descarga.</li>
 </ul>
@@ -1111,7 +1113,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li><b>Bombas</b>: ΔH, potências, eficiência e NPSH, como em [[go:tech.pumps|Bombas]].</li>
 <li><b>K na tabela de tubos</b>: a soma dos K dos acessórios, sobre a área do tubo, sem a correção laminar.</li>
 </ul>
-<p>Também saem avisos de cavitação (pressão estática abaixo da de vapor), de tubo mais curto que o desnível que vence, de tubo acima do nível tomando líquido de um reservatório e de fluxo contra o sentido de referência num componente, além dos avisos de bombas, válvulas e convergência.</p>
+<p>Também saem avisos de cavitação (pressão estática abaixo da de vapor), de tubo mais curto que o desnível que vence, de tubo fechado porque tiraria líquido de um reservatório por uma ligação acima do nível, dos K deixados fora numa pressão imposta estática e de fluxo contra o sentido de referência num componente, além dos avisos de bombas, válvulas e convergência.</p>
 <h4>Saídas da janela de colunas</h4>
 <ul>
 <li><b>Perdas de um tubo</b>: atrito, acessórios e pontas (o K da junção em cada ponta) somam a perda de carga h<sub>L</sub>. A queda de estagnação é a queda devida à cota, ρ·g·(z<sub>saída</sub> − z<sub>entrada</sub>), mais atrito e acessórios, porque P<sub>0</sub> na entrada e na saída já descontam as pontas. A perda de carga unitária é h<sub>L</sub>/L; a perda de pressão por comprimento, ρ·g·h<sub>L</sub>/L.</li>
@@ -1195,7 +1197,7 @@ Ao escolher um catálogo, a rugosidade passa a ser a do material, e ainda pode s
 <li>[[icon:valve]] <b>Válvula</b>, [[icon:generic]] <b>componente genérico</b> e [[icon:orifice]] <b>orifício</b>: as perdas localizadas valem como comprimento equivalente de atrito. Cv e Kv viram o K equivalente na área do tubo de entrada. O orifício também limita a vazão à vazão crítica do furo: um orifício de restrição bloqueia muito antes do tubo.</li>
 <li>[[icon:control]] <b>Válvula de controle</b>: redutora, sustentadora, de vazão e de ΔP, com os mesmos estados do líquido.</li>
 <li>[[icon:spray]] <b>Bocal</b>: escoamento isentrópico pela área efetiva, que bloqueia quando a pressão externa cai abaixo da razão crítica (cerca de 0,53 da pressão a montante, no ar).</li>
-<li>[[icon:exitvalve]] <b>Válvula de saída</b>: a perda da válvula até a pressão externa, onde a pressão estática do jato é a residual.</li>
+<li>[[icon:exitvalve]] <b>Válvula de saída</b>: a perda da válvula até a pressão externa, onde a pressão estática do jato é a residual. O K e o Cv dela nos resultados usam a densidade e a velocidade da ponta do tubo na válvula, qualquer que seja o sentido em que o tubo foi desenhado.</li>
 <li>[[icon:pump]] <b>Bomba</b>: com gás, é um compressor ou soprador, como em [[go:gas.compressor]].</li>
 </ul>
 <p>O modelo de Hazen-Williams não vale para gás: tubos com ele são calculados por Darcy, com a rugosidade guardada no tubo, e um aviso lista quais.</p>`,

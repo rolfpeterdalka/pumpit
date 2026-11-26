@@ -8,22 +8,26 @@
 //   device.review(lk, sol, states, next, env)   → writes the next state into `next`
 //   device.anyway                               → optional: reviewed also after a solution that did not converge (check
 //                                                 valves, whose closing can be what lets it converge)
+// The state of a device is kept under the id of its junction, or under lk.stateKey when the link has one (a pipe with an
+// end above the liquid of a reservoir: 'P' + its id, src/core/solver/network.js).
 (function (root) {
   const PumpIt = root.PumpIt;
 
-  // given: states to start from (opts.states of the solver), by junction id
+  const keyOf = (lk) => (lk.stateKey !== undefined ? lk.stateKey : lk.jid);
+
+  // given: states to start from (opts.states of the solver), by key
   function initialStates(prep, given) {
     const st = {};
     for (const lk of prep.links) {
       if (!lk.device) continue;
-      const s = given ? given[lk.jid] : undefined;
-      st[lk.jid] = s === undefined ? lk.device.initial(lk) : lk.device.resume ? lk.device.resume(lk, s) : s;
+      const k = keyOf(lk), s = given ? given[k] : undefined;
+      st[k] = s === undefined ? lk.device.initial(lk) : lk.device.resume ? lk.device.resume(lk, s) : s;
     }
     return st;
   }
 
   function configure(prep, st) {
-    for (const lk of prep.links) if (lk.device) lk.device.configure(lk, st[lk.jid]);
+    for (const lk of prep.links) if (lk.device) lk.device.configure(lk, st[keyOf(lk)]);
   }
 
   // anyway: only the devices reviewed after a solution that did not converge

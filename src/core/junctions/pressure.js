@@ -10,6 +10,10 @@
 
     defaults: () => ({ P: q(2, 'kgf/cm²(g)'), ptype: 'stagnation', pipeK: {} }),
 
+    // a static pressure is that of the end of its single pipe: the K values of that end are left out, in both modes and
+    // in the water hammer (pipeEndK of shared.js; decision 2a of the review of a952425)
+    atPipeEnd: (j) => j.ptype === 'static',
+
     validate(j, miss, { fin, pipeCount, gasP }) {
       if (!fin(j.P)) miss.push(t('junctions.pressure.check.P'));
       gasP(j.P, 'junctions.pressure.check.P');

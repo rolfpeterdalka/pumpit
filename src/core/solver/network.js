@@ -10,6 +10,33 @@
   const types = PumpIt.junctionTypes;
   const { t } = PumpIt.i18n;
 
+  // a pipe end more than DRY metres above the liquid surface of a reservoir is dry: the pipe discharges into the tank in
+  // free fall from its end, and it cannot take liquid out of the tank (decision T-09 of the time simulation, in every
+  // steady state since the review of a952425). A connection at the surface stays submerged, so that a reservoir whose level
+  // is its bottom (a pressure source) still supplies
+  const DRY = 1e-9;
+  const dry = (nd, zEnd) => !!nd.isRes && zEnd > nd.z + DRY;
+
+  // the state of a pipe with a dry end, a device of the solver (src/core/solver/devices.js) under its own key: open, it
+  // takes the liquid that falls into the tank; it closes ('dry') when its flow would leave the tank through the dry end,
+  // and opens again when the pressures and the elevations of its two nodes would push liquid into the tank. The margins
+  // are those of the time simulation: a velocity of 1e-9 m/s, a grade line of 1e-9 m. A pipe dry at both ends never opens
+  const dryDevice = {
+    initial: () => 'open',
+    configure(lk, s) { lk.mode = s === 'dry' ? 'closed' : 'loss'; },
+    review(lk, sol, st, next, env) {
+      const k = lk.stateKey, d = lk.dry;
+      if (st[k] !== 'dry') {
+        const m = sol.m[lk.idx], tol = 1e-9 * env.rho * lk.P.A * lk.P.N;
+        if ((d.a && m > tol) || (d.b && m < -tol)) next[k] = 'dry';
+      } else if (!(d.a && d.b)) {
+        // what drives the flow from a to b through the closed pipe, Pa − Pb + G (the row of an open pipe)
+        const drive = sol.P[lk.a] - sol.P[lk.b] + lk.G, tol = 1e-9 * env.rho * Math.abs(env.g);
+        if (d.b ? drive > tol : drive < -tol) next[k] = 'open';
+      }
+    },
+  };
+
   // pipe data in SI, by pipe id (also used by the compressible mode): section, length, friction model, ΣK of the
   // fittings, parallel tubes and the elevations where the pipe connects
   function pipeData(eff, si, errors) {
@@ -26,7 +53,11 @@
         A = Math.PI * (a * a - b * b) / 4; Dh = a - b;
         phiLam = H.annulusLaminar(b / a);
       }
-      else if (gm.kind === 'rectangular') { const w = si(gm.width, 'length'), h = si(gm.height, 'length'); A = w * h; Dh = 2 * w * h / (w + h); }
+      else if (gm.kind === 'rectangular') {
+        const w = si(gm.width, 'length'), h = si(gm.height, 'length');
+        A = w * h; Dh = 2 * w * h / (w + h);
+        phiLam = H.rectLaminar(Math.min(w, h) / Math.max(w, h));
+      }
       else { A = si(gm.area, 'area'); Dh = 4 * A / si(gm.perim, 'length'); }
       const red = 1 - (p.idReduction || 0) / 100;
       Dh *= red; A *= red * red;
@@ -120,7 +151,7 @@
       const Re = rho * aV * P.Dh / mu;
       let dpF = 0, f = NaN;
       if (P.fm === 'darcy') {
-        // laminar: phi·64/Re of the section (an annulus loses more than a circle of its hydraulic diameter)
+        // laminar: phi·64/Re of the section (an annulus or a rectangle does not lose as a circle of its hydraulic diameter)
         if (Re < reLam) { dpF = P.phiLam * 32 * mu * P.L * V / (P.Dh * P.Dh); f = Re > 0 ? P.phiLam * 64 / Re : Infinity; }
         else { f = H.frictionFactor(Re, P.eD, reLam, reTurb, P.phiLam); dpF = f * P.L / P.Dh * rho * V * aV / 2; }
       } else if (P.fm === 'explicit') { f = P.fx; dpF = f * P.L / P.Dh * rho * V * aV / 2; }
@@ -129,8 +160,18 @@
         f = aV > 0 ? Math.abs(dpF) / (P.L / P.Dh * rho * V * V / 2) : NaN;
       } else f = 0;
       const dpK = kTerm(P.Ksum, P, V);
-      const dpE = kTerm(V >= 0 ? endK.fwd : endK.rev, P, V);
+      const dpE = kTerm(V >= 0 ? endK.fwd : endK.rev, P, V) + jetLoss(V >= 0 ? endK.jetF : endK.jetR, P, V);
       return { dp: dpF + dpK + dpE, dpF, dpK, dpE, V, Re, f };
+    }
+    // a free jet into a reservoir (the flow enters a dry end, whose K into the tank is kIn ≥ 0; −1: not a jet): the loss of
+    // that end is at least the kinetic energy of the jet, ρV|V|/2, so that its static pressure is that of the gas over the
+    // liquid. A K below 1 counts as 1, without the laminar correction of the K values, which would put the jet above the
+    // pressure of the gas; a larger loss of its own K stays (decision 1a of the review of a952425). → the loss to add to
+    // that of the K
+    function jetLoss(kIn, P, V) {
+      if (!(kIn >= 0)) return 0;
+      const dyn = rho * V * Math.abs(V) / 2, k = kTerm(kIn, P, V);
+      return Math.abs(k) < Math.abs(dyn) ? dyn - k : 0;
     }
 
     // ---- nodes and links
@@ -168,15 +209,20 @@
       const na = nodeFor(ja, p.id), nb = nodeFor(jb, p.id);
       if (!na || !nb) continue;
       const pkA = pipeKs(ja, p.id), pkB = pipeKs(jb, p.id);
-      const endK = { fwd: pkA.out + pkB.in, rev: pkB.out + pkA.in };
+      const dryA = dry(na, P.zUp), dryB = dry(nb, P.zDown);
+      // jetF, jetR: the K into the tank of a dry end that the flow enters, forward (b) or reverse (a)
+      const endK = { fwd: pkA.out + pkB.in, rev: pkB.out + pkA.in, jetF: dryB ? pkB.in : -1, jetR: dryA ? pkA.in : -1 };
       const zaEff = effZ(na, P.zUp), zbEff = effZ(nb, P.zDown);
-      P.zaEff = zaEff; P.zbEff = zbEff; P.endK = endK; P.pkA = pkA; P.pkB = pkB;
-      links.push({
+      Object.assign(P, { zaEff, zbEff, endK, pkA, pkB, dryA, dryB });
+      const lk = {
         kind: 'pipe', pid: p.id, a: na.ix, b: nb.ix, G: rho * g * (zaEff - zbEff),
         mode: P.closed ? 'closed' : 'loss', fixedClosed: P.closed,
         phi: (m) => pipeLoss(P, m, endK).dp, mref: rho * P.A * P.N * 0.01, P,
-      });
-      P.link = links[links.length - 1];
+      };
+      // a dry end: the state of the pipe, by its own key (the junction ids of the dry ends name it in the warnings)
+      if ((dryA || dryB) && !P.closed) Object.assign(lk, { device: dryDevice, stateKey: 'P' + p.id, dry: { a: dryA, b: dryB, ja: ja.id, jb: jb.id } });
+      links.push(lk);
+      P.link = lk;
     }
 
     function nodeFor(j, pid) {
@@ -185,12 +231,14 @@
       if (jn.main) return jn.main;
       return pid === jn.pin ? jn.in : jn.out;
     }
+    // the K of the end of pipe pid at junction j; a static imposed pressure has none, its K values left out with a caution
     function pipeKs(j, pid) {
-      const pk = j.pipeK && j.pipeK[pid];
-      return { out: pk?.kOut || 0, in: pk?.kIn || 0 };
+      const k = PumpIt.junctionTypes.shared.pipeEndK(j, pid);
+      if (k.leftOut) warnings.push({ level: 'caution', text: t('core.solver.endKLeftOut', { id: j.id, pipe: pid }), obj: 'j:' + j.id });
+      return k;
     }
-    // reservoir: a pipe above the liquid level discharges in free fall (boundary pressure = surface pressure)
-    function effZ(nd, zEnd) { return nd.isRes && zEnd > nd.z ? zEnd : nd.z; }
+    // reservoir: a pipe above the liquid level (dry) discharges in free fall (boundary pressure = surface pressure)
+    function effZ(nd, zEnd) { return dry(nd, zEnd) ? zEnd : nd.z; }
 
     // ---- elements of two-port junctions
     for (const j of eff.junctions) {
@@ -209,5 +257,5 @@
     return { eff, env, nodes, links, pp, jNodes, jById, errors, warnings, pipeLoss, kTerm };
   }
 
-  PumpIt.solver = Object.assign(PumpIt.solver || {}, { prepare, pipeData });
+  PumpIt.solver = Object.assign(PumpIt.solver || {}, { prepare, pipeData, DRY });
 })(typeof window !== 'undefined' ? window : globalThis);

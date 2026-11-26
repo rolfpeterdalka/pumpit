@@ -21,6 +21,7 @@
     const Pn = (ix) => res.P[ix];
     const rg = rho * g;
     const pipes = {}, junctions = {}, pumps = {}, valves = {};
+    const dry = []; // the pipes that a dry end closed
 
     // ---- pipes
     for (const l of links) {
@@ -31,12 +32,15 @@
       const V = lo.V;
       const dyn = rho * V * V / 2;
       const kdyn = (K) => Math.abs(prep.kTerm(K, P, V));
+      // the loss of the end the flow enters: into a dry end (a free jet), at least the kinetic energy of the jet, as
+      // pipeLoss takes it, so that the static pressure of the jet is not below that of the gas over the liquid
+      const kin = (K, jet) => (jet ? Math.max(kdyn(K), dyn) : kdyn(K));
       const Pa = Pn(l.a), Pb = Pn(l.b);
       const nA = nodes[l.a], nB = nodes[l.b];
       const P0jA = Pa + rho * g * (P.zaEff - P.zUp);
       const P0jB = Pb + rho * g * (P.zbEff - P.zDown);
-      const P0in = V >= 0 ? P0jA - kdyn(P.pkA.out) : P0jA + kdyn(P.pkA.in);
-      const P0out = V >= 0 ? P0jB + kdyn(P.pkB.in) : P0jB - kdyn(P.pkB.out);
+      const P0in = V >= 0 ? P0jA - kdyn(P.pkA.out) : P0jA + kin(P.pkA.in, P.dryA);
+      const P0out = V >= 0 ? P0jB + kin(P.pkB.in, P.dryB) : P0jB - kdyn(P.pkB.out);
       const r = {
         m, Q: m / rho, V, Re: lo.Re, f: lo.f,
         regime: t('core.solver.regime.' + (lo.Re < env.reLam ? 'laminar' : lo.Re > env.reTurb ? 'turbulent' : 'transition')),
@@ -55,8 +59,18 @@
         if (r.Pout < pv) warn('warning', t('core.solver.vaporOutlet', { id: p.id }), 'p:' + p.id);
       }
       if (P.L < Math.abs(P.zDown - P.zUp) - 1e-9) warn('caution', t('core.solver.shortPipe', { id: p.id }), 'p:' + p.id);
-      if (nA.isRes && P.zUp > nA.z && m < 0) warn('warning', t('core.solver.aboveLevel', { id: p.id, res: nA.jid }), 'p:' + p.id);
-      if (nB.isRes && P.zDown > nB.z && m > 0) warn('warning', t('core.solver.aboveLevel', { id: p.id, res: nB.jid }), 'p:' + p.id);
+      // a pipe end above the liquid of a reservoir (dry): the pipe its rule closed (no warning when the caller logs it, as
+      // the time simulation does), or a pipe that still takes liquid out of the tank through it, when the states of the
+      // devices did not settle (review of a952425: the warning came with the flow into the tank, the free fall)
+      const d = l.dry;
+      if (d && st[l.stateKey] === 'dry') {
+        dry.push(p.id);
+        if (!meta.logsDry) for (const jid of [d.a ? d.ja : null, d.b ? d.jb : null]) if (jid !== null) warn('warning', t('core.solver.dryClosed', { id: p.id, res: jid }), 'p:' + p.id);
+      } else if (d) {
+        const tol = 1e-9 * rho * P.A * P.N;
+        if (d.a && m > tol) warn('warning', t('core.solver.aboveLevel', { id: p.id, res: d.ja }), 'p:' + p.id);
+        if (d.b && m < -tol) warn('warning', t('core.solver.aboveLevel', { id: p.id, res: d.jb }), 'p:' + p.id);
+      }
     }
 
     // §5 of the compressible mode: a fluid as light as a gas (ρ < 50 kg/m³) in a pipe past Mach 0.3 (sound speed of an
@@ -146,6 +160,8 @@
     };
     // imposed flows left without supply (the solver option dropUnsupplied of the time simulation)
     if (prep.unsupplied) out.unsupplied = prep.unsupplied;
+    // the pipes that a dry reservoir connection closed (their ids), which the time simulation logs
+    if (dry.length) out.dry = dry;
     return out;
   }
 

@@ -79,13 +79,15 @@ PumpIt.i18n.add('en', {
 
     spray: {
       label: 'Nozzle / sprinkler',
-      check: { holes: 'Cd, diameter and number of holes', Kf: 'sprinkler K factor', Pext: 'external pressure' },
+      check: { Cd: 'Cd above 0 and at most 1 (a coefficient, not a percentage)', holes: 'diameter and number of holes', Kf: 'sprinkler K factor', Pext: 'external pressure' },
+      error: { Cd: 'Nozzle J{id}: Cd = {Cd}; a discharge coefficient is above 0 and at most 1.' },
       form: {
         model: 'Model',
         CdA: 'Discharge coefficient (Cd·A)',
         K: 'Sprinkler K factor',
         Kf: 'K factor (Q = K·√ΔP)',
         KfHint: 'The K factor assumes water; for another fluid Cd·A = √(ρ<sub>water</sub>/2)·K is used.',
+        CdHint: 'Discharge coefficient of each hole, above 0 and at most 1 (0.62 for a sharp hole, close to 1 for a well-rounded nozzle). Type 0.62, not 62 %.',
         dHole: 'Hole diameter',
         nHoles: 'Number of holes',
         Pext: 'External pressure',
@@ -232,6 +234,8 @@ PumpIt.i18n.add('en', {
       warn: {
         addingPressure: 'Control valve J{id} is adding {dp} kgf/cm² to hold its set point (acts as a pump).',
         notControlling: '{ctype} valve J{id} not controlling ({state}).',
+        beyondOpen: 'PDCV J{id} passes more flow than it can fully open: at this flow the fully open valve loses {open} kgf/cm², above its set drop of {dp} kgf/cm² (the PDCV is ideal and always holds its drop).',
+        beyondChoke: 'PDCV J{id} passes more flow than it can fully open: the fully open valve would be choked at this flow, whatever the drop (the PDCV is ideal and always holds its drop of {dp} kgf/cm²).',
       },
       form: {
         ctype: 'Type',
@@ -251,6 +255,7 @@ PumpIt.i18n.add('en', {
         failOpen: 'Open fully',
         failClosed: 'Close',
         setDP: 'Set pressure drop',
+        pdcvHint: 'The PDCV is ideal: it holds this drop at any flow and never opens fully or closes by itself, so "Always control" changes nothing for it. The fully open K applies in the special condition Fully open; a warning tells when the flow is more than the fully open valve passes at this drop.',
         alwaysControl: 'Always control (may add pressure, with a warning)',
         kOpen: 'Fully open K',
         char: 'Characteristic (for the opening)',
@@ -281,8 +286,12 @@ PumpIt.i18n.add('en', {
 
     orifice: {
       label: 'Orifice',
-      check: { dO: 'orifice diameter' },
-      error: { tooLarge: 'Orifice J{id}: the orifice area must be smaller than the pipe areas.' },
+      check: { dO: 'orifice diameter', rEdge: 'edge radius (zero or more)', Cd: 'Cd above 0 and at most 1', K: 'K (zero or more)' },
+      error: {
+        tooLarge: 'Orifice J{id}: the orifice area must be smaller than the pipe areas.',
+        rEdge: 'Orifice J{id}: the edge radius must be given, zero or more.',
+        Cd: 'Orifice J{id}: Cd = {Cd}; a discharge coefficient is above 0 and at most 1.',
+      },
       form: {
         model: 'Model',
         sharp: 'Sharp-edged (Idelchik)',

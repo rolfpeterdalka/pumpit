@@ -98,10 +98,12 @@ console.log('\nReservoir connections by elevation and by depth');
   // a blank cell is the bottom, and only the field of the reference in use counts
   const rB = solveOk(build({ connBy: 'depth', pipeK: { 1: { kOut: 0, kIn: 0, elev: q(20, 'm') } } }));
   check('By depth, a pipe without one connects at the bottom (its elevation is not used)', rel(rB.pipes[1].P0in, P0at(rB, 30)) < 1e-9);
-  // a negative depth is above the surface: the pipe discharges in free fall, from 12 m
+  // a negative depth is above the surface: the pipe discharges in free fall, from 12 m. The jet leaves at the pressure of
+  // the gas over the liquid, its static pressure, so its kinetic energy is lost too: the exit K of 0 counts as 1 (review
+  // of a952425: the jet left at the stagnation pressure of the tank, with the friction alone)
   const rF = solveOk(build({}, { connBy: 'depth', pipeK: { 1: { kOut: 0, kIn: 0, depth: q(-2, 'm') } } }));
-  const V = bisect((V) => { const Re = fl.rho * V * D / fl.mu; return H.frictionFactor(Re, eps / D) * L / D * V * V / 2 - g * 18; }, 0.01, 20);
-  check('A negative depth discharges in free fall above the surface', rel(rF.pipes[1].V, V) < 1e-7 && rel(rF.pipes[1].P0out, rF.patm) < 1e-9, `${rF.pipes[1].V.toFixed(6)} × ${V.toFixed(6)} m/s`);
+  const V = bisect((V) => { const Re = fl.rho * V * D / fl.mu; return (H.frictionFactor(Re, eps / D) * L / D + 1) * V * V / 2 - g * 18; }, 0.01, 20);
+  check('A negative depth discharges in free fall above the surface', rel(rF.pipes[1].V, V) < 1e-7 && rel(rF.pipes[1].Pout, rF.patm) < 1e-9 && rel(rF.pipes[1].P0out, rF.patm + fl.rho * V * V / 2) < 1e-9, `${rF.pipes[1].V.toFixed(6)} × ${V.toFixed(6)} m/s, static ${rF.pipes[1].Pout.toFixed(3)} Pa`);
   check('… as the same elevation does', rel(solveOk(build({}, byElev(12))).pipes[1].m, rF.pipes[1].m) < 1e-12);
 }
 
@@ -657,6 +659,459 @@ console.log('\nReview of 319654f, bug 3: laminar flow in an annulus');
   const Rf = PumpIt.surge.network.frictionOf(P, A, 1, env), R1 = PumpIt.surge.network.frictionOf(Object.assign({}, P, { phiLam: 1 }), A, 1, env);
   const mLam = 1000 * A * 0.1;
   check('annulus: the variable friction of the water hammer is phi times that of a circle in laminar flow', rel(Rf(mLam) / R1(mLam), H.annulusLaminar(0.8)) < 1e-12);
+}
+
+console.log('\nReview of a952425, item 1: laminar flow in a rectangular duct');
+{
+  // an oil (0.1 Pa·s) at 1 m³/h through 100 m of a smooth duct, from a reservoir at 5 bar(a) to a demand
+  const oil = (geometry, Q = 1, mu = 0.1) => {
+    const m = M.newModel();
+    m.system.fluid = { kind: 'user', name: 'oil', rho: q(1000, 'kg/m³'), mu: q(mu, 'Pa·s') };
+    m.junctions = [
+      Object.assign(M.newJunction('reservoir', 1, 0, 0), { elevation: q(0, 'm'), liquidElev: q(0, 'm'), surfP: q(5, 'bar(a)') }),
+      Object.assign(M.newJunction('flow', 2, 0, 0), { elevation: q(0, 'm'), dir: 'out', Q: q(Q, 'm³/h') }),
+    ];
+    const p = M.newPipe(1, 1, 2);
+    Object.assign(p, { length: q(100, 'm'), geometry, friction: { model: 'smooth' } });
+    m.pipes = [p];
+    const e = M.effective(m, 'base'), r = S.run(e);
+    return { ok: M.validate(e).ok && r.ok, p: r.pipes && r.pipes[1], text: r.ok ? 'solved' : r.errors.join('; ') };
+  };
+  // the series of fully developed laminar flow between four fixed walls, summed term by term with tanh (another form):
+  // ΔP = 12μLQ / (W·H³·(1 − (192H/(π⁵W))·Σ tanh(nπW/(2H))/n⁵)), n odd, W the longer side
+  const series = (w, h, Q = 1 / 3600, mu = 0.1, L = 100) => {
+    const W = Math.max(w, h), Hs = Math.min(w, h);
+    let s = 0;
+    for (let n = 1; n <= 2001; n += 2) s += Math.tanh(n * Math.PI * W / (2 * Hs)) / n ** 5;
+    return 12 * mu * L * Q / (W * Hs ** 3 * (1 - 192 * Hs * s / (Math.PI ** 5 * W)));
+  };
+  const rect = (w, h, wu = 'mm', hu = 'mm', Q, mu) => oil({ kind: 'rectangular', width: q(w, wu), height: q(h, hu) }, Q, mu);
+  const flat = rect(100, 10), tall = rect(10, 100), sq = rect(40, 40);
+  check('rectangle 100 × 10 mm: the laminar drop is the exact one (355.75 kPa, 1.323 times that of 64/Re)',
+    flat.ok && rel(flat.p.dPfric, series(0.1, 0.01)) < 1e-9 && Math.abs(flat.p.dPfric / 1000 - 355.7547) < 1e-4, flat.text + ' ' + (flat.p && flat.p.dPfric));
+  check('rectangle 10 × 100 mm: width and height swapped give the same drop and f, to the last digit', tall.ok && tall.p.dPfric === flat.p.dPfric && tall.p.f === flat.p.f);
+  check('square 40 × 40 mm: the exact drop (30.87 kPa), below that of 64/Re (34.72 kPa)',
+    sq.ok && rel(sq.p.dPfric, series(0.04, 0.04)) < 1e-9 && Math.abs(sq.p.dPfric / 1000 - 30.8747) < 1e-4, sq.text + ' ' + (sq.p && sq.p.dPfric));
+  check('rectangle: the reported f is phi·64/Re', flat.ok && rel(flat.p.f * flat.p.Re, 64 * H.rectLaminar(0.1)) < 1e-12, flat.p && String(flat.p.f * flat.p.Re));
+  const units = rect(0.1, 1, 'm', 'cm');
+  check('rectangle: 0.1 m × 1 cm is the section of 100 × 10 mm', units.ok && rel(units.p.dPfric, flat.p.dPfric) < 1e-12, units.text);
+  // f·Re of Shah and London: 56.91 (a square), 62.19 (1:2), 72.93 (1:4), 84.68 (1:10), 96 (two plates)
+  const fRe = (a) => 64 * H.rectLaminar(a);
+  check('rectangle: f·Re is 56.91, 62.19, 72.93 and 84.68 for sides 1:1, 1:2, 1:4 and 1:10, tends to 96, and 10:1 is 1:10',
+    Math.abs(fRe(1) - 56.908) < 1e-3 && Math.abs(fRe(0.5) - 62.192) < 1e-3 && Math.abs(fRe(0.25) - 72.931) < 1e-3 && Math.abs(fRe(0.1) - 84.676) < 1e-3
+      && Math.abs(fRe(1e-6) - 96) < 1e-3 && fRe(10) === fRe(0.1), [1, 0.5, 0.25, 0.1].map((a) => fRe(a).toFixed(3)).join(' '));
+  const fAt = (Re) => H.frictionFactor(Re, 0, 2300, 4000, H.rectLaminar(0.1));
+  check('rectangle: f has no step at Re_lam (the transition starts from phi·64/Re_lam) and reaches Colebrook at Re_turb',
+    rel(fAt(2300 - 1e-9), fAt(2300)) < 1e-9 && rel(fAt(4000), H.colebrook(4000, 0)) < 1e-12);
+  const turb = rect(100, 10, 'mm', 'mm', 30, 0.001);
+  check('rectangle: in turbulent flow the drop is that of Colebrook on Dh, as before', turb.ok && turb.p.Re > 4000 && rel(turb.p.f, H.colebrook(turb.p.Re, 0)) < 1e-12, turb.text);
+  // controls: a circle and an annulus keep their exact drops
+  const circ = oil({ kind: 'circular', d: q(100, 'mm') }), an = oil({ kind: 'annulus', dOuter: q(100, 'mm'), dInner: q(80, 'mm') });
+  check('rectangle, controls: a circle is still Hagen-Poiseuille and an annulus 100 × 80 mm its exact drop (117.79 kPa)',
+    circ.ok && rel(circ.p.dPfric, 128 * 0.1 * 100 * (1 / 3600) / (Math.PI * 0.1 ** 4)) < 1e-12 && an.ok && Math.abs(an.p.dPfric - 117794.968) < 1e-2, circ.text + ' ' + an.text);
+}
+
+console.log('\nReview of a952425, item 3: the rounded orifice');
+{
+  // a reservoir at 5 bar(a), an orifice between two smooth pipes of 1 m and a demand of 200 m³/h (or a supply, reversed)
+  const run = (dIn, dOut, dO, r, Q = 200, orModel = 'rounded') => {
+    const m = M.newModel();
+    m.system.fluid = { kind: 'user', name: 'water', rho: q(1000, 'kg/m³'), mu: q(0.001, 'Pa·s') };
+    const node = (type, id, props) => Object.assign(M.newJunction(type, id, 100 * id, 0), { elevation: q(0, 'm') }, props);
+    m.junctions = [node('reservoir', 1, { liquidElev: q(0, 'm'), surfP: q(5, 'bar(a)') }), node('orifice', 2, { orModel, dO: q(dO, 'mm'), rEdge: q(r, 'mm') }),
+      node('flow', 3, { dir: Q > 0 ? 'out' : 'in', Q: q(Math.abs(Q), 'm³/h') })];
+    const pipe = (id, up, down, d) => Object.assign(M.newPipe(id, up, down), { geometry: { kind: 'circular', d: q(d, 'mm') }, length: q(1, 'm'), friction: { model: 'smooth' } });
+    m.pipes = [pipe(1, 1, 2, dIn), pipe(2, 2, 3, dOut)];
+    const e = M.effective(m, 'base'), s = S.run(e);
+    return { ok: M.validate(e).ok && s.ok, K: s.ok ? s.junctions[2].K : NaN, s, text: s.ok ? 'solved' : s.errors.join('; ') };
+  };
+  const A = (mm) => Math.PI * (mm / 1000) ** 2 / 4;
+  // the expression of the K, written out (Idelchik): (Aup/Ao)²·(√ζ'·(1 − Ao/Aup)^0.375 + 1 − Ao/Adown)²
+  const idel = (Aup, Adown, Ao, edge) => (Aup / Ao) ** 2 * (edge * (1 - Ao / Aup) ** 0.375 + 1 - Ao / Adown) ** 2;
+  const zeta = (r, Do) => 0.03 + 0.47 * 10 ** (-7.7 * r / Do);
+  const lo = run(100, 99.999, 95, 1), eq = run(100, 100, 95, 1), hi = run(100, 100.001, 95, 1);
+  check('rounded orifice: 0.001 mm on either side of equal pipes changes K by less than 0.1 % (0.16643, 0.16645, 0.16646)',
+    lo.ok && eq.ok && hi.ok && rel(lo.K, eq.K) < 1e-3 && rel(hi.K, eq.K) < 1e-3 && Math.abs(eq.K - 0.16645) < 1e-5, [lo.K, eq.K, hi.K].join(' '));
+  check('rounded orifice: the K of the solution is that of the expression of Idelchik with the edge of r/Do',
+    rel(eq.K, idel(A(100), A(100), A(95), Math.sqrt(zeta(1, 95)))) < 1e-9, String(eq.K));
+  // limits that do not depend on the expression: no radius is the sharp edge (ζ' = 0.5, √0.5 = 0.707), a hole as large as
+  // the upstream pipe is the sudden expansion of Borda-Carnot, one as large as the downstream pipe the contraction
+  const sharp = H.orificeK(A(100), A(100), A(95), 'sharp', 0, 0.095), r0 = H.orificeK(A(100), A(100), A(95), 'rounded', 0, 0.095);
+  check('rounded orifice: a zero radius gives the sharp-edged K (2.3e-4 apart: the sharp edge writes √0.5 as 0.707)',
+    rel(r0, idel(A(100), A(100), A(95), Math.SQRT1_2)) < 1e-12 && rel(r0, sharp) < 3e-4, `${r0} × ${sharp}`);
+  const Ain = A(100), Aout = A(150), big = Ain;
+  check('rounded orifice: a hole as large as the upstream pipe in an expansion 100 → 150 mm is Borda-Carnot, (1 − A1/A2)², at any radius',
+    rel(H.orificeK(Ain, Aout, big, 'rounded', 0.002, 0.1), (1 - Ain / Aout) ** 2) < 1e-6 && rel(H.orificeK(Ain, Aout, big, 'rounded', 0.02, 0.1), (1 - Ain / Aout) ** 2) < 1e-6);
+  const small = A(100), Kc = H.orificeK(Aout, A(100), small, 'rounded', 0.002, 0.1);
+  check('rounded orifice: a hole as large as the downstream pipe in a contraction 150 → 100 mm is ζ\'·(1 − A2/A1)^0.75 on the narrow area',
+    rel(Kc * (small / Aout) ** 2, zeta(0.002, 0.1) * (1 - A(100) / Aout) ** 0.75) < 1e-6, String(Kc));
+  // a change of section, both ways: forward the K of the 100 mm pipe, reversed that of the 150 mm one
+  const fw = run(100, 150, 80, 4), rv = run(100, 150, 80, 4, -200);
+  check('rounded orifice 80 mm between 100 and 150 mm: forward and reversed flows take the K of the pipe the flow comes from',
+    fw.ok && rv.ok && rel(fw.K, idel(A(100), A(150), A(80), Math.sqrt(zeta(4, 80)))) < 1e-9 && rel(rv.K, idel(A(150), A(100), A(80), Math.sqrt(zeta(4, 80)))) < 1e-9
+      && rv.s.pipes[1].Q < 0, `${fw.K} ${rv.K}`);
+  // the sharp edge is the expression it always was
+  const sh = run(100, 150, 80, 0, 200, 'sharp');
+  check('sharp-edged orifice: the expression of before, to the last digit, and the K of the solution',
+    H.orificeK(A(100), A(150), A(80), 'sharp', 0, 0.08) === (A(100) / A(80)) ** 2 * (0.707 * (1 - A(80) / A(100)) ** 0.375 + 1 - A(80) / A(150)) ** 2
+      && sh.ok && rel(sh.K, H.orificeK(A(100), A(150), A(80), 'sharp', 0, 0.08)) < 1e-9, sh.text);
+}
+
+console.log('\nReview of a952425, items 4 and 5: the Cd of a nozzle and the edge radius of an orifice');
+{
+  const look = (m) => {
+    const e = M.effective(m, 'base'), v = M.validate(e), r = S.run(e);
+    const msgs = [...v.undef.values()].flat();
+    return { v, r, msgs, text: msgs.join(' | ') + ' || ' + (r.ok ? 'solved' : r.errors.join('; ')) };
+  };
+  const water = (m) => { m.system.fluid = { kind: 'user', name: 'water', rho: q(1000, 'kg/m³'), mu: q(0.001, 'Pa·s') }; return m; };
+  const node = (type, id, props) => Object.assign(M.newJunction(type, id, 100 * id, 0), { elevation: q(0, 'm') }, props);
+  const pipe = (id, up, down) => Object.assign(M.newPipe(id, up, down), { geometry: { kind: 'circular', d: q(100, 'mm') }, length: q(1, 'm'), friction: { model: 'smooth' } });
+  // item 4: a reservoir at 2 bar(a) and a nozzle of one hole of 5 mm to 1 bar(a)
+  const nozzle = (Cd, sprayModel = 'CdA') => {
+    const m = water(M.newModel());
+    m.junctions = [node('reservoir', 1, { liquidElev: q(0, 'm'), surfP: q(2, 'bar(a)') }), node('spray', 2, { sprayModel, Cd, nHoles: 1, dHole: q(5, 'mm'), Pext: q(1, 'bar(a)'), Kf: q(80, 'L/min/bar½') })];
+    m.pipes = [pipe(1, 1, 2)];
+    return look(m);
+  };
+  const c62 = nozzle(0.62), c1 = nozzle(1), pct = nozzle(62), c0 = nozzle(0), byK = nozzle(62, 'K');
+  check('nozzle: Cd 0.62 discharges 0.620 m³/h, as before', c62.v.ok && c62.r.ok && Math.abs(c62.r.pipes[1].Q * 3600 - 0.6197819525) < 1e-8, c62.text);
+  check('nozzle: Cd 1 is accepted', c1.v.ok && c1.r.ok, c1.text);
+  check('nozzle: Cd 62 (a percentage) is refused by the checklist, its field named, and by the solver, its junction named',
+    !pct.v.ok && pct.msgs.includes(PumpIt.i18n.t('junctions.spray.check.Cd')) && !pct.r.ok && /J2/.test(pct.r.errors[0]) && /62/.test(pct.r.errors[0]), pct.text);
+  check('nozzle: Cd 0 is refused too', !c0.v.ok && !c0.r.ok, c0.text);
+  check('nozzle: a K factor model leaves its old Cd alone', byK.v.ok && byK.r.ok, byK.text);
+  // item 5: the orifice of item 3 between two pipes of 100 mm, 95 mm with an edge radius
+  const orifice = (props) => {
+    const m = water(M.newModel());
+    m.junctions = [node('reservoir', 1, { liquidElev: q(0, 'm'), surfP: q(5, 'bar(a)') }), node('orifice', 2, Object.assign({ orModel: 'rounded', dO: q(95, 'mm') }, props)),
+      node('flow', 3, { dir: 'out', Q: q(200, 'm³/h') })];
+    m.pipes = [pipe(1, 1, 2), pipe(2, 2, 3)];
+    return look(m);
+  };
+  const r10 = orifice({ rEdge: q(10, 'mm') }), rNeg = orifice({ rEdge: q(-10, 'mm') }), rZero = orifice({ rEdge: q(0, 'mm') }), rNone = orifice({ rEdge: q(null, 'mm') });
+  check('orifice: a radius of 10 mm calculates (K 0.06572, 1.644 kPa with the expression of item 3)',
+    r10.v.ok && r10.r.ok && Math.abs(r10.r.junctions[2].K - 0.06572) < 1e-5 && Math.abs(r10.r.junctions[2].dP - 1644) < 1, r10.text);
+  check('orifice: a radius of −10 mm is refused by the checklist and by the solver, with a message of its own',
+    !rNeg.v.ok && rNeg.msgs.includes(PumpIt.i18n.t('junctions.orifice.check.rEdge')) && !rNeg.r.ok && rNeg.r.errors[0] === PumpIt.i18n.t('junctions.orifice.error.rEdge', { id: 2 }), rNeg.text);
+  check('orifice: a radius of zero is the geometric limit, the sharp edge', rZero.v.ok && rZero.r.ok && rel(rZero.r.junctions[2].K, H.orificeK(Math.PI * 0.1 ** 2 / 4, Math.PI * 0.1 ** 2 / 4, Math.PI * 0.095 ** 2 / 4, 'sharp', 0, 0.095)) < 3e-4, rZero.text);
+  check('orifice: a blank radius is refused', !rNone.v.ok && !rNone.r.ok, rNone.text);
+  const sharpOld = orifice({ orModel: 'sharp', rEdge: q(-10, 'mm') }), cdOld = orifice({ orModel: 'Cd', Cd: 0.61, rEdge: q(-10, 'mm') });
+  check('orifice: the sharp-edged and Cd models leave an old radius alone', sharpOld.v.ok && sharpOld.r.ok && cdOld.v.ok && cdOld.r.ok, sharpOld.text + ' ' + cdOld.text);
+  const cdBad = orifice({ orModel: 'Cd', Cd: 61 });
+  check('orifice: a Cd of 61 has its own message in the checklist and is refused by the solver',
+    !cdBad.v.ok && cdBad.msgs.includes(PumpIt.i18n.t('junctions.orifice.check.Cd')) && !cdBad.r.ok && /J2/.test(cdBad.r.errors[0]), cdBad.text);
+}
+
+console.log('\nReview of a952425, items 6 and 7: connections above the liquid level of a reservoir');
+{
+  const t = PumpIt.i18n.t;
+  const g = 9.80665, A = Math.PI * 0.1 ** 2 / 4, rho = 1000;
+  const water = (m, mu = 0.001) => { m.system.fluid = { kind: 'user', name: 'water', rho: q(rho, 'kg/m³'), mu: q(mu, 'Pa·s') }; return m; };
+  const tube = (id, up, down, friction = { model: 'explicitF', f: 0.02 }) => Object.assign(M.newPipe(id, up, down), { length: q(20, 'm'), geometry: { kind: 'circular', d: q(100, 'mm') }, friction });
+  // the model of the report: J1 with its bottom and its nozzle at −1 m and its surface at `level`, J2 with its bottom at
+  // 0 m, its surface at 1 m and its nozzle at 2 m, 1 bar(a) on both; one pipe of 20 m, 100 mm, f = 0.02 (fL/D = 4) and
+  // no end K. k2 goes into the row of the pipe at J2, j2 into J2
+  const tanks = (level, flip, k2 = {}, j2 = {}, friction) => {
+    const m = water(M.newModel());
+    m.junctions = [[level, -1, -1], [1, 0, 2]].map(([h, z, zc], i) => Object.assign(M.newJunction('reservoir', i + 1, i * 100, 0),
+      { elevation: q(z, 'm'), liquidElev: q(h, 'm'), surfP: q(1, 'bar(a)'), pipeK: { 1: Object.assign({ elev: q(zc, 'm'), kIn: 0, kOut: 0 }, i ? k2 : {}) } }, i ? j2 : {}));
+    m.pipes = [tube(1, flip ? 2 : 1, flip ? 1 : 2, friction)];
+    return m;
+  };
+  const solve = (m) => { const e = M.effective(m, 'base'); return { v: M.validate(e), r: S.run(e) }; };
+  const texts = (r) => (r.ok ? r.warnings.map((w) => w.text) : r.errors).join(' | ');
+  const closedText = t('core.solver.dryClosed', { id: 1, res: 2 }), drawText = t('core.solver.aboveLevel', { id: 1, res: 2 });
+  const side = (flip) => (flip ? ' (the pipe drawn from J2)' : ' (the pipe drawn from J1)');
+
+  // item 7: the 8 m between the surface of J1 and the nozzle of J2 feed the kinetic energy of the jet and the friction,
+  // Δz = (1 + fL/D)·V²/2g, 158.390 m³/h, the jet at the 100 kPa(a) of the gas over the liquid
+  const Vjet = Math.sqrt(2 * g * 8 / (1 + 4)), Qjet = A * Vjet;
+  const jet = [false, true].map((flip) => solve(tanks(10, flip)));
+  jet.forEach(({ v, r }, i) => {
+    const flip = i === 1, p = r.pipes[1], Q = (flip ? -1 : 1) * p.Q, Pjet = flip ? p.Pin : p.Pout;
+    check('item 7: the free jet into J2 gives 158.390 m³/h, its static pressure 100 kPa(a), and no warning' + side(flip),
+      v.ok && r.ok && rel(Q, Qjet) < 1e-9 && Math.abs(Pjet - 1e5) < 1e-6 && !r.warnings.length, `${(Q * 3600).toFixed(5)} m³/h, ${(Pjet / 1e3).toFixed(6)} kPa(a) ${texts(r)}`);
+  });
+  // item 6: with the surface of J1 at 0 m the network would draw from J2 through its dry nozzle (88.54 m³/h before)
+  [false, true].forEach((flip) => {
+    const { v, r } = solve(tanks(0, flip));
+    check('item 6: J2 gives no liquid through its dry nozzle: the pipe closes, with a warning that names it' + side(flip),
+      v.ok && r.ok && Math.abs(r.pipes[1].m) < 1e-12 && r.dry && r.dry.join() === '1' && r.states.P1 === 'dry' && r.warnings.some((w) => w.text === closedText) && !r.warnings.some((w) => w.text === drawText),
+      `${(r.pipes[1].Q * 3600).toFixed(6)} m³/h ${texts(r)}`);
+  });
+  // a submerged nozzle supplies: the nozzle of J2 at 0.5 m, under its surface at 1 m, 1 m of head over the friction alone
+  [false, true].forEach((flip) => {
+    const { v, r } = solve(tanks(0, flip, { elev: q(0.5, 'm') }));
+    const Q = (flip ? 1 : -1) * r.pipes[1].Q, Qsub = A * Math.sqrt(2 * g * 1 / 4);
+    check('a submerged nozzle of J2 supplies J1, 62.609 m³/h, without a warning' + side(flip),
+      v.ok && r.ok && rel(Q, Qsub) < 1e-9 && !r.warnings.length && !r.dry, `${(Q * 3600).toFixed(5)} m³/h ${texts(r)}`);
+  });
+  // the connection by depth (1 m above the surface, a depth of −1 m) is the same one as by elevation
+  for (const level of [10, 0]) {
+    const byElev = solve(tanks(level, false)).r, byDepth = solve(tanks(level, false, { depth: q(-1, 'm') }, { connBy: 'depth' })).r;
+    check(`a nozzle at a depth of −1 m is the one at an elevation of 2 m (surface of J1 at ${level} m)`,
+      byElev.ok && byDepth.ok && byElev.pipes[1].m === byDepth.pipes[1].m && byElev.pipes[1].Pout === byDepth.pipes[1].Pout && texts(byElev) === texts(byDepth), `${byDepth.pipes[1].m} × ${byElev.pipes[1].m} kg/s`);
+  }
+  // the exit K of the jet: below 1 it counts as 1 (0.5 as 0), above it stays (1.5: the jet 0.5·ρV²/2 above the gas)
+  const k05 = solve(tanks(10, false, { kIn: 0.5 })).r, k15 = solve(tanks(10, false, { kIn: 1.5 })).r;
+  const V15 = Math.sqrt(2 * g * 8 / (1.5 + 4));
+  check('item 7: an exit K of 0.5 counts as 1; one of 1.5 stays, the jet 0.5·ρV²/2 above the gas',
+    k05.ok && k15.ok && rel(k05.pipes[1].m, jet[0].r.pipes[1].m) < 1e-12 && rel(k15.pipes[1].V, V15) < 1e-9 && rel(k15.pipes[1].Pout - 1e5, 0.5 * rho * V15 * V15 / 2) < 1e-6,
+    `${k15.pipes[1].V.toFixed(6)} × ${V15.toFixed(6)} m/s, ${(k15.pipes[1].Pout - 1e5).toFixed(3)} Pa over the gas`);
+  // laminar, with the laminar correction of the K values by default (Crane): the jet still leaves at the pressure of the
+  // gas, 32μLV/D² + ρV²/2 = ρg·8 (the correction would have multiplied its exit loss)
+  {
+    const m = water(tanks(10, false, {}, {}, { model: 'smooth' }), 1);
+    const r = solve(m).r, p = r.pipes[1];
+    const a = rho / 2, b = 32 * 1 * 20 / 0.01, c = -rho * g * 8, Vl = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+    check('item 7: a laminar jet (Re 120, the Crane correction of K on) leaves at the 100 kPa(a) of the gas, its velocity from 32μLV/D² + ρV²/2 = ρg·8',
+      r.ok && p.Re < 2000 && rel(p.V, Vl) < 1e-9 && Math.abs(p.Pout - 1e5) < 1e-6, `Re ${p.Re.toFixed(1)}, ${p.V.toFixed(6)} × ${Vl.toFixed(6)} m/s, ${(p.Pout / 1e3).toFixed(6)} kPa(a)`);
+  }
+  // another supply path: an outflow of 50 m³/h at J5, from J4, which J3 (surface 1.5 m, its pipe at the bottom) and J2
+  // (its dry nozzle at 2 m) feed. J2 gives nothing and J3 everything, the grade line at J4 below the nozzle of J2; with the
+  // surface of J3 at 10 m the network pushes liquid into J2 in free fall instead
+  const fed = (flip, h3) => {
+    const m = water(M.newModel());
+    m.junctions = [
+      Object.assign(M.newJunction('reservoir', 2, 0, 0), { elevation: q(0, 'm'), liquidElev: q(1, 'm'), surfP: q(1, 'bar(a)'), pipeK: { 1: { elev: q(2, 'm'), kIn: 0, kOut: 0 } } }),
+      Object.assign(M.newJunction('reservoir', 3, 0, 100), { elevation: q(0, 'm'), liquidElev: q(h3, 'm'), surfP: q(1, 'bar(a)') }),
+      Object.assign(M.newJunction('branch', 4, 100, 50), { elevation: q(0, 'm') }),
+      Object.assign(M.newJunction('flow', 5, 200, 50), { elevation: q(0, 'm'), dir: 'out', Q: q(50, 'm³/h') }),
+    ];
+    m.pipes = [flip ? tube(1, 4, 2) : tube(1, 2, 4), tube(2, 3, 4), tube(3, 4, 5)];
+    return m;
+  };
+  const Qout = 50 / 3600, Vout = Qout / A, h4 = 1.5 - 4 * Vout * Vout / (2 * g);
+  [false, true].forEach((flip) => {
+    const { v, r } = solve(fed(flip, 1.5));
+    check('a network with another supply: J3 feeds the whole outflow, J2 nothing, and the grade line at J4 is that of J3 alone' + side(flip),
+      v.ok && r.ok && Math.abs(r.pipes[1].m) < 1e-12 && rel(r.pipes[2].Q, Qout) < 1e-9 && rel(r.pipes[3].Q, Qout) < 1e-9 && rel(r.junctions[4].P0in, 1e5 + rho * g * h4) < 1e-9
+        && r.warnings.some((w) => w.text === closedText),
+      `P2 ${(r.pipes[2].Q * 3600).toFixed(5)} m³/h, J4 at ${((r.junctions[4].P0in - 1e5) / (rho * g)).toFixed(6)} × ${h4.toFixed(6)} m ${texts(r)}`);
+  });
+  // with J3 at 10 m: 10 − h4 = 4·V2²/2g, h4 − 2 = (4 + 1)·V1²/2g (the jet into J2), V2·A = V1·A + 50 m³/h
+  const head4 = bisect((h) => A * Math.sqrt(2 * g * (10 - h) / 4) - A * Math.sqrt(2 * g * (h - 2) / 5) - Qout, 2, 10);
+  const Qin2 = A * Math.sqrt(2 * g * (head4 - 2) / 5);
+  [false, true].forEach((flip) => {
+    const { v, r } = solve(fed(flip, 10));
+    const p = r.pipes[1], Q1 = (flip ? 1 : -1) * p.Q, Pjet = flip ? p.Pout : p.Pin;
+    check('… with J3 at 10 m the pipe takes liquid from J4 into J2 in free fall, its jet at the pressure of the gas' + side(flip),
+      v.ok && r.ok && rel(Q1, Qin2) < 1e-9 && Math.abs(Pjet - 1e5) < 1e-6 && r.states.P1 === 'open' && !r.dry && !r.warnings.length,
+      `${(Q1 * 3600).toFixed(5)} × ${(Qin2 * 3600).toFixed(5)} m³/h ${texts(r)}`);
+  });
+  // nothing else feeds an outflow: the solution asked for is impossible, and the error says why
+  {
+    const m = water(M.newModel());
+    m.junctions = [Object.assign(M.newJunction('reservoir', 1, 0, 0), { elevation: q(0, 'm'), liquidElev: q(1, 'm'), surfP: q(1, 'bar(a)'), pipeK: { 1: { elev: q(2, 'm'), kIn: 0, kOut: 0 } } }),
+      Object.assign(M.newJunction('flow', 2, 100, 0), { elevation: q(0, 'm'), dir: 'out', Q: q(10, 'm³/h') })];
+    m.pipes = [tube(1, 1, 2)];
+    const { v, r } = solve(m);
+    check('an outflow fed only through a dry nozzle stops the calculation, saying which pipe cannot draw from which reservoir',
+      v.ok && !r.ok && r.errors.includes(t('core.solver.dryClosed', { id: 1, res: 1 })), texts(r));
+  }
+  // the time simulation: the level of J2, an infinite reservoir, falls below its nozzle at 2 m and rises again; the pipe
+  // closes and opens again, both in the log, with no warning of the steps
+  {
+    const m = tanks(0, false, {}, { liquidElev: q(3, 'm') });
+    m.junctions[1].time = { use: true, what: 'level', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: [0, 30, 60], v: [3, 1, 3], tUnit: 's', vUnit: 'm' }] };
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(60, 's'), step: q(30, 's') });
+    const tr = PumpIt.time.run(M.effective(m, 'base'));
+    const ms = tr.ok ? [...tr.series.pipes[1].m] : [], m0 = -rho * A * Math.sqrt(2 * g * 3 / 4);
+    const ev = (key) => tr.events.filter((e) => e.obj === 'p:1' && e.key === key).map((e) => e.t).join();
+    check('time: the uncovered nozzle of an infinite reservoir closes its pipe and the covered one opens it again, in the log, without warnings',
+      tr.ok && ms.length === 3 && rel(ms[0], m0) < 1e-9 && Math.abs(ms[1]) < 1e-12 && rel(ms[2], m0) < 1e-9
+        && ev('core.time.log.pipe.closed') === '30' && ev('core.time.log.pipe.reopened') === '60' && !tr.warnings.some((w) => /P1/.test(w.text)),
+      `${ms.map((x) => (x * 3.6).toFixed(4)).join(', ')} m³/h; ${tr.events.map((e) => e.t + ' ' + e.key).join(', ')}; ${tr.warnings.map((w) => w.text).join(' | ')}`);
+  }
+}
+
+console.log('\nReview of a952425, items 8 and 9: a PDCV beyond what it passes fully open, and a static pressure with an end K');
+{
+  const t = PumpIt.i18n.t, { KGF, fmtSI } = PumpIt.solver.util;
+  const A = Math.PI * 0.1 ** 2 / 4, rho = 1000;
+  const Qof = (V) => A * V * 3600; // m³/h at the velocity V (m/s) in the pipes of 100 mm
+  const water = (m) => { m.system.fluid = { kind: 'user', name: 'water', rho: q(rho, 'kg/m³'), mu: q(0.001, 'Pa·s') }; return m; };
+  const node = (type, id, props) => Object.assign(M.newJunction(type, id, id * 100, 0), { elevation: q(0, 'm') }, props);
+  const res = (id, bar, pipeK = {}) => node('reservoir', id, { liquidElev: q(0, 'm'), surfP: q(bar, 'bar(a)'), pipeK });
+  // pipes of 5 m, 100 mm, f = 0.02: fL/D = 1
+  const tube = (id, up, down) => Object.assign(M.newPipe(id, up, down), { length: q(5, 'm'), geometry: { kind: 'circular', d: q(100, 'mm') }, friction: { model: 'explicitF', f: 0.02 } });
+  const solve = (m) => { const e = M.effective(m, 'base'); return { v: M.validate(e), r: S.run(e) }; };
+  const texts = (r) => (r.ok ? r.warnings.map((w) => w.text) : r.errors).join(' | ');
+  const drawn = (flip) => (flip ? ' (drawn from J2)' : ' (drawn from J1)');
+
+  // item 9: J1 a reservoir at 2 bar(a), J2 a static pressure of 1 bar(a) with K in 4 or 0 (163.242 m³/h and 166.67 kPa(a)
+  // at the end of the pipe with K before): the 100 kPa between them go half to friction, half to the velocity head,
+  // V = 10 m/s, 282.743 m³/h, the end of the pipe at 100 kPa(a)
+  const caution2 = t('core.solver.endKLeftOut', { id: 2, pipe: 1 });
+  for (const kIn of [4, 0]) {
+    const m = water(M.newModel());
+    m.junctions = [res(1, 2), node('pressure', 2, { P: q(1, 'bar(a)'), ptype: 'static', pipeK: { 1: { kIn, kOut: 0 } } })];
+    m.pipes = [tube(1, 1, 2)];
+    const { v, r } = solve(m), p = r.ok && r.pipes[1];
+    check(`item 9: a static pressure of 100 kPa(a) holds at the end of the pipe with K in ${kIn}, 282.743 m³/h` + (kIn ? ', its K left out with a caution' : ''),
+      v.ok && r.ok && rel(p.Q * 3600, Qof(10)) < 1e-9 && Math.abs(p.Pout - 1e5) < 1e-6 && r.warnings.some((w) => w.text === caution2) === (kIn > 0),
+      p ? `${(p.Q * 3600).toFixed(5)} m³/h, ${(p.Pout / 1e3).toFixed(6)} kPa(a) ${texts(r)}` : texts(r));
+  }
+  // the inlet end with K out: J1 a static pressure of 2 bar(a) with K out 4 or 0, J2 a reservoir at 1 bar(a) with the K in
+  // 2 of an exit: 200 + ρV²/2·(1 − 1 − 2) = 100, V = 10 m/s again, 200 kPa(a) at the inlet of the pipe
+  const caution1 = t('core.solver.endKLeftOut', { id: 1, pipe: 1 });
+  for (const kOut of [4, 0]) {
+    for (const flip of [false, true]) {
+      const m = water(M.newModel());
+      m.junctions = [node('pressure', 1, { P: q(2, 'bar(a)'), ptype: 'static', pipeK: { 1: { kIn: 0, kOut } } }), res(2, 1, { 1: { kIn: 2, kOut: 0 } })];
+      m.pipes = [flip ? tube(1, 2, 1) : tube(1, 1, 2)];
+      const { v, r } = solve(m), p = r.ok && r.pipes[1];
+      const Q = p ? (flip ? -1 : 1) * p.Q : NaN, Pin = p ? (flip ? p.Pout : p.Pin) : NaN;
+      check(`… at the inlet end with K out ${kOut}: 282.743 m³/h, 200 kPa(a) at the inlet of the pipe` + drawn(flip),
+        v.ok && r.ok && rel(Q * 3600, Qof(10)) < 1e-9 && Math.abs(Pin - 2e5) < 1e-6 && r.warnings.some((w) => w.text === caution1) === (kOut > 0),
+        `${(Q * 3600).toFixed(5)} m³/h, ${(Pin / 1e3).toFixed(6)} kPa(a) ${texts(r)}`);
+    }
+  }
+  // a stagnation pressure keeps its K: 200 − 100 = (1 + 4)·ρV²/2, V = √40 m/s (178.823 m³/h), the stagnation pressure at
+  // the end of the pipe 100 + 4·20 = 180 kPa(a), beyond which the node holds its 100 kPa(a)
+  {
+    const m = water(M.newModel());
+    m.junctions = [res(1, 2), node('pressure', 2, { P: q(1, 'bar(a)'), ptype: 'stagnation', pipeK: { 1: { kIn: 4, kOut: 0 } } })];
+    m.pipes = [tube(1, 1, 2)];
+    const { v, r } = solve(m), p = r.ok && r.pipes[1];
+    check('… a stagnation pressure keeps its K in 4: 178.823 m³/h, 180 kPa(a) of stagnation at the end of the pipe and 100 kPa(a) at the node, no caution',
+      v.ok && r.ok && rel(p.Q * 3600, Qof(Math.sqrt(40))) < 1e-9 && Math.abs(p.P0out - 1.8e5) < 1e-6 && Math.abs(r.junctions[2].P0in - 1e5) < 1e-6 && !r.warnings.length,
+      p ? `${(p.Q * 3600).toFixed(5)} m³/h, P0out ${(p.P0out / 1e3).toFixed(6)} kPa(a) ${texts(r)}` : texts(r));
+  }
+
+  // item 8: J1 at 2 bar(a), J3 at 1 bar(a), a PDCV between the two pipes, its fully open K 8, not always controlling
+  const pdcv = (props) => {
+    const m = water(M.newModel());
+    m.junctions = [res(1, 2), node('control', 2, Object.assign({ ctype: 'PDCV', setDP: q(10, 'kPa'), alwaysControl: false, kOpen: 8, special: 'none' }, props)), res(3, 1)];
+    m.pipes = [tube(1, 1, 2), tube(2, 2, 3)];
+    return m;
+  };
+  const beyond = (open, held) => t('junctions.control.warn.beyondOpen', { id: 2, open: fmtSI(open / KGF), dp: fmtSI(held / KGF) });
+  const pdcvWarn = (r) => r.warnings.some((w) => w.obj === 'j:2' && w.level === 'warning');
+  // the ideal valve holds its 10 kPa: the pipes take the other 90 kPa, V = √90 m/s (268.234 m³/h), a velocity head of
+  // 45 kPa, at which the fully open valve would lose 8 × 45 = 360 kPa
+  {
+    const { v, r } = solve(pdcv({}));
+    check('item 8: the ideal PDCV holds its 10 kPa at 268.234 m³/h, warning that the fully open valve would lose 360 kPa at that flow',
+      v.ok && r.ok && r.states[2] === 'control' && rel(r.pipes[1].Q * 3600, Qof(Math.sqrt(90))) < 1e-9 && Math.abs(r.valves[2].dP - 1e4) < 1e-6 && r.warnings.some((w) => w.text === beyond(3.6e5, 1e4)),
+      `${(r.pipes[1].Q * 3600).toFixed(5)} m³/h ${texts(r)}`);
+  }
+  // forced fully open: K 1 + 8 + 1 = 10 over 100 kPa, V = √20 m/s (126.447 m³/h), 80 kPa across the valve
+  {
+    const { v, r } = solve(pdcv({ special: 'open' }));
+    check('… forced fully open it passes 126.447 m³/h with 80 kPa across it, without that warning',
+      v.ok && r.ok && r.states[2] === 'open' && rel(r.pipes[1].Q * 3600, Qof(Math.sqrt(20))) < 1e-9 && Math.abs(r.valves[2].dP - 8e4) < 1e-6 && !pdcvWarn(r),
+      `${(r.pipes[1].Q * 3600).toFixed(5)} m³/h ${texts(r)}`);
+  }
+  // a set drop of 90 kPa: the pipes take 10 kPa, V = √10 m/s (89.411 m³/h), where the fully open valve loses 40 kPa
+  {
+    const { v, r } = solve(pdcv({ setDP: q(90, 'kPa') }));
+    check('… with a set drop of 90 kPa it controls at 89.411 m³/h, within what it passes fully open (40 kPa), without the warning',
+      v.ok && r.ok && r.states[2] === 'control' && rel(r.pipes[1].Q * 3600, Qof(Math.sqrt(10))) < 1e-9 && Math.abs(r.valves[2].dP - 9e4) < 1e-6 && !pdcvWarn(r),
+      `${(r.pipes[1].Q * 3600).toFixed(5)} m³/h ${texts(r)}`);
+  }
+  // a fully open K of 0 (the default): an ideal valve without loss never passes more than it can
+  {
+    const { v, r } = solve(pdcv({ kOpen: 0 }));
+    check('… with a fully open K of 0 it never warns', v.ok && r.ok && r.states[2] === 'control' && !pdcvWarn(r), texts(r));
+  }
+  // time: the set drop falls from 90 to 10 kPa at 30 s; the valve keeps controlling, and the warning covers the steps
+  // beyond what it passes fully open
+  {
+    const m = pdcv({ setDP: q(90, 'kPa') });
+    m.junctions[1].time = { use: true, what: 'set', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: [0, 30, 60], v: [90, 10, 10], tUnit: 's', vUnit: 'kPa' }] };
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(60, 's'), step: q(30, 's') });
+    const tr = PumpIt.time.run(M.effective(m, 'base'));
+    const Qs = tr.ok ? [...tr.series.pipes[1].Q].map((x) => x * 3600) : [];
+    const w = tr.ok ? tr.warnings.find((x) => x.obj === 'j:2' && x.level === 'warning') : null;
+    check('time: from 90 to 10 kPa at 30 s the PDCV keeps controlling (89.411, 268.234, 268.234 m³/h), its warning from 30 to 60 s',
+      tr.ok && Qs.length === 3 && rel(Qs[0], Qof(Math.sqrt(10))) < 1e-9 && rel(Qs[1], Qof(Math.sqrt(90))) < 1e-9 && rel(Qs[2], Qof(Math.sqrt(90))) < 1e-9
+        && !!w && w.t1 === 30 && w.t2 === 60 && w.n === 2,
+      `${Qs.map((x) => x.toFixed(4)).join(', ')} m³/h; ${tr.ok ? tr.warnings.map((x) => `${x.t1}–${x.t2} ${x.text}`).join(' | ') : tr.errors.join('; ')}`);
+  }
+}
+
+console.log('\nReview of a952425, items 10 and 11 and the static pressure: control valves over time, and the root of a static imposed pressure');
+{
+  const A = Math.PI * 0.1 ** 2 / 4;
+  const Qof = (V) => A * V * 3600; // m³/h at the velocity V (m/s) in the pipes of 100 mm
+  const node = (type, id, props) => Object.assign(M.newJunction(type, id, id * 100, 0), { elevation: q(0, 'm') }, props);
+  const res = (id, bar) => node('reservoir', id, { liquidElev: q(0, 'm'), surfP: q(bar, 'bar(a)') });
+  const tube = (id, up, down, L = 5) => Object.assign(M.newPipe(id, up, down), { length: q(L, 'm'), geometry: { kind: 'circular', d: q(100, 'mm') }, friction: { model: 'explicitF', f: 0.02 } });
+  const water = (m) => { m.system.fluid = { kind: 'user', name: 'water', rho: q(1000, 'kg/m³'), mu: q(0.001, 'Pa·s') }; return m; };
+  // J1 → control valve J2 → J3 at 1.5 bar(a), pipes of 5 m (fL/D = 1), the fully open K 2 (K = 4 in all): the surface
+  // pressure of J1 follows the steps of vals (bar(a)), one every 30 s, the first that of the steady state
+  const net = (props, vals) => {
+    const m = water(M.newModel());
+    m.junctions = [res(1, vals[0]), node('control', 2, Object.assign({ setQ: q(100, 'm³/h'), setP: q(2.5, 'bar(a)'), basis: 'stagnation', alwaysControl: false, kOpen: 2, failAction: 'closed', special: 'none' }, props)), res(3, 1.5)];
+    m.pipes = [tube(1, 1, 2), tube(2, 2, 3)];
+    m.junctions[0].time = { use: true, what: 'surfP', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: vals.map((_, i) => 30 * i), v: vals, tUnit: 's', vUnit: 'bar(a)' }] };
+    Object.assign(m.solution.time, { on: true, start: q(0, 's'), stop: q(30 * (vals.length - 1), 's'), step: q(30, 's') });
+    return m;
+  };
+  const series = (r) => (r.ok ? [...r.series.valves[2].m].map((x) => x * 3.6) : []);
+  const events = (r) => (r.ok ? r.events.filter((e) => e.obj === 'j:2').map((e) => e.t + ':' + e.key.split('.').pop()).join(' ') : '');
+  const same = (xs, ys) => xs.length === ys.length && xs.every((x, i) => Math.abs(x - ys[i]) < 1e-6 * Math.max(1, Math.abs(ys[i])));
+  const finalSteady = (m, bar) => { m.junctions[0].surfP = q(bar, 'bar(a)'); delete m.junctions[0].time; return S.run(M.effective(m, 'base')); };
+  const show = (r) => (r.ok ? `${series(r).map((x) => x.toFixed(3)).join(', ')} m³/h; ${events(r)}` : r.errors.join('; '));
+  const Q5 = Qof(5); // 50 kPa over K = 4: 5 m/s, 141.372 m³/h
+
+  // item 10: an FCV of 100 m³/h closed for lack of pressure (1 kPa) controls once J1 rises to 3 bar(a) (25 kPa needed)
+  {
+    const m = net({ ctype: 'FCV' }, [1.51, 3, 3]), r = PumpIt.time.run(M.effective(m, 'base')), s = finalSteady(m, 3);
+    check('item 10: an FCV closed for lack of pressure controls again once the supply recovers (0, 100, 100 m³/h), as the steady state at 3 bar(a)',
+      same(series(r), [0, 100, 100]) && events(r) === '30:control' && s.ok && s.states[2] === 'control' && rel(s.pipes[1].Q * 3600, 100) < 1e-9, show(r));
+  }
+  {
+    const r = PumpIt.time.run(M.effective(net({ ctype: 'FCV' }, [1.51, 1.51, 1.51]), 'base'));
+    check('… with the supply kept low it stays closed, without events', same(series(r), [0, 0, 0]) && events(r) === '', show(r));
+  }
+  {
+    const r = PumpIt.time.run(M.effective(net({ ctype: 'FCV' }, [1.51, 3, 1.51, 1.51, 3]), 'base'));
+    check('… a second fall closes it again and a second rise reopens it, without alternating between (0, 100, 0, 0, 100 m³/h)',
+      same(series(r), [0, 100, 0, 0, 100]) && events(r) === '30:control 60:closed 120:control', show(r));
+  }
+  {
+    const r = PumpIt.time.run(M.effective(net({ ctype: 'FCV', special: 'closed' }, [3, 3]), 'base'));
+    check('… closed by its special condition, it stays closed', same(series(r), [0, 0]), show(r));
+  }
+
+  // item 11: a PRV of 2.5 bar(a), fully open at 2 bar(a) (+141.372 m³/h), closes against the reverse flow when J1 falls
+  // to 1 bar(a), over time and in the steady state, and opens again when J1 is back at 2 bar(a)
+  {
+    const m = net({ ctype: 'PRV' }, [2, 1, 1]), r = PumpIt.time.run(M.effective(m, 'base')), s = finalSteady(m, 1);
+    check('item 11: a fully open PRV closes against the reverse flow (141.372, 0, 0 m³/h), as the steady state at 1 bar(a)',
+      same(series(r), [Q5, 0, 0]) && events(r) === '30:closed' && s.ok && s.states[2] === 'closed' && s.pipes[1].Q === 0, show(r));
+  }
+  {
+    const r = PumpIt.time.run(M.effective(net({ ctype: 'PRV' }, [2, 1, 2]), 'base'));
+    check('… and opens fully again when the supply is back (141.372, 0, 141.372 m³/h)', same(series(r), [Q5, 0, Q5]) && events(r) === '30:closed 60:open', show(r));
+  }
+  {
+    const m = net({ ctype: 'PRV', special: 'open' }, [2, 1, 1]), r = PumpIt.time.run(M.effective(m, 'base')), s = finalSteady(m, 1);
+    check('… forced fully open by its special condition, it lets the reverse flow through (−141.372 m³/h)',
+      same(series(r), [Q5, -Q5, -Q5]) && s.ok && s.states[2] === 'open' && rel(s.pipes[1].Q * 3600, -Q5) < 1e-9, show(r));
+  }
+  {
+    // a PSV of 1.2 bar(a) fully open with 2 bar(a) upstream; at 1 bar(a) the flow would turn back
+    const r = PumpIt.time.run(M.effective(net({ ctype: 'PSV', setP: q(1.2, 'bar(a)') }, [2, 1, 1]), 'base'));
+    check('… a fully open PSV closes against a reverse flow too (141.372, 0, 0 m³/h)', same(series(r), [Q5, 0, 0]) && events(r) === '30:closed', show(r));
+  }
+
+  // a static pressure of 1 bar(a) at the end a of a pipe whose flow comes from a reservoir at 2 bar(a): 100 kPa =
+  // (1 + fL/D)·ρV²/2. Drawn from the static pressure, the guess of 1 m/s took the root of the other direction where
+  // fL/D < 1 (565.487 m³/h at 2.5 m, against 326.484), and none at fL/D = 1 (a singular system at 5 m)
+  for (const [L, V] of [[2.5, Math.sqrt(2e5 / (1000 * 1.5))], [5, 10], [20, Math.sqrt(2e5 / (1000 * 5))]]) {
+    for (const flip of [false, true]) {
+      const m = water(M.newModel());
+      m.junctions = [res(1, 2), node('pressure', 2, { P: q(1, 'bar(a)'), ptype: 'static' })];
+      m.pipes = [flip ? tube(1, 1, 2, L) : tube(1, 2, 1, L)];
+      const r = S.run(M.effective(m, 'base')), Q = r.ok ? (flip ? 1 : -1) * r.pipes[1].Q * 3600 : NaN;
+      check(`a static pressure fed by a pipe of ${L} m: ${Qof(V).toFixed(3)} m³/h towards it` + (flip ? ' (drawn towards it)' : ' (drawn from it)'),
+        r.ok && rel(Q, Qof(V)) < 1e-9, r.ok ? `${Q.toFixed(4)} m³/h` : r.errors.join('; '));
+    }
+  }
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

@@ -11,8 +11,10 @@
 
   const device = {
     initial: (lk) => (lk.j.special === 'closed' ? 'closed' : lk.j.special === 'open' ? 'open' : 'control'),
-    // a state carried from the step before (time simulation): a special condition still fixes the state
-    resume: (lk, s) => (lk.j.special && lk.j.special !== 'none' ? device.initial(lk) : s),
+    // a state carried from the step before (time simulation): a special condition still fixes the state. A flow control
+    // valve closed by a failure starts again from control, so that it controls once the network lets it, and closes
+    // again where it still cannot (item 10 of the review of a952425): its closed state has no review of its own
+    resume: (lk, s) => (lk.j.special && lk.j.special !== 'none' ? device.initial(lk) : lk.ctype === 'FCV' && s === 'closed' ? 'control' : s),
 
     configure(lk, s) {
       if (s === 'closed') lk.mode = 'closed';
@@ -31,6 +33,8 @@
       const dPopen = lk.phiOpen(m);
       const basisDown = Pb - dynOf(lk.ctype === 'PRV' ? lk.dynPipe : null, rho, sol.m[lk.dynPipe?.link?.idx ?? -1] ?? m);
       const basisUp = Pa - dynOf(lk.ctype === 'PSV' ? lk.dynPipe : null, rho, sol.m[lk.dynPipe?.link?.idx ?? -1] ?? m);
+      // a reverse flow beyond the rounding: a velocity of 1e-9 m/s in the inlet pipe
+      const reverse = m < -1e-9 * rho * lk.Ain;
       if (s === 'control') {
         if (j.alwaysControl) return;
         if (lk.ctype === 'FCV') { if (dPreq < dPopen) next[lk.jid] = j.failAction === 'closed' ? 'closed' : 'open'; }
@@ -39,6 +43,9 @@
           else if (dPreq < dPopen) next[lk.jid] = 'open';
         }
       } else if (s === 'open') {
+        // fully open, a pressure reducing or sustaining valve closes against a reverse flow, as it does controlling
+        // (I-61; item 11 of the review of a952425)
+        if ((lk.ctype === 'PRV' || lk.ctype === 'PSV') && reverse) { next[lk.jid] = 'closed'; return; }
         if (lk.ctype === 'PRV' && basisDown > lk.value) next[lk.jid] = 'control';
         if (lk.ctype === 'PSV' && basisUp < lk.value) next[lk.jid] = 'control';
         if (lk.ctype === 'FCV' && m > lk.value) next[lk.jid] = 'control';
@@ -77,12 +84,14 @@
       else if (j.ctype === 'FCV') { lk.controlMode = 'fixedFlow'; lk.value = si(j.setQ, 'flow'); }
       else { lk.controlMode = 'dP'; lk.value = si(j.setDP, 'dp'); }
       lk.phi = lk.phiOpen;
+      lk.Ain = net.Pin.A * net.Pin.N;
       lk.device = device;
     },
 
     elementResults(j, jr, rc) {
       const vr = JS.inlineValveResult(j, jr, rc);
-      stateAndWarnings(j, vr, rc);
+      // the loss of the fully open valve at the flow, against the drop it holds
+      stateAndWarnings(j, vr, rc, () => [rc.el.phiOpen(rc.m), rc.dP]);
       rc.valves[j.id] = vr;
     },
 
@@ -164,14 +173,19 @@
         const vr = { type: j.type, m: rc.m, Q: jr.Q, QN: jr.QN, dP: rc.dP, Pin: jr.Pin, P0in: rc.P0in, K: jr.K, choked: jr.choked };
         // the K and the area of the pipe the flow comes from (the outlet one in reverse flow, as the K is referred)
         vr.Cv = JS.gasEquivalentCv(jr.K, rc.el.d ? rc.el.d.A[rc.m < 0 ? 1 : 0] : NaN);
-        stateAndWarnings(j, vr, rc);
+        // the drop the fully open valve needs for the flow, against the drop it holds (between its nodes, as its row)
+        stateAndWarnings(j, vr, rc, () => {
+          const na = gnode(rc.el, rc.res, rc.el.a), nb = gnode(rc.el, rc.res, rc.el.b);
+          return [openDrop(rc.cx, rc.el, na, nb, rc.m), na.P - nb.P];
+        });
         rc.valves[j.id] = vr;
       },
     },
   });
 
-  // state shown for the valve and the warnings of a valve that adds pressure or does not control
-  function stateAndWarnings(j, vr, rc) {
+  // state shown for the valve and the warnings of a valve that adds pressure or does not control. openLoss() gives the
+  // drop the fully open valve needs for the flow and the drop the valve holds
+  function stateAndWarnings(j, vr, rc, openLoss) {
     const s = rc.st[j.id];
     vr.state = t('junctions.states.' + (s === 'control' ? 'controlling' : s === 'open' ? 'fullyOpen' : 'closed'));
     vr.ctype = j.ctype;
@@ -180,6 +194,16 @@
     if (s === 'control' && rc.dP < 0) {
       vr.state = t('junctions.states.addingPressure');
       rc.warn('critical', t('junctions.control.warn.addingPressure', { id: j.id, dp: fmtSI(-rc.dP / KGF) }), 'j:' + j.id);
+    }
+    // a PDCV is ideal: it holds its drop at any flow and never fails (I-61). A flow above what the fully open valve passes
+    // at that drop warns (decision 3b of the review of a952425): the fully open valve would need more than the drop
+    if (s === 'control' && j.ctype === 'PDCV' && rc.m > 0 && openLoss) {
+      const [open, held] = openLoss();
+      if (open > held + 1e-9 * Math.max(Math.abs(held), 1)) {
+        const text = Number.isFinite(open) ? t('junctions.control.warn.beyondOpen', { id: j.id, open: fmtSI(open / KGF), dp: fmtSI(held / KGF) })
+          : t('junctions.control.warn.beyondChoke', { id: j.id, dp: fmtSI(held / KGF) });
+        rc.warn('warning', text, 'j:' + j.id);
+      }
     }
     if (s !== 'control' && j.special === 'none') rc.warn('warning', t('junctions.control.warn.notControlling', { ctype: j.ctype, id: j.id, state: vr.state }), 'j:' + j.id);
   }
@@ -211,6 +235,9 @@
       const na = gnode(lk, sol, lk.a), nb = gnode(lk, sol, lk.b);
       const s = st[lk.jid];
       const dPreq = na.P - nb.P, dPopen = openDrop(cx, lk, na, nb, m);
+      // a reverse flow beyond the rounding: a velocity of 1e-9 m/s in the inlet pipe, at the density of its node
+      const Fw = PumpIt.gas.flow, A = lk.d ? lk.d.A[0] * lk.d.N : NaN;
+      const reverse = m < 0 && !(m >= -1e-9 * Fw.rhoOf(cx, na.P, Fw.tempOf(cx, na)) * A);
       if (s === 'control') {
         if (j.alwaysControl) return;
         if (lk.ctype === 'FCV') { if (dPreq < dPopen) next[lk.jid] = j.failAction === 'closed' ? 'closed' : 'open'; }
@@ -219,6 +246,7 @@
           else if (dPreq < dPopen) next[lk.jid] = 'open';
         }
       } else if (s === 'open') {
+        if ((lk.ctype === 'PRV' || lk.ctype === 'PSV') && reverse) { next[lk.jid] = 'closed'; return; }
         if (lk.ctype === 'PRV' && lk.basisOf(sol, 'b') > lk.value) next[lk.jid] = 'control';
         if (lk.ctype === 'PSV' && lk.basisOf(sol, 'a') < lk.value) next[lk.jid] = 'control';
         if (lk.ctype === 'FCV' && m > lk.setMass(na)) next[lk.jid] = 'control';

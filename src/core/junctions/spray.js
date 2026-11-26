@@ -13,7 +13,12 @@
     defaults: () => ({ sprayModel: 'CdA', Cd: 0.62, dHole: q(10, 'mm'), nHoles: 1, Kf: q(80, 'L/min/bar½'), Pext: q(0, 'kgf/cm²(g)') }),
 
     validate(j, miss, { fin, pos, gasP }) {
-      if (j.sprayModel === 'CdA' && !(j.Cd > 0 && pos(j.dHole) && j.nHoles >= 1)) miss.push(t('junctions.spray.check.holes'));
+      if (j.sprayModel === 'CdA') {
+        // a discharge coefficient is above 0 and at most 1: 62 is a percentage typed as a coefficient, and it is not
+        // converted, since only the one who typed it knows what was meant (review of a952425)
+        if (!cdOk(j)) miss.push(t('junctions.spray.check.Cd'));
+        if (!(pos(j.dHole) && j.nHoles >= 1)) miss.push(t('junctions.spray.check.holes'));
+      }
       if (j.sprayModel === 'K' && !pos(j.Kf)) miss.push(t('junctions.spray.check.Kf'));
       if (!fin(j.Pext)) miss.push(t('junctions.spray.check.Pext'));
       gasP(j.Pext, 'junctions.spray.check.Pext');
@@ -21,6 +26,7 @@
 
     buildNode(j, net, z) {
       const rho = net.rho;
+      cdCheck(j, net);
       const nd = net.addNode({ z, jid: j.id });
       const ext = net.addNode({ kind: 'fixed', value: net.si(j.Pext, 'pressure'), z, jid: j.id, role: 'ext' });
       const CdA = effectiveArea(j, net.si);
@@ -56,6 +62,7 @@
     // compressible mode: the same effective area, with isentropic flow that chokes below the critical pressure ratio
     gas: {
       node(j, net, z) {
+        cdCheck(j, net);
         const nd = net.addNode({ z, jid: j.id });
         const ext = net.addNode({ kind: 'fixed', value: net.si(j.Pext, 'pressure'), pk: 'static', z, jid: j.id, role: 'ext' });
         const lk = net.addLink({ kind: 'ext', jid: j.id, a: nd.ix, b: ext.ix, mode: 'loss', rel: 'nozzle', CdA: effectiveArea(j, net.si), Text: net.env.fluid.T });
@@ -65,6 +72,13 @@
       results: (j, jr, rc) => JS.gasDischargeResults(j, jr, rc),
     },
   });
+
+  // the discharge coefficient of the holes: above 0 and at most 1 (the model by K factor has none). The solver refuses
+  // one outside, as the checklist does
+  const cdOk = (j) => j.Cd > 0 && j.Cd <= 1;
+  function cdCheck(j, net) {
+    if (j.sprayModel !== 'K' && !cdOk(j)) net.errors.push(t('junctions.spray.error.Cd', { id: j.id, Cd: String(j.Cd) }));
+  }
 
   // effective area Cd·A of the holes, or the area of a K factor read as water (ρ = 1000 kg/m³): Q = K·√ΔP
   function effectiveArea(j, si) {

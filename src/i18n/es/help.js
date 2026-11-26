@@ -377,14 +377,14 @@ PumpIt.i18n.add('es', {
 </ul>
 <p>En lo alto de los datos, un dibujo del tanque en corte muestra estas cotas en una misma escala: el nivel del líquido y el fondo a la izquierda, la presión en la superficie arriba y cada tubería en la pared derecha, donde se une, con su cota, o con su profundidad acotada desde la superficie. El campo en edición, o bajo el puntero, ilumina su parte del dibujo.</p>
 <h4>Cómo se calcula</h4>
-<p>El reservorio es un nudo cuya presión de estancamiento es igual a la presión en la superficie, en la cota del nivel. Sin K indicado, la presión de estancamiento es continua entre el tanque y el extremo de la tubería. Una tubería unida por encima del nivel del líquido descarga en caída libre; si intenta tomar líquido del tanque, aparece un aviso.</p>
+<p>El reservorio es un nudo cuya presión de estancamiento es igual a la presión en la superficie, en la cota del nivel. Sin K indicado, la presión de estancamiento es continua entre el tanque y el extremo de la tubería. Una tubería unida por encima del nivel del líquido descarga en caída libre: el chorro sale a la presión del gas sobre el líquido, como presión estática, de modo que la pérdida de ese extremo es como mínimo la energía cinética del chorro ([[t:inspector.pipeLosses.kIn]] por debajo de 1 cuenta como 1, sin la corrección laminar). No toma líquido del tanque: cuando la red tomaría líquido por ella, la tubería se cierra, con un aviso, y la red se calcula de nuevo; se abre otra vez cuando la red empuja líquido hacia el tanque. Una conexión en el propio nivel sigue alimentando.</p>
 <p>En los resultados, cada reservorio aparece en [[t:results.boundaries.title]], con el caudal que entra en la red o sale de ella por allí.</p>`,
           },
           pressure: {
             title: 'Presión impuesta',
             body: `<p>[[icon:pressure]] Un punto de presión conocida, como la conexión a una red pública o un colector mantenido a presión constante.</p>
 <ul>
-<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (la presión total en el nudo, la opción habitual) o [[t:junctions.pressure.form.static]], que vale para la única tubería unida: la presión estática es la de estancamiento menos ½ρV² de esa tubería.</li>
+<li>[[t:junctions.pressure.form.ptype]]: [[t:junctions.pressure.form.stagnation]] (la presión total en el nudo, la opción habitual) o [[t:junctions.pressure.form.static]], que vale para la única tubería unida: la presión estática es la de estancamiento menos ½ρV² de esa tubería. Es la presión estática en el extremo de la propia tubería, donde la muestran los resultados de la tubería, así que los K de la tabla de pérdidas se dejan fuera para esa tubería, con una precaución cuando no son cero.</li>
 <li>[[t:junctions.pressure.form.P]]: el valor impuesto.</li>
 </ul>
 <p>Acepta hasta 25 tuberías (en el tipo estático, solo 1) y tiene la tabla de pérdidas por tubería. Sirve como referencia de presión.</p>`,
@@ -466,9 +466,9 @@ PumpIt.i18n.add('es', {
 </table>
 <ul>
 <li>[[t:junctions.control.form.basis]] (PRV y PSV): presión estática (la habitual) o de estancamiento.</li>
-<li>[[t:junctions.control.form.alwaysControl]]: activado, la válvula mantiene el ajuste incluso cuando tendría que agregar presión, y el resultado avisa, porque una válvula real no hace eso. Desactivado, puede abrir totalmente o cerrar cuando no logra controlar.</li>
-<li>[[t:junctions.control.form.kOpen]]: la pérdida de la válvula totalmente abierta.</li>
-<li>[[t:junctions.control.form.failAction]] (FCV): abrir totalmente o cerrar.</li>
+<li>[[t:junctions.control.form.alwaysControl]]: activado, la válvula mantiene el ajuste incluso cuando tendría que agregar presión, y el resultado avisa, porque una válvula real no hace eso. Desactivado, puede abrir totalmente o cerrar cuando no logra controlar. Una PDCV nunca deja de controlar, así que la opción no cambia nada en ella.</li>
+<li>[[t:junctions.control.form.kOpen]]: la pérdida de la válvula totalmente abierta. Una PDCV la usa solo en la condición especial [[t:junctions.control.form.specialOpen]]: controlando, es una válvula ideal que mantiene su caída con cualquier caudal, y el resultado avisa cuando el caudal supera lo que la válvula totalmente abierta deja pasar con esa caída.</li>
+<li>[[t:junctions.control.form.failAction]] (FCV): abrir totalmente o cerrar. Cerrada, la válvula intenta controlar de nuevo en cada paso de la simulación en el tiempo; no hace falta un rearme manual.</li>
 <li>[[t:junctions.control.form.special]]: fuerza la válvula cerrada o totalmente abierta, ignorando el ajuste.</li>
 </ul>
 <p>El estado resultante — controlando, totalmente abierta o cerrada — aparece en el panel y en la tabla de válvulas. Detalles en [[go:tech.valves|Válvulas, orificios y boquillas]].</p>`,
@@ -1002,6 +1002,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <h4>Secciones no circulares</h4>
 <p>Todas las fórmulas usan el diámetro hidráulico — para la sección circular, el anillo, el rectángulo de lados <i>a</i> y <i>b</i> o el área y el perímetro indicados:</p>
 [[eq:hydraulicDiameter]]
+<p>En régimen laminar, el anillo y el rectángulo tienen su pérdida exacta sobre ese diámetro, f = 64·φ/Re, y la transición parte de ella. En el anillo de relación de diámetros κ = interior/exterior, φ = (1 − κ)²/(1 + κ² + (1 − κ²)/ln κ): 1 sin tubo interior, hasta 1,5 en una holgura estrecha. En el rectángulo de relación de lados α = menor/mayor, φ = 1,5/((1 + α)²·(1 − (192α/π⁵)·Σ tanh(nπ/(2α))/n⁵)) en los n impares: 0,889 en el cuadrado, hasta 1,5 en placas planas. Una sección dada por su área y su perímetro mantiene 64/Re.</p>
 <p>La incrustación reduce el diámetro hidráulico y el área (<i>r</i> es la reducción como fracción):</p>
 [[eq:fouling]]`,
           },
@@ -1056,8 +1057,9 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <p>Mientras controla, el enlace deja de tener pérdida e impone la presión aguas abajo (PRV) o aguas arriba (PSV), estática o de estancamiento, el caudal (FCV) o la caída de presión (PDCV). Totalmente abierta, vale la pérdida con el K de válvula abierta; cerrada, ṁ = 0. Después de cada convergencia se revisan los estados:</p>
 <ul>
 <li>una PRV o PSV que controla pasa a <b>cerrada</b> si su caudal se vuelve negativo, y a <b>totalmente abierta</b> si la caída exigida es menor que la pérdida con la válvula abierta (excepto con [[t:junctions.control.form.alwaysControl]]);</li>
-<li>totalmente abierta, vuelve a controlar cuando la presión aguas abajo supera el ajuste (PRV), cuando la de aguas arriba queda por debajo de él (PSV) o cuando el caudal supera el ajuste (FCV);</li>
-<li>una FCV que no logra controlar sigue la elección [[t:junctions.control.form.failAction]].</li>
+<li>totalmente abierta, una PRV o PSV pasa a <b>cerrada</b> si su caudal se vuelve negativo, y la válvula vuelve a controlar cuando la presión aguas abajo supera el ajuste (PRV), cuando la de aguas arriba queda por debajo de él (PSV) o cuando el caudal supera el ajuste (FCV);</li>
+<li>una FCV que no logra controlar sigue la elección [[t:junctions.control.form.failAction]]; cerrada de ese modo, intenta controlar de nuevo en cada paso de la simulación en el tiempo, y controla en cuanto la red lo permite;</li>
+<li>una PDCV nunca deja de controlar: es una válvula ideal que mantiene su caída con cualquier caudal, y cuando la pérdida de su K totalmente abierta con ese caudal supera la caída, el resultado avisa que deja pasar más de lo que puede totalmente abierta.</li>
 </ul>
 <h4>Válvula de salida</h4>
 [[eq:exitValve]]
@@ -1080,8 +1082,8 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
           boundaries: {
             title: 'Contornos',
             body: `<ul>
-<li><b>Reservorio</b>: un nudo de presión fija igual a la presión en la superficie, en la cota del nivel del líquido. Cada tubería se une en la cota del fondo o en su propia conexión, dada como cota o como profundidad bajo el nivel (cota = nivel − profundidad); si la conexión está por encima del nivel, la tubería descarga en caída libre, y la presión de contorno vale en el extremo de la tubería.</li>
-<li><b>Presión impuesta</b>: un nudo de presión de estancamiento fija; en el tipo estático, se fija p = P<sub>0</sub> − ½ρV² de la única tubería.</li>
+<li><b>Reservorio</b>: un nudo de presión fija igual a la presión en la superficie, en la cota del nivel del líquido. Cada tubería se une en la cota del fondo o en su propia conexión, dada como cota o como profundidad bajo el nivel (cota = nivel − profundidad); si la conexión está por encima del nivel, la tubería descarga en caída libre: la presión de contorno vale en el extremo de la tubería como presión estática del chorro, cuya pérdida de salida es como mínimo su energía cinética, y la tubería no puede tomar líquido del tanque (se cierra, y se abre otra vez cuando la red empuja líquido hacia él).</li>
+<li><b>Presión impuesta</b>: un nudo de presión de estancamiento fija; en el tipo estático, se fija p = P<sub>0</sub> − ½ρV² de la única tubería, en el extremo de la propia tubería: los K de ese extremo se dejan fuera.</li>
 <li><b>Caudal impuesto</b> y <b>fuente de un nudo</b>: entran en la continuidad como demanda (positiva sale, negativa entra).</li>
 <li><b>Boquilla</b> y <b>válvula de salida</b>: un nudo externo de presión fija (la externa o la residual), unido por un enlace de descarga.</li>
 </ul>
@@ -1111,7 +1113,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <li><b>Bombas</b>: ΔH, potencias, eficiencia y NPSH, como en [[go:tech.pumps|Bombas]].</li>
 <li><b>K en la tabla de tuberías</b>: la suma de los K de los accesorios, sobre el área de la tubería, sin la corrección laminar.</li>
 </ul>
-<p>También salen avisos de cavitación (presión estática por debajo de la de vapor), de tubería más corta que el desnivel que vence, de tubería por encima del nivel tomando líquido de un reservorio y de flujo en contra del sentido de referencia en un componente, además de los avisos de bombas, válvulas y convergencia.</p>
+<p>También salen avisos de cavitación (presión estática por debajo de la de vapor), de tubería más corta que el desnivel que vence, de tubería cerrada porque tomaría líquido de un reservorio por una conexión por encima del nivel, de los K dejados fuera en una presión impuesta estática y de flujo en contra del sentido de referencia en un componente, además de los avisos de bombas, válvulas y convergencia.</p>
 <h4>Salidas de la ventana de columnas</h4>
 <ul>
 <li><b>Pérdidas de una tubería</b>: fricción, accesorios y extremos (el K de la unión en cada extremo) suman la pérdida de carga h<sub>L</sub>. La caída de estancamiento es la caída debida a la cota, ρ·g·(z<sub>salida</sub> − z<sub>entrada</sub>), más fricción y accesorios, porque P<sub>0</sub> a la entrada y a la salida ya descuentan los extremos. La pérdida de carga unitaria es h<sub>L</sub>/L; la pérdida de presión por longitud, ρ·g·h<sub>L</sub>/L.</li>
@@ -1195,7 +1197,7 @@ Al elegir un catálogo, la rugosidad pasa a ser la del material, y todavía se p
 <li>[[icon:valve]] <b>Válvula</b>, [[icon:generic]] <b>componente genérico</b> y [[icon:orifice]] <b>orificio</b>: las pérdidas localizadas cuentan como longitud equivalente de fricción. Cv y Kv se vuelven el K equivalente en el área de la tubería de entrada. El orificio también limita el caudal al caudal crítico de su agujero: un orificio de restricción se bloquea mucho antes que la tubería.</li>
 <li>[[icon:control]] <b>Válvula de control</b>: reductora, sostenedora, de caudal y de ΔP, con los estados del líquido.</li>
 <li>[[icon:spray]] <b>Boquilla</b>: flujo isentrópico por el área efectiva, que se bloquea cuando la presión exterior cae por debajo de la relación crítica (alrededor de 0,53 de la presión aguas arriba, para el aire).</li>
-<li>[[icon:exitvalve]] <b>Válvula de salida</b>: la pérdida de la válvula hasta la presión exterior, donde la presión estática del chorro es la residual.</li>
+<li>[[icon:exitvalve]] <b>Válvula de salida</b>: la pérdida de la válvula hasta la presión exterior, donde la presión estática del chorro es la residual. Su K y su Cv en los resultados toman la densidad y la velocidad del extremo de su tubería en la válvula, sea cual sea el sentido en que se dibujó la tubería.</li>
 <li>[[icon:pump]] <b>Bomba</b>: con gas, es un compresor o un soplador, como en [[go:gas.compressor]].</li>
 </ul>
 <p>El modelo de Hazen-Williams no vale para gases: esas tuberías se calculan con Darcy y la rugosidad guardada en la tubería, y un aviso las lista.</p>`,

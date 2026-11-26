@@ -176,7 +176,7 @@
     if (d.fm === 'explicit') return d.fx;
     if (d.fm === 'none') return 0;
     if (!(Re > 0)) return Infinity;
-    // the laminar factor of the section (an annulus: src/core/hydraulics/friction.js); 1 for a K element
+    // the laminar factor of the section (an annulus or a rectangle: src/core/hydraulics/friction.js); 1 for a K element
     const phi = d.phiLam || 1;
     return Re < d.reLam ? phi * 64 / Re : H.frictionFactor(Re, d.eD, d.reLam, d.reTurb, phi);
   }

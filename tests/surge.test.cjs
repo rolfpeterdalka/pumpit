@@ -1076,5 +1076,88 @@ console.log('\nReview of aca2807, case 13: the highest pressure of a pipe');
   check('10 bar(g), below the pressure reached: the warning of the highest pressure', low.warnings.some((w) => w.key === 'surge.warn.pMax' && w.obj === 'p:1'));
 }
 
+// ---------- review of a952425, items 6 and 7: pipe ends above the liquid of a reservoir
+console.log('\nReview of a952425: pipe ends above the liquid of a reservoir');
+{
+  // J1 with its bottom and its pipe at −1 m and its surface at h1, J2 with its bottom at 0 m, its surface at 1 m and its pipe
+  // at 2 m (dry), the gas at the atmospheric pressure; one pipe of L = 20 m, 100 mm, f = 0.02, a = 1000 m/s, no end K
+  const two = (h1, flip, more = {}, L = 20, dur = 0.5) => {
+    const m = base();
+    J(m, 'reservoir', 1, Object.assign({ elevation: q(-1, 'm'), liquidElev: q(h1, 'm'), surfP: q(101.325, 'kPa(a)'), pipeK: { 1: { elev: q(-1, 'm'), kIn: 0, kOut: 0 } } }, more));
+    J(m, 'reservoir', 2, { elevation: q(0, 'm'), liquidElev: q(1, 'm'), surfP: q(101.325, 'kPa(a)'), pipeK: { 1: { elev: q(2, 'm'), kIn: 0, kOut: 0 } } });
+    pipe(m, 1, flip ? 2 : 1, flip ? 1 : 2, L, 0.1, 0.02, 1000);
+    control(m, 0.001, dur);
+    return m;
+  };
+  // the largest departure of the run from its steady state: pressures relative, flows in kg/s
+  const drift = (r) => {
+    let dP = 0, dm = 0;
+    for (const id in r.pipes) {
+      const p = r.pipes[id], X = r.extremes.pipes[id];
+      for (let i = 0; i <= p.n; i++) {
+        const P0 = p.steady.P[i];
+        dP = Math.max(dP, Math.abs(X.Pmax[i] - P0) / Math.abs(P0), Math.abs(X.Pmin[i] - P0) / Math.abs(P0));
+        dm = Math.max(dm, Math.abs(X.mmax[i] - p.steady.m), Math.abs(X.mmin[i] - p.steady.m));
+      }
+    }
+    return { dP, dm };
+  };
+  const side = (flip) => (flip ? ' (the pipe drawn from J2)' : ' (the pipe drawn from J1)');
+  for (const flip of [false, true]) {
+    // the free jet into J2: its exit loss is the kinetic energy of the jet in the transient too, so the steady state holds
+    const rj = simulate(two(10, flip)), dj = drift(rj), mj = rj.steady.pipes[1].m;
+    check('a free jet into a reservoir: the steady state (158.390 m³/h) holds, its exit loss the kinetic energy of the jet' + side(flip),
+      near(Math.abs(rj.steady.pipes[1].Q) * 3600, 158.38998, 1e-4) && rj.artificial.ok && dj.dP <= 1e-9 && dj.dm <= 1e-9 * Math.abs(mj),
+      `${(Math.abs(rj.steady.pipes[1].Q) * 3600).toFixed(5)} m³/h, ΔP ${dj.dP.toExponential(1)}, Δṁ ${(dj.dm / Math.abs(mj)).toExponential(1)}`);
+    // the pipe that the steady state closed at the dry end: it stands still, its pressure that of the end at J1
+    const rc = simulate(two(0, flip)), dc = drift(rc);
+    check('a pipe closed at a dry end in the steady state stands still in the transient' + side(flip),
+      rc.steady.states.P1 === 'dry' && rc.steady.pipes[1].m === 0 && dc.dP <= 1e-9 && dc.dm <= 1e-9, `ΔP ${dc.dP.toExponential(1)}, Δṁ ${dc.dm.toExponential(1)} kg/s`);
+  }
+  // a pipe of 4 m, and the surface pressure of J1 falls by 90 kPa at 0.05 s, below what lifts the liquid to the end of the
+  // pipe at J2: the jet stops, and J2 gives no liquid through its dry end, which holds the column (a closed end)
+  const drop = { use: true, what: 'surfP', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 0.05], v: [101.325, 11.325], tUnit: 's', vUnit: 'kPa(a)' }], repeat: false, interp: 'step' };
+  const rd = simulate(two(10, false, { surge: drop }, 4, 2));
+  const pd = rd.pipes[1], intoJ2 = seriesOf(rd, 1, pd.n, 'mD'), times = [...rd.times];
+  const stop = times[intoJ2.findIndex((x) => x === 0)], lowest = Math.min(...intoJ2);
+  check('the flow into a dry end that would turn back: the jet stops (about 1.5 s) and the end gives no liquid, the flow into J2 never below zero',
+    stop > 1 && stop < 2 && lowest === 0 && intoJ2[intoJ2.length - 1] === 0, `stops at ${stop} s, lowest flow into J2 ${lowest} kg/s`);
+}
+
+// ---------- review of a952425, item 9: a static imposed pressure with an end K
+console.log('\nReview of a952425: a static imposed pressure with an end K');
+{
+  // J1 a reservoir at 2 bar(a), J2 a static pressure of 1 bar(a) whose table gives its pipe a K out and in of 4, or none;
+  // one pipe of 10 m, 100 mm, f = 0.02 (fL/D = 2), a = 1000 m/s: 100 kPa = (1 + 2)·ρV²/2 with the K left out
+  const one = (k, flip) => {
+    const m = base();
+    J(m, 'reservoir', 1, { elevation: q(0, 'm'), liquidElev: q(0, 'm'), surfP: q(200, 'kPa(a)') });
+    J(m, 'pressure', 2, { elevation: q(0, 'm'), P: q(100, 'kPa(a)'), ptype: 'static', pipeK: { 1: { kIn: k, kOut: k } } });
+    pipe(m, 1, flip ? 2 : 1, flip ? 1 : 2, 10, 0.1, 0.02, 1000);
+    control(m, 0.001, 0.2);
+    return m;
+  };
+  // the largest departure of the run from its steady state: pressures relative, flows in kg/s
+  const drift = (r) => {
+    let dP = 0, dm = 0;
+    for (const id in r.pipes) {
+      const p = r.pipes[id], X = r.extremes.pipes[id];
+      for (let i = 0; i <= p.n; i++) {
+        const P0 = p.steady.P[i];
+        dP = Math.max(dP, Math.abs(X.Pmax[i] - P0) / Math.abs(P0), Math.abs(X.Pmin[i] - P0) / Math.abs(P0));
+        dm = Math.max(dm, Math.abs(X.mmax[i] - p.steady.m), Math.abs(X.mmin[i] - p.steady.m));
+      }
+    }
+    return { dP, dm };
+  };
+  const V = Math.sqrt(2 * 1e5 / (3 * 998.2)), m0 = 998.2 * area(0.1) * V;
+  for (const flip of [false, true]) {
+    const r4 = simulate(one(4, flip)), r0 = simulate(one(0, flip)), d = drift(r4), m4 = Math.abs(r4.steady.pipes[1].m);
+    check('a static pressure with an end K: the transient leaves the K out as the steady state, which holds (' + V.toFixed(4) + ' m/s)' + (flip ? ' (the pipe drawn from J2)' : ' (the pipe drawn from J1)'),
+      near(m4, m0, 1e-9 * m0) && near(Math.abs(r0.steady.pipes[1].m), m4, 1e-12 * m4) && r4.artificial.ok && d.dP <= 1e-9 && d.dm <= 1e-9 * m4,
+      `${m4.toFixed(6)} × ${m0.toFixed(6)} kg/s, ΔP ${d.dP.toExponential(1)}, Δṁ ${(d.dm / m4).toExponential(1)}`);
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -47,6 +47,9 @@
     }
     table.appendChild(tb);
     s.append(table, errs);
+    // a static imposed pressure is that of the end of its pipe: the calculation leaves these K values out
+    const def = PumpIt.junctionTypes.get(j.type);
+    if (def && def.atPipeEnd && def.atPipeEnd(j)) s.appendChild(hint(tx('atPipeEnd')));
     return s;
   }
 

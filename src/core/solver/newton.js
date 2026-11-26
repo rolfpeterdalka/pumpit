@@ -12,7 +12,9 @@
   const { dynOf, dynDer, describe } = S.util;
   const { t } = PumpIt.i18n;
 
-  function newton(prep, guess, sc) {
+  // opts.staticAsFixed: a static imposed pressure taken as a fixed one, without the velocity head of its pipe (the first
+  // guess of solver.js)
+  function newton(prep, guess, sc, opts = {}) {
     const { env } = prep;
     const rho = env.rho;
     const L = prep.links.filter((l) => !l.isolated);
@@ -82,7 +84,7 @@
           R[r] = s; rowScale[r] = 1 / Mscale;
         } else {
           let dyn = 0;
-          if (nd.kind === 'fixedStatic') {
+          if (nd.kind === 'fixedStatic' && !opts.staticAsFixed) {
             const pk = inL[i].concat(outL[i])[0];
             if (pk !== undefined && L[pk].kind === 'pipe') {
               dyn = dynOf(L[pk].P, rho, xv[pk]);

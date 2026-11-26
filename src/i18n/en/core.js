@@ -345,6 +345,8 @@ PumpIt.i18n.add('en', {
       vaporOutlet: 'Static pressure below the vapor pressure at the outlet of pipe P{id}.',
       shortPipe: 'Pipe P{id}: length smaller than the elevation difference.',
       aboveLevel: 'Pipe P{id} above the liquid level of reservoir J{res} drawing fluid from it.',
+      dryClosed: 'Pipe P{id} closed: it would draw liquid from reservoir J{res} through a connection above the liquid level.',
+      endKLeftOut: 'Imposed pressure J{id} is a static pressure at the end of pipe P{pipe}: the K out and K in of that pipe are left out.',
       reverseFlow: 'Flow against the reference direction at junction J{id}: the K values may not apply.',
       massImbalance: 'Mass imbalance at junction J{id} ({err} kg/s).',
       massCheckOff: 'The mass balance check is off.',

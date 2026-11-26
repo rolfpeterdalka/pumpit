@@ -67,6 +67,18 @@
     return vr;
   }
 
+  // the K of the end of pipe pid at a single-node junction j (its pipeK): out of the junction into the pipe, and in from
+  // the pipe. A junction whose pressure is the static pressure at the end of its pipe (def.atPipeEnd: an imposed static
+  // pressure) has no loss there, so that its pressure holds at the end of the pipe, where the results of the pipe show
+  // it; the K values the model holds there are left out (leftOut, for a caution; decision 2a of the review of a952425)
+  function pipeEndK(j, pid) {
+    const pk = j.pipeK && j.pipeK[pid];
+    const out = (pk && pk.kOut) || 0, inn = (pk && pk.kIn) || 0;
+    const def = PumpIt.junctionTypes.get(j.type);
+    if (def && def.atPipeEnd && def.atPipeEnd(j)) return { out: 0, in: 0, leftOut: out !== 0 || inn !== 0 };
+    return { out, in: inn, leftOut: false };
+  }
+
   // flow and pressure drop through the discharge link of a single-node junction (nozzle, exit valve)
   function dischargeResults(j, jr, rc) {
     const el = rc.links.find((l) => l.kind === 'ext' && l.jid === j.id);
@@ -185,7 +197,7 @@
 
   PumpIt.junctionTypes.shared = {
     LOSS_FIELDS, keepsOnRetype, valveTime, gasTemperature, K_SPACE, CHARS, cvAtOpening, openingOfCv, openingCv, shutByOpening, checkCharacteristic,
-    valveLoss, checkValveLoss, equivalentCv, flowCv, inlineValveResult, dischargeResults,
+    valveLoss, checkValveLoss, equivalentCv, flowCv, inlineValveResult, dischargeResults, pipeEndK,
     gasValveK, gasEquivalentCv, gasDischargeResults, gasNode, gasMachAt, gasBasisP,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

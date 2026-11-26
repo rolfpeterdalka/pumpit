@@ -126,19 +126,24 @@
 
   // ---------- the ports
   // a port joined to a junction: the elevation between the pressure of the junction (at zNode; a reservoir at its level,
-  // unless the pipe is above it) and the end of the pipe, and the loss of the end (its pipeK)
+  // unless the pipe is above it) and the end of the pipe, and the loss of the end (its pipeK; none at a static imposed
+  // pressure, as in the steady state)
   function attach(net, pt, j, nodeZ, isRes) {
     const P = net.prep.pp.get(pt.pipe.id);
     const zEnd = pt.down ? P.zDown : P.zUp;
     pt.zEnd = zEnd;
-    level(net, pt, nodeZ, isRes);
-    const pk = j.pipeK && j.pipeK[pt.pipe.id];
-    pt.kIn = (pk && pk.kIn) || 0; pt.kOut = (pk && pk.kOut) || 0;
+    const k = PumpIt.junctionTypes.shared.pipeEndK(j, pt.pipe.id);
+    pt.kIn = k.in; pt.kOut = k.out;
     pt.kTerm = net.prep.kTerm; pt.PP = P;
+    level(net, pt, nodeZ, isRes);
   }
-  // the elevation term of a port for a node at zNode (a reservoir whose level moves calls it again)
+  // the elevation term of a port for a node at zNode (a reservoir whose level moves calls it again). An end more than
+  // 1e-9 m above the liquid of a reservoir is dry, as in the steady state (src/core/solver/network.js): the pipe
+  // discharges in free fall from its end, with a loss into the tank of at least the kinetic energy of the jet (portLoss
+  // in moc.js), and an infinite reservoir gives no liquid through it
   function level(net, pt, nodeZ, isRes) {
-    const zEff = isRes && pt.zEnd > nodeZ ? pt.zEnd : nodeZ;
+    pt.dry = !!isRes && pt.zEnd > nodeZ + PumpIt.solver.DRY;
+    const zEff = pt.dry ? pt.zEnd : nodeZ;
     pt.hz = net.env.rho * net.env.g * (zEff - pt.zEnd);
   }
 
@@ -265,8 +270,11 @@
           for (const pt of ports) {
             const r = portQ(pt, nd.value, sc);
             if (!r.ok) net.rootFailed(j.id, S);
-            MOC().portSet(pt, pt.C - pt.B * r.q, r.q, r.q, 0);
-            nx.net += r.q;
+            // a dry end of a reservoir takes the liquid that falls in and gives none: closed while it would draw from the
+            // tank (decision T-09, as the steady state and the finite reservoir)
+            const q = pt.dry && r.q < 0 ? 0 : r.q;
+            MOC().portSet(pt, pt.C - pt.B * q, q, q, 0);
+            nx.net += q;
           }
           return;
         }

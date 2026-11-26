@@ -272,13 +272,18 @@
     if (pt.down) { p.mUn[i] = qp; p.mDn[i] = qj; } else { p.mUn[i] = -qj; p.mDn[i] = -qp; }
   }
   // the loss at the end of a pipe (Pa) for a flow q into the junction, with the sign of q (the pipeK of the junction: kIn
-  // into it, kOut out of it, by the steady relation with its laminar correction)
+  // into it, kOut out of it, by the steady relation with its laminar correction). Into a reservoir through a dry end (a
+  // free jet, pt.dry), at least the kinetic energy of the jet, ρV|V|/2, as the steady state takes it (jetLoss in
+  // src/core/solver/network.js)
   function portLoss(pt, q) {
-    if (!pt.kTerm || (!pt.kIn && !pt.kOut)) return 0;
-    const K = q >= 0 ? pt.kIn : pt.kOut;
-    return K ? pt.kTerm(K, pt.PP, q / (pt.pipe.rho * pt.pipe.A)) : 0;
+    if (!hasLoss(pt)) return 0;
+    const K = q >= 0 ? pt.kIn : pt.kOut, V = q / (pt.pipe.rho * pt.pipe.A);
+    const loss = K ? pt.kTerm(K, pt.PP, V) : 0;
+    if (!(pt.dry && q >= 0)) return loss;
+    const dyn = pt.pipe.rho * V * Math.abs(V) / 2;
+    return Math.abs(loss) < Math.abs(dyn) ? dyn : loss;
   }
-  const hasLoss = (pt) => !!(pt.kTerm && (pt.kIn || pt.kOut));
+  const hasLoss = (pt) => !!(pt.kTerm && (pt.kIn || pt.kOut || pt.dry));
   // the pressure of the cavity at the station of a port
   const portCavityP = (pt, cv) => cavityP(pt.pipe, pt.i, cv);
 
