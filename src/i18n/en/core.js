@@ -355,6 +355,7 @@ PumpIt.i18n.add('en', {
     gas: {
       unavailable: 'The compressible (gas) calculation is not available in this version yet.',
       badGas: 'Invalid gas data: check the molar mass, k, Z, the viscosity and the temperature.',
+      cannotControl: 'Control valve J{id} ({ctype}): with "Always control" on, the network has no solution with the valve controlling; without the option it would be {state}. Turn the option off or review the setting.',
       typeNotSupported: 'Junction J{id} ({label}) is not calculated in the compressible mode.',
       hwAsDarcy: 'Hazen-Williams does not apply to a gas: pipes {pipes} were calculated with Darcy, using the roughness stored in each one.',
       chokedPipe: 'Pipe P{id} is choked: the gas reaches the speed of sound at the outlet and the flow cannot exceed {m} kg/s.',

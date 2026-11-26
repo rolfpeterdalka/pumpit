@@ -6,6 +6,41 @@
 (function (root) {
   const PumpIt = root.PumpIt;
   const S = PumpIt.solver, Gas = PumpIt.gas;
+  const { t } = PumpIt.i18n;
+  const keyOf = (lk) => (lk.stateKey !== undefined ? lk.stateKey : lk.jid);
+
+  // Control valves that cannot control (a gas issue left open by the review of a952425): with a PRV or a PSV whose
+  // supply is below its setting, or an FCV whose flow the network cannot pass, there is no solution with the valve
+  // controlling, so the review that would open or close it (as for a liquid) never came. The states with every valve
+  // that may leave its control (of the keys `only`, when given) at the first state it may take then (`fail` of its
+  // device) that it has not taken yet (`tried`: key → states, updated here), or null when none would change
+  function failStates(prep, st, tried, only) {
+    let next = null;
+    for (const lk of prep.links) {
+      if (!lk.device || !lk.device.fail || lk.isolated) continue;
+      const k = keyOf(lk);
+      if (only && !only.has(String(k))) continue;
+      const had = tried.get(String(k)) || new Set();
+      const s = (lk.device.fail(lk, st[k], false) || []).find((c) => !had.has(c));
+      if (!s) continue;
+      tried.set(String(k), had.add(s));
+      next = next || Object.assign({}, st); next[k] = s;
+    }
+    return next;
+  }
+
+  // a network without a solution where a valve of "always control" controls: the messages naming the valves that do not
+  // control in the solution without the option, or none when it has no solution either
+  function alwaysControlErrors(eff, prep, st, opts) {
+    const ids = prep.links.filter((lk) => lk.device && lk.device.fail && !lk.isolated && lk.j && lk.j.alwaysControl
+      && lk.device.fail(lk, st[keyOf(lk)], true)).map((lk) => lk.jid);
+    if (!ids.length) return [];
+    const free = Object.assign({}, eff, { junctions: eff.junctions.map((j) => (ids.includes(j.id) ? Object.assign({}, j, { alwaysControl: false }) : j)) });
+    const r = solveModelGas(free, { raw: true, states: opts.states, noForced: true });
+    if (!r.ok || !r.res.converged) return [];
+    const state = (s) => t('junctions.states.' + (s === 'open' ? 'fullyOpen' : 'closed'));
+    return ids.filter((id) => r.st[id] !== 'control').map((id) => t('core.gas.cannotControl', { id, ctype: eff.junctions.find((j) => j.id === id).ctype, state: state(r.st[id]) }));
+  }
 
   // scales of the residual: pressures [Pa] and mass flows [kg/s]
   function scales(prep) {
@@ -236,7 +271,11 @@
     // states to start from and parts without supply left out: options of the time simulation (as for a liquid)
     let st = S.initialStates(prep, opts.states);
     const seen = new Set();
-    let res = null, cycling = false, pass = 0, totalIt = 0, guess = null;
+    // back: the first solution that failed, with its states, while the valves that cannot control try their other
+    // states; tried: the states each of them took
+    // warm: the guess is the solution of the pass before
+    let res = null, cycling = false, pass = 0, totalIt = 0, guess = null, back = null, warm = false;
+    const tried = new Map();
     const allHist = [];
     for (pass = 0; pass < 50; pass++) {
       S.configure(prep, st);
@@ -248,15 +287,34 @@
       res = solvePressures(prep, guess, sc, { maxIter: eff.solution.maxIter });
       // a marched pipe that choked: the same states again with it as an ordinary pipe
       if ((!res.ok || !res.converged) && unmarch(res.choked)) { pass--; continue; }
+      // a pass that started from the solution of other states and failed: once more from the first pressures (a PSV
+      // opened by the review did not converge from the pressures it held controlling)
+      if ((!res.ok || !res.converged) && warm) { warm = false; guess = null; continue; }
+      if (!res.ok || !res.converged) {
+        // no solution with the valves controlling: those that may leave their control take the state they take then,
+        // and the review goes on from there; when that fails too, the first failure is the result, as before
+        const fb = failStates(prep, st, tried);
+        if (fb && !seen.has(JSON.stringify(fb))) { back = back || { res, st }; st = fb; guess = null; continue; }
+        if (back) { ({ res, st } = back); S.configure(prep, st); S.analyze(prep, opts); }
+        const forced = opts.noForced || opts.isoStart ? [] : alwaysControlErrors(eff, prep, st, opts);
+        if (forced.length) return { ok: false, errors: forced, warnings: prep.warnings };
+      }
       if (!res.ok) return { ok: false, errors: [res.error], warnings: prep.warnings, history: res.hist };
       totalIt += res.it;
       allHist.push(...res.hist.map((h) => Object.assign({ pass }, h)));
       if (!res.converged) break;
-      const next = S.review(prep, res, st);
+      let next = S.review(prep, res, st);
       if (JSON.stringify(next) === JSON.stringify(st)) break;
+      if (back && seen.has(JSON.stringify(next))) {
+        // a valve that left its control sent back to it, where the network had no solution: its next state
+        const only = new Set(Object.keys(next).filter((k) => next[k] === 'control' && st[k] !== 'control' && tried.has(k)));
+        const alt = only.size ? failStates(prep, next, tried, only) : null;
+        if (alt && !seen.has(JSON.stringify(alt))) next = alt;
+      }
       if (seen.has(JSON.stringify(next))) { cycling = true; break; }
       st = next;
       // the solution is the next guess
+      warm = true;
       guess = {
         P: new Map(res.N.filter((nd) => nd.kind === 'free').map((nd) => [nd.ix, res.P[nd.ix]])),
         m: new Map(res.L.map((l) => [l, res.m[l.idx]])), T0: res.T0,

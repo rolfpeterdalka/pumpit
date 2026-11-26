@@ -354,6 +354,7 @@ PumpIt.i18n.add('pt-BR', {
     gas: {
       unavailable: 'O cálculo compressível (gás) ainda não está disponível nesta versão.',
       badGas: 'Dados do gás inválidos: confira a massa molar, k, Z, a viscosidade e a temperatura.',
+      cannotControl: 'Válvula de controle J{id} ({ctype}): com "Sempre controlar" ligado, a rede não tem solução com a válvula controlando; sem a opção, ela ficaria {state}. Desligue a opção ou revise o ajuste.',
       typeNotSupported: 'Junção J{id} ({label}): não é calculada no modo compressível.',
       hwAsDarcy: 'Hazen-Williams não vale para gás: os tubos {pipes} foram calculados por Darcy, com a rugosidade guardada em cada um.',
       chokedPipe: 'Tubo P{id} bloqueado: o gás chega à velocidade do som na saída e a vazão não passa de {m} kg/s.',

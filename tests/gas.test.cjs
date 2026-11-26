@@ -1080,5 +1080,67 @@ if (PumpIt) {
   }
 }
 
+console.log('\nControl valves that cannot control (a gas issue left open by the review of a952425): PRV, PSV and FCV from scratch');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  const node = (type, id, props) => Object.assign(M.newJunction(type, id, id * 100, 0), { elevation: q(0, 'm') }, props);
+  const tank = (id, bar) => node('reservoir', id, { liquidElev: q(0, 'm'), surfP: q(bar, 'bar(a)') });
+  // a valve between a supply and a reservoir at 1.5 bar(a), pipes of 20 m and 100 mm with f = 0.02
+  const valveModel = (mode, P1, props) => {
+    const m = M.newModel();
+    Object.assign(m.system, { regime: 'compressible', gasMode: mode });
+    m.solution.maxIter = 50; // these networks converge in a few iterations; a lower limit shortens the attempts without a solution
+    m.junctions = [tank(1, P1), node('control', 2, Object.assign({ basis: 'stagnation', alwaysControl: false, kOpen: 2, special: 'none', failAction: 'open' }, props)), tank(3, 1.5)];
+    m.pipes = [1, 2].map((id) => Object.assign(M.newPipe(id, id, id + 1), { length: q(20, 'm'), geometry: { kind: 'circular', d: q(100, 'mm') }, friction: { model: 'explicitF', f: 0.02 } }));
+    return m;
+  };
+  const run = (m) => PumpIt.solver.run(M.effective(m, 'base'));
+  const prv = { ctype: 'PRV', setP: q(2.5, 'bar(a)') }, psv = { ctype: 'PSV', setP: q(2.5, 'bar(a)') };
+  const fcv = { ctype: 'FCV', setQ: q(3, 'kg/s') }, fcvClosed = Object.assign({}, fcv, { failAction: 'closed' });
+  // the state and flow of the valve, and whether they are those of the valve held in that state by its special condition
+  const check = (mode, props, P1) => {
+    const s = run(valveModel(mode, P1, props));
+    if (!s.ok || s.converged === false) return { text: s.ok ? 'not converged' : s.errors.join('; '), good: false };
+    const st = s.states[2], m = s.pipes[1].m;
+    let good = true;
+    if (st !== 'control') {
+      const r = run(valveModel(mode, P1, Object.assign({}, props, { special: st })));
+      good = r.ok && Math.abs(r.pipes[1].m - m) <= 1e-6 * Math.max(Math.abs(m), 1e-3);
+    }
+    return { st, m, good, text: `${st} ${m.toFixed(5)}` };
+  };
+  const cases = [
+    ['a PRV of 2.5 bar(a)', prv, [[1, 'closed'], [2, 'open'], [5, 'control']]],
+    ['a PSV of 2.5 bar(a)', psv, [[1, 'closed'], [2, 'closed'], [5, 'open']]],
+    ['an FCV of 3 kg/s failing open', fcv, [[2, 'open'], [5, 'control']]],
+    ['an FCV of 3 kg/s failing closed', fcvClosed, [[2, 'closed'], [5, 'control']]],
+  ];
+  for (const mode of ['isothermal', 'adiabatic']) {
+    // a singular system (PRV, PSV) or a result not converged with absurd flows (FCV) before; the PSV at 5 bar(a) did not
+    // converge from the pressures it held controlling
+    for (const [name, props, list] of cases) {
+      const r = list.map(([P1]) => check(mode, props, P1));
+      ok(`valve that cannot control (${mode}): ${name}, supplies of ${list.map((x) => x[0]).join(', ')} bar(a) give ${list.map((x) => x[1]).join(', ')}, each as the valve held in that state`,
+        r.every((x, i) => x.good && x.st === list[i][1]), r.map((x) => x.text).join(', '));
+    }
+    // "always control": the network has no solution with the valve controlling; the message names it and its state
+    const a = run(valveModel(mode, 2, Object.assign({}, prv, { alwaysControl: true })));
+    ok(`valve that cannot control (${mode}): a PRV with "always control" and a supply of 2 bar(a) stops with a message naming it and its state`,
+      !a.ok && a.errors.length === 1 && /J2 \(PRV\)/.test(a.errors[0]) && a.errors[0].includes(PumpIt.i18n.t('junctions.states.fullyOpen')), a.ok ? 'solved' : a.errors[0]);
+    // over time ("always control" off, T-15): supplies of 1, 2, 5 and 3 bar(a), each step as its steady state
+    for (const [name, props] of [['PRV', prv], ['PSV', psv], ['FCV', fcv]]) {
+      const tm = valveModel(mode, 1, props);
+      tm.junctions[0].time = { use: true, what: 'surfP', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: [0, 30, 60, 90], v: [1, 2, 5, 3], tUnit: 's', vUnit: 'bar(a)' }] };
+      Object.assign(tm.solution.time, { on: true, start: q(0, 's'), stop: q(90, 's'), step: q(30, 's') });
+      const tr = PumpIt.time.run(M.effective(tm, 'base'));
+      const series = tr.ok ? [...tr.series.pipes[1].m] : [];
+      const steady = [1, 2, 5, 3].map((P1) => run(valveModel(mode, P1, props))).map((s) => (s.ok && s.converged !== false ? s.pipes[1].m : NaN));
+      ok(`valve that cannot control (${mode}): a ${name} over time, supplies of 1, 2, 5 and 3 bar(a), each step as its steady state`,
+        series.length === 4 && series.every((x, i) => Math.abs(x - steady[i]) <= 1e-6 * Math.max(Math.abs(steady[i]), 1e-3)),
+        tr.ok ? series.map((x) => x.toFixed(5)).join(', ') + ' / ' + steady.map((x) => x.toFixed(5)).join(', ') : tr.errors.join('; '));
+    }
+  }
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

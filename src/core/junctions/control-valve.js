@@ -221,6 +221,17 @@
   const gasDevice = {
     initial: device.initial,
     resume: device.resume,
+    // the states a controlling valve may take, in this order, when the network has no solution with it controlling: a
+    // PRV fully open first (its supply below the setting; the review closes it against a reverse flow), a PSV closed
+    // first (its supply below the setting), the other one when the review sends the first back to control (a valve too
+    // small for its flow), an FCV its failure action. None for a PDCV, which never fails (I-61), a special condition
+    // or, unless `forced`, "always control"
+    fail(lk, s, forced) {
+      const j = lk.j;
+      if (s !== 'control' || (j.special && j.special !== 'none') || (j.alwaysControl && !forced)) return null;
+      if (lk.ctype === 'FCV') return [j.failAction === 'closed' ? 'closed' : 'open'];
+      return lk.ctype === 'PRV' ? ['open', 'closed'] : lk.ctype === 'PSV' ? ['closed', 'open'] : null;
+    },
     configure(lk, s) {
       const o = s === 'open' ? lk.open : s === 'control' ? lk.ctrl : null;
       if (!o) { lk.mode = 'closed'; return; }

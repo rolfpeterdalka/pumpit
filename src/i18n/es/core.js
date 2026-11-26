@@ -353,6 +353,7 @@ PumpIt.i18n.add('es', {
     gas: {
       unavailable: 'El cálculo compresible (gas) aún no está disponible en esta versión.',
       badGas: 'Datos del gas no válidos: revise la masa molar, k, Z, la viscosidad y la temperatura.',
+      cannotControl: 'Válvula de control J{id} ({ctype}): con "Controlar siempre" activado, la red no tiene solución con la válvula controlando; sin la opción, quedaría {state}. Desactive la opción o revise el ajuste.',
       typeNotSupported: 'Unión J{id} ({label}): no se calcula en el modo compresible.',
       hwAsDarcy: 'Hazen-Williams no vale para gases: las tuberías {pipes} se calcularon con Darcy, con la rugosidad guardada en cada una.',
       chokedPipe: 'Tubería P{id} bloqueada: el gas alcanza la velocidad del sonido a la salida y el caudal no puede superar {m} kg/s.',
