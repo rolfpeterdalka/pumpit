@@ -27,6 +27,52 @@
     };
   }
 
+  // A pipe between nodes of two kinds of pressure (static and stagnation) whose losses may fall below one velocity head
+  // has its flow as an unknown (network.js). At zero flow its relation is flat, and with its losses below a velocity
+  // head it has a second root: the gas carried by its own velocity from the lower pressure to the higher. The linear
+  // theory takes it as a loss of F + 1 velocity heads (the velocity head of its static end), and its first flow follows
+  // the pressures of its ends through that relation, in the direction they give, as for a liquid (review of a952425)
+  const twoKinds = (prep, l) => !!l.marched && prep.nodes[l.a].pk !== prep.nodes[l.b].pk;
+  // gas column of a pipe in u = P²: u_b = col2·u_a at rest
+  const col2Of = (cx, l) => (l.kind === 'pipe' && l.d && l.d.dz ? Math.exp(-2 * cx.g * l.d.dz / (cx.ZR * cx.T)) : 1);
+  // C of a duct link in m² = C·Δu (f = 0.02 when its friction depends on the flow), with `extra` velocity heads, in the
+  // direction i (0 forward, 1 reverse)
+  function ductC(cx, l, extra, i = 0) {
+    const d = l.d, A = d.A[i] * d.N;
+    const F = (d.L > 0 ? (d.fm === 'explicit' ? d.fx : d.fm === 'none' ? 0 : 0.02) * d.L / d.D[i] : 0) + d.K[i] + extra;
+    return A * A / (cx.ZR * cx.T * Math.max(F, 0.1));
+  }
+
+  // first flows of the pipes of two kinds of ends that have none, or none but zero: from the pressures of their ends
+  // (those of the guess at the free nodes). A copy of the guess, which may belong to the caller
+  function startFlows(prep, guess, sc) {
+    const { cx, nodes, links } = prep;
+    let m = null;
+    const Pof = (ix) => (nodes[ix].kind === 'free' ? guess.P.get(ix) ?? sc.Pmean : nodes[ix].value);
+    for (const l of links) {
+      if (l.isolated || l.mode === 'closed' || !twoKinds(prep, l) || Math.abs(guess.m.get(l)) > 1e-12 * sc.Mscale) continue;
+      const Pa = Pof(l.a), Pb = Pof(l.b);
+      if (!(Pa > 0 && Pb > 0)) continue;
+      const du = col2Of(cx, l) * Pa * Pa - Pb * Pb;
+      m = m || new Map(guess.m);
+      m.set(l, Math.sign(du) * Math.sqrt(ductC(cx, l, 1, du < 0 ? 1 : 0) * Math.abs(du)));
+    }
+    return m ? Object.assign({}, guess, { m }) : guess;
+  }
+
+  // pipes whose flow is an unknown, marched from one end, that choked on the way of a Newton method that did not reach
+  // a solution: that relation has no value beyond the critical flow. They become ordinary pipes, their flow following
+  // their pressures up to the critical flow (choked, the flow goes from the higher pressure to the lower). Whether any did
+  function unmarch(list) {
+    let any = false;
+    for (const l of list || []) {
+      if (!l.marched) continue;
+      Object.assign(l, { mode: 'loss', marched: false, con: undefined, conScale: undefined, column: undefined });
+      any = true;
+    }
+    return any;
+  }
+
   // first pressures: the linear theory on u = P² (isothermal closed form without the acceleration term, f = 0.02),
   // m² = C·Δu linearised as m = (C/|m_ref|)·Δu and repeated a few times with the flows it gives
   function initialGuess(prep, sc) {
@@ -39,22 +85,20 @@
     if (!nF) return { P, m: new Map() };
     const ZRT = cx.ZR * cx.T;
     const live = links.filter((l) => !l.isolated && l.mode !== 'closed');
+    // links whose flow follows the pressures in this theory: those of the mode 'loss', and the pipes of two kinds of ends
+    const lossy = (l) => l.mode === 'loss' || twoKinds(prep, l);
     // C of every link that carries a flow following the pressures; constraint links tie their nodes strongly
     const Cof = (l) => {
       if (l.rel === 'nozzle') return l.CdA * l.CdA / ZRT;
-      if (l.rel === 'duct' && l.d) {
-        const d = l.d, A = d.A[0] * d.N;
-        const F = (d.L > 0 ? (d.fm === 'explicit' ? d.fx : d.fm === 'none' ? 0 : 0.02) * d.L / d.D[0] : 0) + d.K[0];
-        return A * A / (ZRT * Math.max(F, 0.1));
-      }
+      if (l.rel === 'duct' && l.d) return ductC(cx, l, twoKinds(prep, l) ? 1 : 0);
       return 1e-6;
     };
     const C = new Map(live.map((l) => [l, Cof(l)]));
-    const col2 = (l) => (l.kind === 'pipe' && l.d && l.d.dz ? Math.exp(-2 * cx.g * l.d.dz / ZRT) : 1);
+    const col2 = (l) => col2Of(cx, l);
     const mref = new Map(live.map((l) => [l, sc.Mscale]));
     // links that impose a relation between the pressures of their nodes, linear in u: a ratio (u_b = r²·u_a), a set
     // pressure (u = set²) or a tie or set difference (u_a − u_b = 2·P̄·ΔP); their flows are unknowns of the system too
-    const rel = live.filter((l) => (l.mode === 'ratio' || l.mode === 'pDown' || l.mode === 'pUp' || l.mode === 'dP') && (col[l.a] >= 0 || col[l.b] >= 0));
+    const rel = live.filter((l) => !lossy(l) && (l.mode === 'ratio' || l.mode === 'pDown' || l.mode === 'pUp' || l.mode === 'dP') && (col[l.a] >= 0 || col[l.b] >= 0));
     const nR = rel.length, n = nF + nR;
     let u = new Float64Array(nF).fill(sc.Pmean * sc.Pmean), mrel = new Float64Array(nR);
     const uOf = (ix) => (col[ix] >= 0 ? u[col[ix]] : nodes[ix].value * nodes[ix].value);
@@ -64,7 +108,7 @@
       for (const l of live) {
         const ia = col[l.a], ib = col[l.b];
         if (l.mode === 'fixedFlow') { if (ia >= 0) b[ia] -= l.value || 0; if (ib >= 0) b[ib] += l.value || 0; continue; }
-        if (l.mode !== 'loss') continue;
+        if (!lossy(l)) continue;
         const c = C.get(l) / mref.get(l), r2 = col2(l);
         if (ia >= 0) { A[ia * n + ia] += c * r2; if (ib >= 0) A[ia * n + ib] -= c; else b[ia] += c * uOf(l.b); }
         if (ib >= 0) { A[ib * n + ib] += c; if (ia >= 0) A[ib * n + ia] -= c * r2; else b[ib] += c * r2 * uOf(l.a); }
@@ -90,7 +134,7 @@
       u = x.slice(0, nF).map((v) => Math.max(v, floor));
       mrel = x.slice(nF);
       for (const l of live) {
-        if (l.mode !== 'loss') continue;
+        if (!lossy(l)) continue;
         const du = Math.abs(col2(l) * uOf(l.a) - uOf(l.b));
         // the flows swing from one pass to the next: the average of the old and the new one damps them
         mref.set(l, Math.max((mref.get(l) + Math.sqrt(C.get(l) * du)) / 2, 1e-6 * sc.Mscale));
@@ -200,7 +244,10 @@
       if (errs.length) return { ok: false, errors: errs, warnings: prep.warnings };
       seen.add(JSON.stringify(st));
       if (!guess) guess = opts.guess || initialGuess(prep, sc);
+      guess = startFlows(prep, guess, sc);
       res = solvePressures(prep, guess, sc, { maxIter: eff.solution.maxIter });
+      // a marched pipe that choked: the same states again with it as an ordinary pipe
+      if ((!res.ok || !res.converged) && unmarch(res.choked)) { pass--; continue; }
       if (!res.ok) return { ok: false, errors: [res.error], warnings: prep.warnings, history: res.hist };
       totalIt += res.it;
       allHist.push(...res.hist.map((h) => Object.assign({ pass }, h)));

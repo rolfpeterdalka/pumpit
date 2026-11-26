@@ -126,11 +126,14 @@
       };
       const lk = { kind: 'pipe', pid: p.id, a: na.ix, b: nb.ix, mode: P.closed ? 'closed' : 'loss', fixedClosed: P.closed, rel: 'duct', d, P };
       // a pipe without friction nor losses at one elevation ties the pressures of its ends; a pipe whose losses may
-      // fall below the gravity of its gas or a velocity head between nodes of two kinds takes its flow as an unknown
+      // fall below the gravity of its gas or a velocity head between nodes of two kinds takes its flow as an unknown.
+      // Between two fixed pressures nothing else sets that flow: the velocity head counts only with a free end, and
+      // between two fixed pressures of two kinds the flow goes from the higher to the lower, as for a liquid, and may
+      // choke (review of a952425)
       if (!P.closed && !(P.L > 0)) { if (d.fm === 'none' && !(d.K[0] > 0) && !(d.K[1] > 0) && na.pk === nb.pk) tie(lk); }
       else if (!P.closed) {
         const Fmin = (fr.fm === 'none' ? 0 : fr.fm === 'explicit' ? fr.fx * P.L / P.Dh : Infinity) + Math.min(d.K[0], d.K[1]);
-        const crit = 4 * g * Math.abs(d.dz) / (cx.ZR * cx.T) + (na.pk !== nb.pk ? 1 : 0);
+        const crit = 4 * g * Math.abs(d.dz) / (cx.ZR * cx.T) + (na.pk !== nb.pk && (na.kind === 'free' || nb.kind === 'free') ? 1 : 0);
         if (Fmin <= crit) {
           lk.mode = 'dP'; lk.value = 0; lk.conScale = 'P'; lk.marched = true;
           lk.column = Math.exp(-g * d.dz / (cx.ZR * cx.T));

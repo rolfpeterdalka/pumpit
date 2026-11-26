@@ -1007,5 +1007,78 @@ if (PumpIt) {
   }
 }
 
+console.log('\nShort pipes between a static and a stagnation end (a gas issue left open by the review of a952425): pipes of fL/D up to 1');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q;
+  const node = (type, id, props) => Object.assign(M.newJunction(type, id, id * 100, 0), { elevation: q(0, 'm') }, props);
+  const tank = (id, bar, pipeK = {}) => node('reservoir', id, { liquidElev: q(0, 'm'), surfP: q(bar, 'bar(a)'), pipeK });
+  const stat = (id, bar) => node('pressure', id, { P: q(bar, 'bar(a)'), ptype: 'static' });
+  // pipes of 100 mm with f = 0.02, fL/D = F at a length of 5·F m, drawn from `up` to `down` or the other way round
+  const tube = (id, up, down, F, flip) => Object.assign(M.newPipe(id, flip ? down : up, flip ? up : down),
+    { length: q(5 * F, 'm'), geometry: { kind: 'circular', d: q(100, 'mm') }, friction: { model: 'explicitF', f: 0.02 } });
+  const gasModel = (mode, junctions, pipes) => {
+    const m = M.newModel();
+    Object.assign(m.system, { regime: 'compressible', gasMode: mode });
+    Object.assign(m, { junctions, pipes });
+    return m;
+  };
+  const run = (m) => PumpIt.solver.run(M.effective(m, 'base'));
+  // the flow of pipe id from `up` to `down` whichever way it is drawn, and whether pipe cid chokes; null when the run fails
+  const flowOf = (s, id, flip, cid = id) => (s.ok && s.converged !== false ? { m: (flip ? -1 : 1) * s.pipes[id].m, choked: s.pipes[cid].choked } : null);
+  const show = (r) => r.map((x) => (x ? x.m.toFixed(5) + (x.choked ? ' choked' : '') : 'failed')).join(', ');
+  // the same in both drawings (a pipe marched from one end or from the other, within 1e-6), decreasing with F, without a
+  // jump at F = 1 (the step from 1 to 1.01 below 0.5 %)
+  const smooth = (a, b) => a.every((x, i) => x && b[i] && Math.abs(x.m - b[i].m) <= 1e-6 * x.m && (i === 0 || x.m < a[i - 1].m))
+    && Math.abs(a.at(-2).m - a.at(-1).m) < 5e-3 * a.at(-1).m;
+  const Fs = [0.5, 0.9, 1, 1.01];
+  for (const mode of ['isothermal', 'adiabatic']) {
+    // a reservoir into a static pressure of 1 bar(a): singular below fL/D 1 before; at 3 bar(a) the pipe chokes
+    for (const P1 of [1.05, 3]) {
+      const [a, b] = [false, true].map((flip) => Fs.map((F) => flowOf(run(gasModel(mode, [tank(1, P1), stat(2, 1)], [tube(1, 1, 2, F, flip)])), 1, flip)));
+      ok(`short pipe (${mode}): from ${P1} bar(a) into a static pressure of 1 bar(a), fL/D 0.5 to 1.01, the same flow drawn either way, continuous across 1` + (P1 > 2 ? ', choked' : ''),
+        smooth(a, b) && a.every((x) => x.choked === (P1 > 2)), show(a));
+    }
+    // at a drop of 50 Pa the flow approaches the incompressible ΔP = (1 + F)·ρV²/2, the velocity head of the static end
+    // included (gas at 1 bar(a) and 20 °C)
+    const rho = 1e5 * PumpIt.fluids.evaluateGas(M.newModel().system).MW / (8314.462618 * 293.15), A = Math.PI * 0.1 ** 2 / 4;
+    const drop = [0.5, 1, 2].flatMap((F) => [false, true].map((flip) => {
+      const m = gasModel(mode, [tank(1, 1), stat(2, 1)], [tube(1, 1, 2, F, flip)]);
+      m.junctions[0].surfP = q(100050, 'Pa(a)');
+      const x = flowOf(run(m), 1, flip);
+      return x ? x.m / (rho * A * Math.sqrt(2 * 50 / ((1 + F) * rho))) - 1 : NaN;
+    }));
+    ok(`short pipe (${mode}): at a drop of 50 Pa the flow is that of ΔP = (1 + F)·ρV²/2 within 1e-4, fL/D 0.5, 1 and 2, drawn either way`,
+      drop.every((d) => Math.abs(d) < 1e-4), drop.map((d) => (d * 1e6).toFixed(1) + ' ppm').join(', '));
+    // a valve of K 2 between reservoirs at 2 and 1.5 bar(a): the isothermal model diverged with pipes of fL/D 0.8 to 1
+    // (the flow of the inlet pipe, whether the outlet pipe chokes)
+    const valve = (P1, P3, F, flip) => flowOf(run(gasModel(mode, [tank(1, P1), node('valve', 2, { lossModel: 'K', K: 2 }), tank(3, P3)], [tube(1, 1, 2, F, flip), tube(2, 2, 3, F, flip)])), 1, flip, 2);
+    const [va, vb] = [false, true].map((flip) => [0.8, 0.9, 1, 1.01].map((F) => valve(2, 1.5, F, flip)));
+    ok(`short pipe (${mode}): a valve between reservoirs at 2 and 1.5 bar(a), pipes of fL/D 0.8 to 1.01, the same flow drawn either way, continuous across 1`,
+      smooth(va, vb) && va.every((x) => !x.choked), show(va));
+    // from 3 to 1 bar(a) the outlet pipe chokes (failed before in the isothermal model, where its inlet is a free node of
+    // static pressure)
+    const [ca, cb] = [false, true].map((flip) => Fs.map((F) => valve(3, 1, F, flip)));
+    ok(`short pipe (${mode}): the same valve from 3 to 1 bar(a), choked, the same flow drawn either way, continuous across 1`,
+      smooth(ca, cb) && ca.every((x) => x.choked), show(ca));
+    // a static pressure of 1.05 bar(a) feeding a reservoir at 1 bar(a): with an exit K of 2 below fL/D 1 as above it; without
+    // it the losses fall below the velocity head the static end gives, and the gas accelerates until the pipe chokes
+    const feed = (F, kIn) => flowOf(run(gasModel(mode, [stat(1, 1.05), tank(2, 1, { 1: { kIn, kOut: 0 } })], [tube(1, 1, 2, F, false)])), 1, false);
+    const fk = Fs.map((F) => feed(F, 2)), f0 = feed(0.5, 0);
+    ok(`short pipe (${mode}): a static pressure feeding a reservoir with an exit K of 2, fL/D 0.5 to 1.01, continuous across 1; without the exit K, choked at fL/D 0.5`,
+      fk.every((x, i) => x && !x.choked && (i === 0 || x.m < fk[i - 1].m)) && Math.abs(fk[2].m - fk[3].m) < 5e-3 * fk[3].m && !!f0 && f0.choked,
+      `${show(fk)}; ${show([f0])}`);
+    // over time: 1.05, 3, 1.0 and 1.5 bar(a) into a static pressure of 1 bar(a) through a pipe of fL/D 0.5, drawn from it
+    const tm = gasModel(mode, [tank(1, 1.05), stat(2, 1)], [tube(1, 1, 2, 0.5, true)]);
+    tm.junctions[0].time = { use: true, what: 'surfP', basis: 'absolute', start: 'time', when: [], interp: 'step', repeat: false, tables: [{ t: [0, 30, 60, 90], v: [1.05, 3, 1, 1.5], tUnit: 's', vUnit: 'bar(a)' }] };
+    Object.assign(tm.solution.time, { on: true, start: q(0, 's'), stop: q(90, 's'), step: q(30, 's') });
+    const tr = PumpIt.time.run(M.effective(tm, 'base'));
+    const series = tr.ok ? [...tr.series.pipes[1].m].map((x) => -x) : [];
+    const steady = [1.05, 3, 1, 1.5].map((P1) => flowOf(run(gasModel(mode, [tank(1, P1), stat(2, 1)], [tube(1, 1, 2, 0.5, true)])), 1, true));
+    ok(`short pipe (${mode}): over time, 1.05, 3, 1 and 1.5 bar(a) into the static pressure, each step as its steady state, no flow at equal pressures`,
+      series.length === 4 && steady.every((x) => x) && series.every((x, i) => Math.abs(x - steady[i].m) <= 1e-9 * Math.max(steady[i].m, 1e-9)) && series[2] === 0,
+      tr.ok ? series.map((x) => x.toFixed(5)).join(', ') : tr.errors.join('; '));
+  }
+}
+
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');
 process.exit(fails ? 1 : 0);

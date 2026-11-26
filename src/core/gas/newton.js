@@ -81,6 +81,7 @@
     const st = new Array(L.length);          // state of every ordinary link
     const R = new Float64Array(n), rowScale = new Float64Array(n);
     const thr = new Float64Array(nF);        // flow through every free node (convergence measure)
+    const choked = new Set();                // pipes marched from one end that choked at a flow tried on the way
 
     // residual (and Jacobian when J is given) at the unknowns xv
     function evaluate(xv, Rv, J) {
@@ -96,7 +97,12 @@
       for (const l of fix) mL[l.idx] = l.value;
       for (const l of con) mL[l.idx] = xv[l.ci];
       // the state of a pipe whose flow is an unknown, marched from its end a (the Mach numbers at its ends for the junctions)
-      for (const l of con) if (l.marched) { const sm = Fw.pipeOut(cx, l.d, nodeOf(l.a, Pv), nodeOf(l.b, Pv), xv[l.ci]); st[l.idx] = sm ? { s: sm, dir: 1, G: sm.G, marched: true } : null; }
+      for (const l of con) {
+        if (!l.marched) continue;
+        const sm = Fw.pipeOut(cx, l.d, nodeOf(l.a, Pv), nodeOf(l.b, Pv), xv[l.ci]);
+        st[l.idx] = sm ? { s: sm, dir: 1, G: sm.G, marched: true } : null;
+        if (!sm) choked.add(l);
+      }
       for (const l of links) if (l.mode === 'closed' && l.idx >= 0) mL[l.idx] = 0;
       // balances
       for (const l of L) {
@@ -159,7 +165,15 @@
 
     const J = new Float64Array(n * n), Rt = new Float64Array(n), xt = new Float64Array(n);
     const hist = [];
-    if (!evaluate(x, R, J)) return { ok: false, error: t('core.solver.diverged'), it: 0, hist };
+    // a first flow at which a pipe marched from one end chokes (its relation has no value there): the first flows of
+    // those pipes are halved until every relation has one
+    let first = evaluate(x, R, J);
+    for (let k = 0; !first && k < 40 && con.some((l) => l.marched && x[l.ci] !== 0); k++) {
+      for (const l of con) if (l.marched) x[l.ci] /= 2;
+      first = evaluate(x, R, J);
+    }
+    if (!first) return { ok: false, error: t('core.solver.diverged'), it: 0, hist, choked: [...choked] };
+    choked.clear(); // a first flow too large does not make a pipe choked
     let nrm = norm(R), fit = misfit(R), converged = n === 0 || fit.worst <= 1e-8, it = 0, haveJ = true;
     for (it = 1; it <= opts.maxIter && !converged; it++) {
       if (!haveJ) evaluate(x, R, J);
@@ -175,7 +189,7 @@
         for (let i = 0; i < n; i++) b[i] = -R[i];
         dx = S.solveDense(Jd, b, n);
       }
-      if (!dx) return { ok: false, error: t('core.solver.singular'), it, hist };
+      if (!dx) return { ok: false, error: t('core.solver.singular'), it, hist, choked: [...choked] };
       // a step below the resolution of the unknowns (32 units in the last place) cannot balance the nodes any better
       if (fit.worst <= 1e-6 && dx.every((d, i) => abs(d) <= 32 * Number.EPSILON * max(abs(x[i]), i < nF ? 0 : Mscale))) { converged = true; break; }
       // pressures stay positive: at most 90 % of the way to zero in one step
@@ -194,7 +208,7 @@
       }
       if (!ok) {
         // no decrease along the Newton direction: take the smallest step anyway (the residual may grow for a moment)
-        if (!evaluate(xt, Rt, null)) return { ok: false, error: t('core.solver.diverged'), it, hist };
+        if (!evaluate(xt, Rt, null)) return { ok: false, error: t('core.solver.diverged'), it, hist, choked: [...choked] };
         nt = norm(Rt); haveJ = false;
       }
       x.set(xt); R.set(Rt); nrm = nt;
@@ -217,7 +231,7 @@
       }
       imb.set(nd, { err: abs(R[i]), thr: max(sin, sout) });
     });
-    return { ok: true, converged, it: it - 1, hist, P: Pout, m: mL.slice(), st: st.slice(), L, N, imb, T0 };
+    return { ok: true, converged, it: it - 1, hist, P: Pout, m: mL.slice(), st: st.slice(), L, N, imb, T0, choked: converged ? [] : [...choked] };
   }
 
   Object.assign(PumpIt.gas, { newton, linkFlow, CON_MODES, isCon });
