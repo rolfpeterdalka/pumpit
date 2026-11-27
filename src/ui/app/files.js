@@ -31,15 +31,40 @@
     M.normalizeEnds(m);
     // overrides of a whole block of friction or of losses at the pipes: one per field that differs from the parent
     M.splitBlocksOnLoad(m);
+    // a catalogue pipe of a scenario whose section is not that of its size and series (docs/pipe-library.md, P-09 to P-11)
+    m._fitted = M.fitCataloguePipesOnLoad(m);
     return m;
   }
 
-  app.loadModel = (m, { fit = true } = {}) => {
-    const before = { model: app.model, results: app.results, timeRuns: app.timeRuns, selSet: app.selSet, sel: app.sel };
+  // ------------------------------------------------------------ one model in place of another
+  // What the model open still has pending when another one comes (review of e81e282, items 2, 3 and 9): the field being
+  // edited is confirmed into it first, as leaving the field would, and is part of its history; once the new model is
+  // in, the dialogs and menus opened for the model before are closed (each one is also stamped with the model it was
+  // opened for, src/ui/common/dialogs.js), and only the latest request to open a file applies.
+  app.commitPending = () => {
+    const a = document.activeElement;
+    if (a && a !== document.body && a.matches && a.matches('input, select, textarea')) a.blur();
+  };
+  app.closeTransient = () => {
+    const D = UI.dialogs;
+    if (D.isModalOpen && D.isModalOpen()) D.closeModal();
+    if (app.hideMenus) app.hideMenus();
+  };
+  // the requests to open a file: a reading that ends after a later request, or after another model came in, is dropped
+  let opens = 0;
+  function request() {
+    const n = ++opens;
+    return () => n === opens;
+  }
+
+  // note: what the caller says of the model ("Opened: name"), in one message with what the opening changed in it
+  app.loadModel = (m, { fit = true, note = '' } = {}) => {
+    const before = { model: app.model, results: app.results, timeRuns: app.timeRuns, selSet: app.selSet, sel: app.sel, modelGen: app.modelGen };
     app.model = normalize(m);
-    const notes = app.model._notes;
-    delete app.model._notes;
+    const notes = app.model._notes, fitted = app.model._fitted;
+    delete app.model._notes; delete app.model._fitted;
     app.selSet = new Set(); app.sel = null;
+    app.modelGen++;
     app.version++;
     app.results = {};
     app.timeRuns = {};
@@ -57,17 +82,24 @@
       if (app.model) app.renderAll();
       throw new Error(t('app.files.notAModel'));
     }
+    opens++;
+    app.closeTransient();
     app.save();
     // the schematic is framed; the cameras of the 3D views were saved with the model (3D views R-02), and are framed
     // again only when the scene is out of their sight
     if (fit) requestAnimationFrame(() => { UI.scene3d.ensureVisible(); UI.canvas.fitSchematic(); });
-    if (notes && notes.length) toast(t('app.files.converted', { notes: notes.join('; ') }));
+    const said = [];
+    if (notes && notes.length) said.push(t('app.files.converted', { notes: notes.join('; ') }));
+    if (fitted && fitted.length) said.push(t('app.files.pipesFitted', { pipes: fitted.join(', ') }));
+    const msg = [note, said.join(' ')].filter(Boolean).join(' · ');
+    if (msg) toast(msg);
   };
 
   // Another model in place of the one in the editor, as one step of the history: the model before goes to the undo
   // stack and the redo stack empties only once the new model is accepted. A refused model throws, with the model, the
   // undo and the redo stacks as they were.
   app.replaceModel = (m, opts) => {
+    app.commitPending();
     const before = JSON.stringify(app.model);
     app.loadModel(m, opts);
     app.pushUndo(before);
@@ -94,11 +126,13 @@
 
   // a file of another format becomes a model, and the import report tells what was read; a file with several scenarios
   // first asks which one to import (a file whose scenarios have no network is refused by the importer at once)
-  function importFile(f, imp) {
+  function importFile(f, imp, latest) {
     const rd = new FileReader();
     rd.onload = () => {
+      if (!latest()) return;
       const text = new TextDecoder(imp.encoding || 'utf-8').decode(rd.result);
       const load = (opts) => {
+        if (!latest()) return;
         let res;
         try { res = imp.read(text, Object.assign({ name: f.name }, opts)); }
         catch (err) { toast(t('app.importReport.cannotRead', { message: err.message })); return; }
@@ -116,14 +150,15 @@
 
   function openFile(f) {
     if (!f) return;
-    const imp = importerOf(f.name);
-    if (imp) { importFile(f, imp); return; }
+    const imp = importerOf(f.name), latest = request();
+    if (imp) { importFile(f, imp, latest); return; }
     const rd = new FileReader();
     rd.onload = () => {
+      if (!latest()) return;
       let model;
       try { model = JSON.parse(rd.result); } catch (err) { toast(t('app.files.cannotOpen', { message: err.message })); return; }
       if (profileRefused(model)) return;
-      try { app.replaceModel(model); toast(t('app.files.opened', { name: f.name })); }
+      try { app.replaceModel(model, { note: t('app.files.opened', { name: f.name }) }); }
       catch (err) { toast(t('app.files.cannotOpen', { message: err.message })); }
     };
     rd.readAsText(f);

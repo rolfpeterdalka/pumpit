@@ -28,6 +28,7 @@
     const m = PumpIt.app && PumpIt.app.model;
     return (m && m.scenarios ? m.scenarios.current : '') + '|' + id;
   };
+  const modelGen = () => (PumpIt.app ? PumpIt.app.modelGen : 0);
   const same = (a, b) => a === b || (a !== a && b !== b) || (a == null && b == null); // eslint-disable-line no-self-compare
 
   // what a text in a cell means: { value } or { error: 'empty' | 'invalid' | 'rule', why }
@@ -70,6 +71,8 @@
     const shown = () => (o.value === null || o.value === undefined ? '' : typeof o.value === 'number' ? F.inputStr(o.value) : String(o.value));
     const msgId = o.id + '-err';
     const key = keyOf(o.id);
+    // the model the cell was drawn for: a cell left after another model came in writes nothing (review of e81e282)
+    const gen = modelGen();
     function clear() {
       drafts.delete(key);
       inp.removeAttribute('aria-invalid');
@@ -104,6 +107,7 @@
     if (d && same(d.base, o.value)) { const r = read(d.text, o); inp.value = d.text; refuse(d.text, r.error || 'invalid', r.why); }
     else { if (d) drafts.delete(key); markStored(); }
     inp.addEventListener('change', () => {
+      if (gen !== modelGen()) return;
       const r = read(inp.value, o);
       if (r.error) { refuse(inp.value, r.error, r.why); return; }
       clear();

@@ -129,9 +129,11 @@
     }
   }
 
+  // the overrides of an object that is gone, and its dormant section (pipe-scenarios.js)
   function removeObjectOverrides(m, objKey) {
     for (const s of m.scenarios.list) {
       for (const k of Object.keys(s.overrides)) if (k.split('|')[0] === objKey) delete s.overrides[k];
+      if (s.parked && s.parked[objKey]) { delete s.parked[objKey]; if (!Object.keys(s.parked).length) delete s.parked; }
     }
   }
 

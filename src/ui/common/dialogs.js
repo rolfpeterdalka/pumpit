@@ -20,9 +20,14 @@
   let opener = null, openerId = null;
   let inerted = []; // the elements the box made inert (those already inert, behind a window, stay as they were)
 
+  // the model open in the editor (PumpIt.app.modelGen): a box opened for one model does nothing in another
+  const modelGen = () => (PumpIt.app ? PumpIt.app.modelGen : 0);
+
   // actions: [{ label, primary, onClick }]; onClick returning false keeps the box open. opener: the control that opens
-  // the box, when it is not the one with the focus
+  // the box, when it is not the one with the focus. An action of a box opened before another model came in only closes
+  // the box (review of e81e282, item 3)
   function modal({ title, body, actions, opener: from }) {
+    const made = modelGen();
     if (PumpIt.ui.tips) PumpIt.ui.tips.hide(); // a note left open by the field behind would cover the box
     if (!isModalOpen()) {
       const o = from || document.activeElement;
@@ -40,7 +45,10 @@
       btn.type = 'button';
       btn.className = 'btn' + (act.primary ? ' primary' : '');
       btn.textContent = act.label;
-      btn.addEventListener('click', () => { if (act.onClick && act.onClick() === false) return; closeModal(); });
+      btn.addEventListener('click', () => {
+        if (made === modelGen() && act.onClick && act.onClick() === false) return;
+        closeModal();
+      });
       a.appendChild(btn);
     }
     if (isModalOpen()) { focusFirst(); return; }

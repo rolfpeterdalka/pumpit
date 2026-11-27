@@ -32,9 +32,9 @@
     s1.appendChild(sel(key, 'material.kind', tx('material'), [['user', tx('userDefined')]].concat(D.PIPE_KINDS.map((k) => [k, tx('materials.' + k)])), { info: tx('materialInfo') }));
     const cat = D.PIPE_KINDS.includes(p.material.kind);
     if (cat) catalogFields(s1, key, p.material);
-    s1.appendChild(sel(key, 'geometry.kind', tx('section'), ['circular', 'annulus', 'rectangular', 'noncircular'].map((g) => [g, tx('sections.' + g)]), { disabled: cat }));
+    s1.appendChild(sel(key, 'geometry.kind', tx('section'), ['circular', 'annulus', 'rectangular', 'noncircular'].map((g) => [g, tx('sections.' + g)]), { disabled: cat, derived: cat }));
     const g = p.geometry.kind;
-    if (g === 'circular') s1.appendChild(qty(key, 'geometry.d', tx('innerDiameter'), 'length', { disabled: cat }));
+    if (g === 'circular') s1.appendChild(qty(key, 'geometry.d', tx('innerDiameter'), 'length', { disabled: cat, derived: cat }));
     if (g === 'annulus') { s1.appendChild(qty(key, 'geometry.dOuter', tx('outerDiameter'), 'length')); s1.appendChild(qty(key, 'geometry.dInner', tx('innerDiameter'), 'length')); }
     if (g === 'rectangular') { s1.appendChild(qty(key, 'geometry.width', tx('width'), 'length')); s1.appendChild(qty(key, 'geometry.height', tx('height'), 'length')); }
     if (g === 'noncircular') { s1.appendChild(qty(key, 'geometry.area', tx('area'), 'area')); s1.appendChild(qty(key, 'geometry.perim', tx('perimeter'), 'length')); }

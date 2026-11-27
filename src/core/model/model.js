@@ -142,8 +142,11 @@
     for (const k of path.split('.')) { if (cur == null) return undefined; cur = cur[k]; }
     return cur;
   }
+  // a path read from a file (an override, a dormant section) never writes into the prototype of an object
+  const UNSAFE = new Set(['__proto__', 'prototype', 'constructor']);
   function setPath(o, path, v) {
     const ks = path.split('.');
+    if (ks.some((k) => UNSAFE.has(k))) return;
     let cur = o;
     for (let i = 0; i < ks.length - 1; i++) {
       if (cur[ks[i]] == null || typeof cur[ks[i]] !== 'object') cur[ks[i]] = {};

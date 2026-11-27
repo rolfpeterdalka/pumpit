@@ -48,6 +48,7 @@ function openTab(name, stored) {
     addEventListener(t, f) { (this.listeners[t] = this.listeners[t] || []).push(f); },
     fire(t, extra = {}) { let stop = false; const e = Object.assign({ type: t, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { stop = true; } }, extra); (this.listeners[t] || []).forEach((f) => { if (!stop) f(e); }); this.lastPrevented = !!e.prevented; return stop; } };
   const saved = [];
+  const dialogs = { open: false, isModalOpen: () => dialogs.open, closeModal() { dialogs.open = false; } };
   const app = {
     model: stored ? JSON.parse(stored) : { pipes: [] },
     undoStack: [], redoStack: [], menusHidden: 0, hideMenus() { app.menusHidden++; },
@@ -55,6 +56,9 @@ function openTab(name, stored) {
     savePrefs() {},
     storedModel: () => (data.has('pumpit.model') ? JSON.parse(data.get('pumpit.model')) : null),
     loadModel(m) { app.model = m; },
+    // as in src/ui/app/files.js
+    closeTransient() { if (dialogs.isModalOpen()) dialogs.closeModal(); app.hideMenus(); },
+    commitPending() {},
   };
   const ctx = vm.createContext({
     console, setTimeout, Math, Date, JSON,
@@ -62,7 +66,6 @@ function openTab(name, stored) {
     document: { body, get activeElement() { return body; } },
   });
   Object.assign(ctx, { window: ctx, addEventListener: win.addEventListener.bind(win) });
-  const dialogs = { open: false, isModalOpen: () => dialogs.open, closeModal() { dialogs.open = false; } };
   ctx.PumpIt = { app, ui: { dom: { $: (s) => byId[s.slice(1)] }, tips: null, dialogs }, i18n: { t: (k) => k } };
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/app/single-tab.js'), 'utf8'), ctx, { filename: 'single-tab.js' });
   tabs.add(win);

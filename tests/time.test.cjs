@@ -1521,5 +1521,42 @@ console.log('\nReview of 319654f, bugs 7 and 8: exact times of events on tanks')
   check('exact events: the level of a constant section is unchanged by the volume form (2 m at 1 s)', m2.ok && m2.times[1] === 1);
 }
 
+// ---------- review of e81e282, item 4: the velocity of a two-port junction, whichever way its inlet pipe is drawn
+console.log('\nThe velocity of a valve has the sign of the valve, whichever way its pipes are drawn (T-08)');
+{
+  // water at 20 °C between reservoirs at 30 and 10 m; the valve J2 (K = 1) between P1 and P2 of 50 m and 100 mm; its
+  // table of K (1, then 500 at 1 s) starts when the velocity of the sensor is above 1 m/s
+  function valveLine(reversed, sensor) {
+    const m = M.newModel();
+    m.solution.time.on = true;
+    junction(m, 'reservoir', 1, { elevation: q(0, 'm'), liquidElev: q(30, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    junction(m, 'valve', 2, {
+      elevation: q(0, 'm'), lossModel: 'K', K: 1,
+      time: timeData('K', 'single', [{ q: 'velocity', obj: sensor, op: '>', value: q(1, 'm/s') }], [table([0, 1], [1, 500], 's', '')]),
+    });
+    junction(m, 'reservoir', 3, { elevation: q(0, 'm'), liquidElev: q(10, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    for (const [id, up, down] of [[1, reversed ? 2 : 1, reversed ? 1 : 2], [2, 2, 3]]) {
+      const p = M.newPipe(id, up, down);
+      p.length = q(50, 'm');
+      p.geometry.d = q(100, 'mm');
+      p.friction = { model: 'roughness', eps: q(0.046, 'mm') };
+      m.pipes.push(p);
+    }
+    control(m, 3, 1);
+    return simulate(m);
+  }
+  const lps = (r, t) => at(r, 'pipes', 2, 'Q', t) * 1000;
+  const row = (r) => [0, 1, 3].map((t) => lps(r, t).toFixed(5)).join(' / ');
+  const ahead = valveLine(false, 'j:2'), back = valveLine(true, 'j:2');
+  check('P1 from J1 to J2, sensor J2: 36.18509, 6.81772 and 6.81772 L/s at 0, 1 and 3 s',
+    near(lps(ahead, 0), 36.18509, 1e-3) && near(lps(ahead, 1), 6.81772, 1e-3) && near(lps(ahead, 3), 6.81772, 1e-3), row(ahead));
+  check('P1 drawn from J2 to J1: the same (was 36.18509 L/s at 1 and 3 s, the table never started)',
+    near(lps(back, 0), 36.18509, 1e-3) && near(lps(back, 1), 6.81772, 1e-3) && near(lps(back, 3), 6.81772, 1e-3), row(back));
+  // a condition on the pipe itself keeps the sign of the pipe: drawn against the flow, its velocity is negative
+  const pAhead = valveLine(false, 'p:1'), pBack = valveLine(true, 'p:1');
+  check('control: sensor P1 drawn along the flow (+4.6 m/s) starts the table; drawn against it (-4.6 m/s) does not',
+    near(lps(pAhead, 3), 6.81772, 1e-3) && near(lps(pBack, 3), 36.18509, 1e-3), row(pAhead) + ' · ' + row(pBack));
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

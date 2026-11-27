@@ -29,62 +29,56 @@
   app.redo = () => { if (!app.redoStack.length) return toast(t('app.edit.nothingToRedo')); app.undoStack.push(JSON.stringify(app.model)); restore(app.redoStack.pop()); };
 
   // ------------------------------------------------------------ fields
+  // an edit of the material or of the section of a pipe: the scenarios below it follow the catalogue rules too
+  // (M.fitPipesBelow, src/core/model/pipe-scenarios.js)
+  const pipeField = (key, path, what) => key.startsWith('p:') && (path === what || path.startsWith(what + '.'));
   app.setVal = (key, path, value) => {
     app.pushUndo();
     const sid = app.model.scenarios.current;
-    const before = key.startsWith('p:') && path.startsWith('material') ? M.getObj(M.effective(app.model, sid), key) : null;
+    const mat = pipeField(key, path, 'material');
+    const before = mat || pipeField(key, path, 'geometry') ? M.pipeStates(app.model, sid, key) : null;
     M.setField(app.model, sid, key, path, value);
-    if (before) { fitPipe(sid, key, path, before); fitBelow(sid, key); }
+    if (mat) fitPipe(sid, key, before.get(sid));
+    if (before) M.fitPipesBelow(app.model, sid, key, before);
     app.changed();
   };
   // A pipe of a catalogue (src/core/data/pipe-library.js): its nominal size and series define the inner diameter. A new
   // material keeps the size when both catalogues mean the same sizes (carbon and stainless steel) and otherwise takes the
   // size whose bore is closest to the pipe's, with the roughness of the material; a series that the size lacks becomes
   // the nearest one (decision P-07 of docs/pipe-library.md).
-  // restore: the material came back from the parent scenario (app.clearOv). The diameter, and with a new material the
-  // roughness, that the catalogue gave the material of the child go back to the parent too; a roughness or a geometry
-  // the user changed on their own in the child stay.
-  function fitPipe(sid, key, path, before, restore = false) {
-    const mat = M.getObj(M.effective(app.model, sid), key).material;
+  // restore: the material came back from the parent scenario (app.clearOv). The size, series and grade of the child
+  // that the restored catalogue does not have, the diameter the catalogue gave and, with a new material, the default
+  // roughness of the abandoned one go back to the parent too; a roughness the user changed on their own stays. A section
+  // of its own, from a user-defined material, goes dormant (P-11).
+  function fitPipe(sid, key, before, restore = false) {
+    const m = app.model;
+    let mat = M.getObj(M.effective(m, sid), key).material;
     const newKind = before.material.kind !== mat.kind;
     const g = before.geometry;
-    const own = (p) => M.isOverridden(app.model, sid, key, p);
-    // what the catalogue gave the material of the child before: its bore and its default roughness
-    const wasCatalogue = D.PIPE_KINDS.includes(before.material.kind);
-    const dims = wasCatalogue ? D.pipeDims(before.material) : null;
-    const catalogueId = dims ? +dims.id.toFixed(2) : NaN;
-    const fromCatalogue = (gg) => wasCatalogue && gg.kind === 'circular' && gg.d && gg.d.unit === 'mm' && gg.d.value === catalogueId;
+    const own = (p) => M.isOverridden(m, sid, key, p);
+    const wasCatalogue = M.isCatalogue(before.material);
     if (restore && newKind && wasCatalogue && own('friction') && M.deepEqual(before.friction, defaultFriction(before.material.kind))) {
-      M.clearOverride(app.model, sid, key, 'friction');
+      M.clearOverride(m, sid, key, 'friction');
     }
-    if (!D.PIPE_KINDS.includes(mat.kind)) {
-      // back to a material without a catalogue: the geometry the catalogue gave goes back to the parent
-      if (restore && own('geometry') && fromCatalogue(g)) M.clearOverride(app.model, sid, key, 'geometry');
+    if (!M.isCatalogue(mat)) {
+      // back to a material without a catalogue: the geometry the catalogue gave goes back to the parent, and a section of
+      // its own that went dormant under an inherited catalogue comes back (P-10)
+      if (restore && own('geometry') && M.fitsCatalogue(g, before.material)) M.clearOverride(m, sid, key, 'geometry');
+      M.unparkSection(m, sid, key);
       return;
     }
-    const refId = g.kind === 'circular' && g.d && Number.isFinite(g.d.value) ? U.toSI(g.d.value, g.d.unit, 'length') * 1000 : NaN;
-    // a grade the catalogue of the child gave means nothing to a material without grades
-    if (restore && newKind && !D.pipeGrades(mat.kind).length && own('material.grade')) M.clearOverride(app.model, sid, key, 'material.grade');
-    const fit = D.fitMaterial(mat, { refId, resize: newKind && !D.sameSizes(before.material.kind, mat.kind) });
-    for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && fit[f] !== mat[f]) M.setField(app.model, sid, key, 'material.' + f, fit[f]);
-    M.setField(app.model, sid, key, 'geometry.kind', 'circular');
-    M.setField(app.model, sid, key, 'geometry.d', { value: +D.pipeDims(fit).id.toFixed(2), unit: 'mm' });
-    // the friction of the material field by field: a field equal to the parent's stays inherited
-    if (newKind && !restore) for (const [f, v] of Object.entries(defaultFriction(mat.kind))) M.setField(app.model, sid, key, 'friction.' + f, v);
-  }
-  // The scenarios below sid whose pipe holds a diameter of its own take the bore of the material they now see: a series
-  // chosen in a child stays and a size changed in its parent reaches it (decision P-09 of docs/pipe-library.md). The
-  // diameter field is disabled for a catalogue material, so that diameter is always the one the catalogue gave.
-  function fitBelow(sid, key) {
-    for (const d of M.descendants(app.model, sid)) {
-      if (!M.isOverridden(app.model, d, key, 'geometry.d') && !M.isOverridden(app.model, d, key, 'geometry')) continue;
-      const p = M.getObj(M.effective(app.model, d), key);
-      if (!p || !D.PIPE_KINDS.includes(p.material.kind)) continue;
-      const fit = D.fitMaterial(p.material);
-      for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && String(fit[f]) !== String(p.material[f])) M.setField(app.model, d, key, 'material.' + f, fit[f]);
-      const dims = D.pipeDims(fit);
-      if (dims) M.setField(app.model, d, key, 'geometry.d', { value: +dims.id.toFixed(2), unit: 'mm' });
+    if (restore && newKind) {
+      if (!wasCatalogue) M.parkSection(m, sid, key);
+      M.dropForeign(m, sid, key, before.material.kind, mat.kind);
+      mat = M.getObj(M.effective(m, sid), key).material;
     }
+    const refId = g.kind === 'circular' && g.d && Number.isFinite(g.d.value) ? U.toSI(g.d.value, g.d.unit, 'length') * 1000 : NaN;
+    const fit = D.fitMaterial(mat, { refId, resize: newKind && !restore && !D.sameSizes(before.material.kind, mat.kind) });
+    for (const f of ['nps', 'sch', 'grade']) if (fit[f] !== undefined && fit[f] !== mat[f]) M.setField(m, sid, key, 'material.' + f, fit[f]);
+    M.setField(m, sid, key, 'geometry.kind', 'circular');
+    M.setField(m, sid, key, 'geometry.d', { value: M.catalogueBore(fit), unit: 'mm' });
+    // the friction of the material field by field: a field equal to the parent's stays inherited
+    if (newKind && !restore) for (const [f, v] of Object.entries(defaultFriction(mat.kind))) M.setField(m, sid, key, 'friction.' + f, v);
   }
   const defaultFriction = (kind) => ({ model: 'roughness', eps: { value: D.pipeEps(kind), unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
   // several fields of one object in a single step (one undo snapshot, one recalculation): [[path, value], ...]
@@ -94,14 +88,17 @@
     for (const [path, value] of pairs) M.setField(app.model, sid, key, path, value);
     app.changed();
   };
-  // the value of the parent back: for the material of a pipe, with the catalogue rules of an edit (fitPipe), in the
-  // same undo step
+  // the value of the parent back: for the material of a pipe, with the catalogue rules of an edit (fitPipe); for the
+  // section of a catalogue pipe, the section of its catalogue again; in the same undo step
   app.clearOv = (key, path) => {
     app.pushUndo();
     const sid = app.model.scenarios.current;
-    const before = key.startsWith('p:') && (path === 'material' || path.startsWith('material.')) ? M.getObj(M.effective(app.model, sid), key) : null;
+    const mat = pipeField(key, path, 'material');
+    const before = mat || pipeField(key, path, 'geometry') ? M.pipeStates(app.model, sid, key) : null;
     M.clearOverride(app.model, sid, key, path);
-    if (before) { fitPipe(sid, key, path, before, true); fitBelow(sid, key); }
+    if (mat) fitPipe(sid, key, before.get(sid), true);
+    else if (before && M.isCatalogue(M.getObj(M.effective(app.model, sid), key).material)) M.fitCatalogueHere(app.model, sid, key);
+    if (before) M.fitPipesBelow(app.model, sid, key, before);
     app.changed();
   };
 

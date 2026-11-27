@@ -73,11 +73,8 @@
   }
   // A window or a menu open in this tab belongs to the study as it was here: a conversion would apply a value read
   // before (review of e6b8f15, item 18). Locking closes them, and so does taking the study over.
-  function closeOpen() {
-    const D = PumpIt.ui.dialogs;
-    if (D && D.isModalOpen && D.isModalOpen()) D.closeModal();
-    if (app.hideMenus) app.hideMenus();
-  }
+  // (the same closing as when another model comes in: app.closeTransient, files.js)
+  const closeOpen = () => app.closeTransient();
   // "Use here": the study as the other tab last saved it. Its history stays in the other tab: the undo and redo of this
   // tab hold copies of a revision left behind, so they are dropped (review of e6b8f15, item 17)
   function useHere() {
@@ -119,8 +116,7 @@
 
   // the field being edited is written before the page goes, and the study is given back
   function leaving() {
-    const a = document.activeElement;
-    if (active && a && a !== document.body && a.matches && a.matches('input, select, textarea')) a.blur();
+    if (active) app.commitPending();
   }
   window.addEventListener('beforeunload', leaving);
   window.addEventListener('pagehide', () => {

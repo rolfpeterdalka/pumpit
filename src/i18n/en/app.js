@@ -100,6 +100,7 @@ PumpIt.i18n.add('en', {
       duplicateIds: 'The file was not opened: {list}',
       isProfile: 'This file is a profile of result columns, not a model. Bring it in with {path}.',
       converted: 'Junction types converted: {notes}.',
+      pipesFitted: 'Section set from the catalogue of the material, which the scenario shows: {pipes}.',
       opened: 'Opened: {name}',
       cannotOpen: 'Could not open: {message}',
       modelCopied: 'Model copied to the clipboard.',

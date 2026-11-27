@@ -1162,9 +1162,11 @@ console.log('\nA field inside a block of a scenario follows the parent');
   // a file of before, with the friction written whole by the change of material
   fresh();
   M.setField(app.model, 's1', 'p:1', 'material.kind', 'stainless');
+  M.setField(app.model, 's1', 'p:1', 'material.sch', '10S');
+  M.setField(app.model, 's1', 'p:1', 'geometry.d', { value: M.catalogueBore({ kind: 'stainless', nps: '6', sch: '10S' }), unit: 'mm' });
   M.setField(app.model, 's1', 'p:1', 'friction', { model: 'roughness', eps: { value: 0.015, unit: 'mm' }, rel: 0.0001, f: 0.02, C: 120 });
   reopen(JSON.stringify(app.model));
-  ok('I7 a file of before: the friction becomes its roughness alone, 0.015 mm', own('p:1|') === 'p:1|friction.eps,p:1|material.kind' && eps() === 0.015, own('p:1|'));
+  ok('I7 a file of before: the friction becomes its roughness alone, 0.015 mm', own('p:1|') === 'p:1|friction.eps,p:1|geometry.d,p:1|material.kind,p:1|material.sch' && eps() === 0.015, own('p:1|'));
   app.model.scenarios.current = 's1';
   app.clearOv('p:1', 'friction.eps');
   ok('I7 and its restore brings back 0.046 mm', eps() === 0.046 && !app.isOv('p:1', 'friction.eps'));
@@ -1762,6 +1764,440 @@ console.log('\nReview of d05430d: a point added to a curve, the count of fitting
   setUp({ state: 'on', speed: 90 });
   r = draw();
   ok('TODO d a running pump keeps its legend and point', r.d.series[0].name === 'Bomba a 90%' && r.d.points[0].label.startsWith('Operação') && !r.notes.includes('parada'), r.d.series[0].name);
+}
+
+// ------------------------------------------------------------ catalogue pipes across scenarios (review of e81e282)
+// Items 1, 5, 6 and 8 and the first loss of a row (item 7), on two atmospheric reservoirs (surfaces at 30 and 10 m)
+// joined by P1 of 800 m of water at 20 °C, with a child scenario: the material back from the parent, a size changed in
+// the base under a series of the child, a section of the child's own under a catalogue the base chooses, and files
+// saved in those states (decisions P-09 to P-11 of docs/pipe-library.md).
+console.log('\nReview of e81e282: catalogue pipes across scenarios and the first loss of a row');
+{
+  const cx = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const PX = cx.PumpIt, UI = PX.ui, M = PX.model, D = PX.data, q = M.q;
+  const toasts = [];
+  UI.dialogs = { toast: (s) => toasts.push(s), modal() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection() {} };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), cx, { filename: f });
+  run('src/ui/app/state.js');
+  const app = PX.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/inspector/pipe-losses-table.js');
+  UI.junctionTypes = { get: (type) => ({ connectionElevation: type === 'reservoir' }) };
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, recalc() {}, okResults: () => null });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  app.effObj = (k) => M.getObj(app.eff(), k);
+  app.getVal = (k, p) => M.effValue(app.model, app.model.scenarios.current, k, p);
+  app.isOv = (k, p) => M.isOverridden(app.model, app.model.scenarios.current, k, p);
+  PX.i18n.setLanguage('pt-BR');
+  const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+  const reopen = () => app.loadModel(JSON.parse(JSON.stringify(app.model)), { fit: false });
+  // the two reservoirs and P1 of a catalogue (its bore as the field holds it) or of a user-defined material
+  const tanks = (mat, geometry) => {
+    const m = M.newModel();
+    const r1 = Object.assign(M.newJunction('reservoir', 1, 0, 0), { liquidElev: q(30, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    const r2 = Object.assign(M.newJunction('reservoir', 2, 100, 0), { liquidElev: q(10, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    const p = Object.assign(M.newPipe(1, 1, 2), { length: q(800, 'm'), material: mat });
+    p.geometry = Object.assign(p.geometry, geometry || { kind: 'circular', d: q(M.catalogueBore(mat), 'mm') });
+    m.junctions = [r1, r2]; m.pipes = [p]; m.nextId = { j: 3, p: 2 };
+    return m;
+  };
+  let child = null, grand = null;
+  const start = (mat, geometry) => {
+    app.model = tanks(mat, geometry); app.undoStack = []; app.redoStack = [];
+    child = M.addScenario(app.model, 'base', 'child').id;
+    grand = M.addScenario(app.model, child, 'grandchild').id;
+    app.model.scenarios.current = child;
+  };
+  const at = (sid) => { app.model.scenarios.current = sid; };
+  const pipe = (sid = app.model.scenarios.current, m = app.model) => M.getObj(M.effective(m, sid), 'p:1');
+  const d = (sid, m) => pipe(sid, m).geometry.d.value;
+  const flow = (sid = app.model.scenarios.current, m = app.model) => PX.solver.run(M.effective(m, sid)).pipes[1].Q * 1000;
+  const own = (sid = child, prefix = 'p:1|') => Object.keys(app.model.scenarios.list.find((s) => s.id === sid).overrides).filter((k) => k.startsWith(prefix)).sort().join(',');
+  const direct = (mat) => flow('base', tanks(mat));
+
+  // item 1: the material back from the parent is the parent's pipe, whatever size the abandoned catalogue had
+  start({ kind: 'steel', nps: '1/2', sch: '80' });
+  const q12 = flow('base');
+  ok('E1 the base: steel 1/2" Sch 80, 13.87 mm, 0.062515 L/s', d('base') === 13.87 && near(q12, 0.0625150, 1e-5), String(q12));
+  app.setVal('p:1', 'material.kind', 'ductile');
+  ok('E1 ductile iron in the child: DN 80 K9', pipe().material.nps === '80' && pipe().material.sch === 'K9' && d(child) === 80);
+  app.clearOv('p:1', 'material.kind');
+  ok('E1 the material restored: steel 1/2" Sch 80, 13.87 mm and the flow of the base (was NPS 3 Sch 40, 6.505441 L/s)',
+    pipe().material.nps === '1/2' && pipe().material.sch === '80' && d(child) === 13.87 && flow() === q12, `${pipe().material.nps} ${pipe().material.sch} ${d(child)} ${flow()}`);
+  ok('E1 nothing of the pipe is left changed in the child, nor in the grandchild', own() === '' && own(grand) === '' && d(grand) === 13.87, own());
+  app.undo();
+  ok('E1 undo brings back ductile iron DN 80 in the child and the grandchild', pipe().material.kind === 'ductile' && d(child) === 80 && d(grand) === 80);
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  const q8 = flow('base');
+  app.setVal('p:1', 'material.kind', 'hdpe');
+  ok('E1 HDPE in the child: OD 225 SDR 11', pipe().material.nps === '225' && pipe().material.sch === '11');
+  app.clearOv('p:1', 'material.kind');
+  ok('E1 restored from HDPE: steel 8" Sch 80, 193.68 mm, 72.15653 L/s (was Sch 40, 81.35626 L/s)',
+    pipe().material.sch === '80' && d(child) === 193.68 && near(flow(), 72.15653, 1e-6) && flow() === q8 && own() === '', `${pipe().material.sch} ${flow()} ${own()}`);
+  // a size of the child's own, in a catalogue of the same sizes, stays; its series of stainless steel does not
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  app.setVal('p:1', 'material.nps', '2');
+  app.setVal('p:1', 'material.kind', 'stainless');
+  ok('E1 stainless steel in a child with 2": 2" 10S', pipe().material.nps === '2' && pipe().material.sch === '10S');
+  app.clearOv('p:1', 'material.kind');
+  ok('E1 steel back: the 2" of the child stays, with the Sch 80 of the base and its bore',
+    pipe().material.nps === '2' && pipe().material.sch === '80' && d(child) === M.catalogueBore({ kind: 'steel', nps: '2', sch: '80' }) && own() === 'p:1|geometry.d,p:1|material.nps', own());
+  // a roughness typed in the child stays, the default one of the abandoned material goes
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  app.setVal('p:1', 'material.kind', 'hdpe');
+  app.setVal('p:1', 'friction.eps', q(0.2, 'mm'));
+  app.clearOv('p:1', 'material.kind');
+  ok('E1 control: a roughness of the child stays when the material comes back', pipe().friction.eps.value === 0.2 && d(child) === 193.68 && own() === 'p:1|friction.eps', own());
+
+  // item 8: a series of the child under a size changed in the base
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  app.setVal('p:1', 'material.sch', 'XS');
+  ok('E8 XS in the child: 193.68 mm, the same bore as Sch 80, no diameter of its own', d(child) === 193.68 && own() === 'p:1|material.sch', own());
+  at('base');
+  app.setVal('p:1', 'material.nps', '24');
+  const q24 = direct({ kind: 'steel', nps: '24', sch: 'XS' });
+  ok('E8 NPS 24 in the base: the child calculates 24" XS, 584.20 mm and 1300.79981 L/s, as the direct choice (was 547.67 mm, 1099.08631 L/s)',
+    pipe(child).material.nps === '24' && d(child) === 584.2 && flow(child) === q24 && near(q24, 1300.79981, 1e-8), `${d(child)} ${flow(child)}`);
+  ok('E8 … and the grandchild, which inherits from the child', d(grand) === 584.2);
+  ok('E8 the base keeps Sch 80: 547.67 mm and 1099.08631 L/s', d('base') === 547.67 && near(flow('base'), 1099.08631, 1e-8));
+  app.setVal('p:1', 'material.nps', '8');
+  ok('E8 the base back to NPS 8: the child is 8" XS again, with nothing but its series', d(child) === 193.68 && own() === 'p:1|material.sch', own());
+  app.undo();
+  ok('E8 undo: 24" in both again', d(child) === 584.2 && d('base') === 547.67);
+  reopen();
+  ok('E8 saved and opened again: the same pair and no note', d(child) === 584.2 && flow(child) === q24 && !toasts.length, toasts.join(' | '));
+  // a file saved in the wrong state: the child holds XS and inherits the bore of 24" Sch 80
+  {
+    const m = tanks({ kind: 'steel', nps: '24', sch: '80' });
+    const c = M.addScenario(m, 'base', 'child');
+    c.overrides['p:1|material.sch'] = 'XS';
+    toasts.length = 0;
+    app.loadModel(JSON.parse(JSON.stringify(m)), { fit: false });
+    ok('E8 a file of before: the child gets the bore of 24" XS on opening', d('s1') === 584.2 && flow('s1') === q24 && d('base') === 547.67, String(d('s1')));
+    ok('E8 … and the note names the pipe and the scenario', toasts.length === 1 && toasts[0].includes('Seção ajustada') && toasts[0].includes('P1 (child)'), toasts.join(' | '));
+  }
+  // controls of the file fix: a base built by code with a geometry of its own, and a child with both of its own
+  {
+    const m = tanks({ kind: 'steel', nps: '4', sch: '40' }, { kind: 'circular', d: q(90, 'mm') });
+    const c = M.addScenario(m, 'base', 'child');
+    c.overrides['p:1|material.sch'] = '80';
+    c.overrides['p:1|geometry.d'] = q(70, 'mm');
+    toasts.length = 0;
+    app.loadModel(JSON.parse(JSON.stringify(m)), { fit: false });
+    ok('E8 control: the base and a child with both of their own open as they were, with no note', d('base') === 90 && d('s1') === 70 && !toasts.length, `${d('base')} ${d('s1')} ${toasts.join(' | ')}`);
+  }
+
+  // item 5: a diameter of the child's own under a base that goes to a catalogue and back
+  start({ kind: 'user', nps: '4', sch: '40' }, { kind: 'circular', d: q(100, 'mm') });
+  app.setVal('p:1', 'geometry.d', q(200, 'mm'));
+  const q200 = flow();
+  ok('E5 200 mm in the child: 78.51651 L/s', near(q200, 78.51651, 1e-6), String(q200));
+  at('base');
+  app.setVal('p:1', 'material.kind', 'steel');
+  ok('E5 steel in the base: the child calculates steel 4" Sch 40, 102.26 mm, and keeps its 200 mm dormant',
+    d(child) === 102.26 && own() === '' && JSON.stringify(app.model.scenarios.list[1].parked) === '{"p:1":{"geometry.d":{"value":200,"unit":"mm"}}}', JSON.stringify(app.model.scenarios.list[1].parked));
+  reopen();
+  at('base');
+  app.setVal('p:1', 'material.kind', 'user');
+  app.setVal('p:1', 'geometry.d', q(100, 'mm'));
+  ok('E5 saved, opened, and the base back to 100 mm user-defined: the child has its 200 mm and 78.51651 L/s (was 100 mm, 12.60423 L/s)',
+    d(child) === 200 && flow(child) === q200 && own() === 'p:1|geometry.d' && !app.model.scenarios.list[1].parked, `${d(child)} ${own()}`);
+  ok('E5 the base calculates its 100 mm', d('base') === 100 && near(flow('base'), 12.60423, 1e-6));
+  app.undo(); app.undo();
+  ok('E5 two undos: steel in both, the 200 mm dormant again', d(child) === 102.26 && !!app.model.scenarios.list[1].parked);
+  // a pipe deleted takes its dormant section with it
+  app.selSet = new Set(['p:1']);
+  app.deleteSelection();
+  ok('E5 the pipe deleted: no dormant section is left', !app.model.scenarios.list[1].parked);
+
+  // item 6: a rectangular section of the child's own
+  start({ kind: 'user', nps: '4', sch: '40' }, { kind: 'circular', d: q(100, 'mm') });
+  app.setVal('p:1', 'geometry.kind', 'rectangular');
+  app.setVal('p:1', 'geometry.width', q(200, 'mm'));
+  app.setVal('p:1', 'geometry.height', q(150, 'mm'));
+  const qRect = flow();
+  ok('E6 a rectangle 200 × 150 mm in the child: 68.01627 L/s', near(qRect, 68.01627, 1e-6), String(qRect));
+  at('base');
+  app.setVal('p:1', 'material.kind', 'steel');
+  ok('E6 steel in the base: the child is circular steel 4" Sch 40, 13.37272 L/s, as the control (was the rectangle, 68.01627 L/s)',
+    pipe(child).geometry.kind === 'circular' && d(child) === 102.26 && flow(child) === flow('base') && near(flow(child), 13.37272, 1e-6), `${pipe(child).geometry.kind} ${flow(child)}`);
+  app.setVal('p:1', 'material.kind', 'user');
+  ok('E6 the base user-defined again: the rectangle of the child comes back', pipe(child).geometry.kind === 'rectangular' && flow(child) === qRect);
+  // the child restores the material of a base of a catalogue: its rectangle goes dormant, and comes back with its own
+  // user-defined material
+  at('base'); app.setVal('p:1', 'material.kind', 'steel');
+  at(child); app.setVal('p:1', 'material.kind', 'user');
+  ok('E6 user-defined in the child: its rectangle again', pipe().geometry.kind === 'rectangular' && flow() === qRect);
+  app.clearOv('p:1', 'material.kind');
+  ok('E6 the material restored in the child: steel 4" Sch 40, circular, the rectangle dormant', pipe().geometry.kind === 'circular' && d(child) === 102.26 && own() === '' && !!app.model.scenarios.list[1].parked, own());
+  app.setVal('p:1', 'material.kind', 'user');
+  ok('E6 user-defined again: the rectangle back', pipe().geometry.kind === 'rectangular' && flow() === qRect);
+  // a file saved in the wrong state: a rectangle of the child under the steel of the base
+  {
+    const m = tanks({ kind: 'steel', nps: '4', sch: '40' });
+    const c = M.addScenario(m, 'base', 'child');
+    Object.assign(c.overrides, { 'p:1|geometry.kind': 'rectangular', 'p:1|geometry.width': q(200, 'mm'), 'p:1|geometry.height': q(150, 'mm') });
+    toasts.length = 0;
+    app.loadModel(JSON.parse(JSON.stringify(m)), { fit: false });
+    ok('E6 a file of before: the child is circular steel on opening, with a note, and its rectangle dormant',
+      pipe('s1').geometry.kind === 'circular' && d('s1') === 102.26 && toasts.length === 1 && !!app.model.scenarios.list[1].parked, toasts.join(' | '));
+    at('base'); app.setVal('p:1', 'material.kind', 'user');
+    ok('E6 … which comes back once the base is user-defined', pipe('s1').geometry.kind === 'rectangular' && flow('s1') === qRect);
+  }
+
+  // the section of a catalogue pipe has no restore of its own, and a restore by code gives the catalogue's again
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  app.setVal('p:1', 'material.nps', '2');
+  const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+  const dots = (f) => all(f).filter((n) => n.tagName === 'BUTTON' && (n.getAttribute('class') || n.className || '').includes('ov-dot')).length;
+  ok('E9 the diameter of the child is its own, from 2" Sch 80', app.isOv('p:1', 'geometry.d') && d(child) === M.catalogueBore({ kind: 'steel', nps: '2', sch: '80' }));
+  ok('E9 a derived diameter has no restore dot; the same field of a user-defined material has one',
+    dots(UI.forms.wrap('p:1', 'geometry.d', 'D', documentStub.createElement('input'), { derived: true })) === 0 && dots(UI.forms.wrap('p:1', 'geometry.d', 'D', documentStub.createElement('input'))) === 1);
+  app.clearOv('p:1', 'geometry.d');
+  ok('E9 a restore of that diameter by code keeps the bore of 2" Sch 80', d(child) === M.catalogueBore({ kind: 'steel', nps: '2', sch: '80' }));
+
+  // item 7: the first loss typed in an empty row of a child, then the base raises the connection
+  start({ kind: 'steel', nps: '8', sch: '80' });
+  const typeIn = (sid, field, text) => {
+    at(sid);
+    const inp = all(UI.pipeLossesTable.build('j:2', M.getObj(app.eff(), 'j:2'))).find((n) => n.id === 'pk-2-1-' + field);
+    inp.value = text; inp.fire('change');
+  };
+  typeIn(child, 'kIn', '1');
+  ok('E7 K arriving 1 in an empty row of the child: that field alone, 71.58775 L/s', own(child, 'j:2|') === 'j:2|pipeK.1.kIn' && near(flow(child), 71.58775, 1e-6), own(child, 'j:2|'));
+  typeIn('base', 'elev', '20');
+  ok('E7 the base raises the connection to 20 m: the child follows, 49.78470 L/s (was 71.58775 L/s)',
+    near(flow('base'), 49.78470, 1e-6) && near(flow(child), 49.78470, 1e-6) && M.getObj(M.effective(app.model, child), 'j:2').pipeK[1].kIn === 1, String(flow(child)));
+  reopen();
+  ok('E7 saved and opened again: the same', near(flow(child), 49.78470, 1e-6) && own(child, 'j:2|') === 'j:2|pipeK.1.kIn');
+}
+
+// ------------------------------------------------------------ another model in place of the one open (review of e81e282)
+// Items 2, 3 and 9, on two files A and B with the same ids (two atmospheric reservoirs at 30 and 10 m, P1 of steel 8"
+// Sch 80 of 800 m in A and 1600 m in B, a child scenario s1 in each): a field being edited in A when B comes, a dialog
+// of A confirmed after B came, a refused file as a control, and two readings of files that end in either order.
+console.log('\nReview of e81e282: another model in place of the one open');
+{
+  const cx = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const PX = cx.PumpIt, UI = PX.ui, M = PX.model, q = M.q;
+  // what these modules use of the page: the box of the dialogs, the focus, and the files read
+  const doc = documentStub;
+  const byId = {};
+  for (const id of ['toast', 'modal', 'modal-title', 'modal-body', 'modal-actions']) byId['#' + id] = new Node('div');
+  byId['#modal .modal'] = new Node('div');
+  const page = new Node('div');
+  page.appendChild(byId['#modal']);
+  byId['#modal'].parentElement = page;
+  byId['#modal'].hidden = true;
+  Object.assign(doc, { body: new Node('body'), querySelector: (s) => byId[s] || null, getElementById: () => ({}) });
+  doc.activeElement = doc.body;
+  Object.defineProperty(Node.prototype, 'innerHTML', { configurable: true, set(h) { this.html = h; this.children = []; } });
+  Node.prototype.matches = function (s) { return s.split(',').map((x) => x.trim().toUpperCase()).includes(this.tagName); };
+  Node.prototype.focus = function () { doc.activeElement = this; };
+  // leaving a field: its change fires when its text was typed
+  Node.prototype.blur = function () { if (doc.activeElement === this) doc.activeElement = doc.body; if (this.typed) { this.typed = false; this.fire('change'); } };
+  const typing = (inp, text) => { inp.value = text; inp.typed = true; doc.activeElement = inp; };
+  Object.assign(cx, { setTimeout: () => 0, clearTimeout() {}, requestAnimationFrame: () => 0, TextDecoder });
+  const readers = [];
+  cx.FileReader = class {
+    constructor() { readers.push(this); }
+    readAsText(f) { this.file = f; }
+    readAsArrayBuffer(f) { this.file = f; this.bytes = true; }
+    finish() { this.result = this.bytes ? new TextEncoder().encode(this.file.text).buffer : this.file.text; this.onload(); }
+  };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), cx, { filename: f });
+  UI.focusKeep = { tabbables: () => [] };
+  run('src/ui/common/dialogs.js');
+  const toasts = [];
+  const toast0 = UI.dialogs.toast;
+  UI.dialogs.toast = (s) => { toasts.push(s); toast0(s); };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {} };
+  UI.inspector = { addSection() {} };
+  UI.scene3d.ensureVisible = () => {};
+  run('src/ui/app/state.js');
+  const app = PX.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/files.js');
+  run('src/ui/inspector/forms.js');
+  run('src/ui/inspector/pipe-losses-table.js');
+  UI.junctionTypes = { get: (type) => ({ connectionElevation: type === 'reservoir' }) };
+  let saved = null;
+  Object.assign(app, { changed: () => { app.version++; app.save(); }, pruneSelection() {}, renderAll() {}, save() { saved = JSON.stringify(app.model); }, recalc() {}, okResults: () => null });
+  app.eff = () => M.effective(app.model, app.model.scenarios.current);
+  app.effObj = (k) => M.getObj(app.eff(), k);
+  app.getVal = (k, p) => M.effValue(app.model, app.model.scenarios.current, k, p);
+  app.isOv = (k, p) => M.isOverridden(app.model, app.model.scenarios.current, k, p);
+  PX.i18n.setLanguage('pt-BR');
+  const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+  const all = (n, out = []) => { out.push(n); for (const c of n.children || []) all(c, out); return out; };
+  const study = (title, len, child) => {
+    const m = M.newModel();
+    m.title = title;
+    const r1 = Object.assign(M.newJunction('reservoir', 1, 0, 0), { liquidElev: q(30, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    const r2 = Object.assign(M.newJunction('reservoir', 2, 100, 0), { liquidElev: q(10, 'm'), surfP: q(0, 'kgf/cm²(g)') });
+    const mat = { kind: 'steel', nps: '8', sch: '80' };
+    const p = Object.assign(M.newPipe(1, 1, 2), { length: q(len, 'm'), material: mat });
+    p.geometry = Object.assign(p.geometry, { kind: 'circular', d: q(M.catalogueBore(mat), 'mm') });
+    m.junctions = [r1, r2]; m.pipes = [p]; m.nextId = { j: 3, p: 2 };
+    M.addScenario(m, 'base', child);
+    return JSON.stringify(m);
+  };
+  const A = study('A', 800, 'child of A'), B = study('B', 1600, 'child of B');
+  const flow = (m = app.model) => PX.solver.run(M.effective(m, m.scenarios.current)).pipes[1].Q * 1000;
+  const len = (m = app.model) => M.getObj(M.effective(m, m.scenarios.current), 'p:1').length.value;
+  const kIn = (m = app.model) => { const pk = M.getObj(M.effective(m, m.scenarios.current), 'j:2').pipeK; return pk && pk[1] ? pk[1].kIn || 0 : 0; };
+  const open = (text, name = 'B.json') => { UI.files.openFile({ name, text }); return readers[readers.length - 1]; };
+  const startA = () => { app.loadModel(JSON.parse(A), { fit: false }); app.undoStack = []; app.redoStack = []; readers.length = 0; toasts.length = 0; };
+  const isB = (m = app.model) => m.title === 'B' && len(m) === 1600 && kIn(m) === 0 && near(flow(m), 50.17091, 1e-6);
+  const savedB = () => isB(JSON.parse(saved));
+  // the length of P1 as the inspector draws it (its unit selector on m, as the page shows it)
+  const lengthField = () => {
+    const f = all(UI.forms.qty('p:1', 'length', 'Comprimento', 'length'));
+    f.find((x) => x.id === UI.forms.idOf('p:1', 'length') + '-u').value = 'm';
+    return f.find((x) => x.id === UI.forms.idOf('p:1', 'length'));
+  };
+
+  // item 2: the length of P1 being typed in A when B is dropped
+  startA();
+  ok('F2 A: 800 m, 72.15653 L/s; B: 1600 m, 50.17091 L/s', near(flow(), 72.15653, 1e-6) && near(flow(JSON.parse(B)), 50.17091, 1e-6));
+  let inp = lengthField();
+  typing(inp, '1200');
+  open(B).finish();
+  ok('F2 B opens with its own 1600 m and 50.17091 L/s, and is saved so (was 1200 m, 58.36357 L/s)', isB() && savedB(), `${len()} ${flow()}`);
+  inp.value = '1300'; inp.fire('change');
+  ok('F2 a late change of the field of A writes nothing into B', isB() && app.undoStack.length === 2, String(len()));
+  app.undo();
+  ok('F2 undo of the open: A with the 1200 m typed in it, 58.36357 L/s', app.model.title === 'A' && len() === 1200 && near(flow(), 58.36357, 1e-6), `${len()} ${flow()}`);
+  app.undo();
+  ok('F2 undo again: A as it was, 800 m', app.model.title === 'A' && len() === 800);
+  // the same with K arriving of P1 at J2 being typed in A
+  startA();
+  inp = all(UI.pipeLossesTable.build('j:2', M.getObj(app.eff(), 'j:2'))).find((n) => n.id === 'pk-2-1-kIn');
+  typing(inp, '100');
+  open(B).finish();
+  ok('F2 the cell: B keeps its 1600 m, no loss and 50.17091 L/s, and is saved so (was K arriving 100, 37.69938 L/s)', isB() && savedB(), `${kIn()} ${flow()}`);
+  inp.value = '200'; inp.fire('change');
+  ok('F2 a late change of the cell of A writes nothing into B', isB());
+  app.undo();
+  ok('F2 undo of the open: A with K arriving 100 at 800 m', app.model.title === 'A' && kIn() === 100 && len() === 800);
+  // a field drawn for B writes into B
+  app.redo();
+  inp = lengthField();
+  inp.value = '1700'; inp.fire('change');
+  ok('F2 control: a field drawn for B still writes into B', app.model.title === 'B' && len() === 1700);
+
+  // item 3: a dialog of A confirmed after B was dropped over it
+  const primary = () => byId['#modal-actions'].children.find((b) => b.className.includes('primary'));
+  const dialogCase = (name, show) => {
+    startA();
+    show();
+    const btn = primary();
+    open(B).finish();
+    const closed = byId['#modal'].hidden;
+    btn.fire('click');
+    return closed;
+  };
+  let closed = dialogCase('new', () => UI.dialogs.confirmBox('Novo', '', 'OK', () => app.replaceModel(M.newModel())));
+  ok('F3 File → New model, B dropped: the box of A is closed, and its OK clicked late does not empty B', closed && isB() && app.model.pipes.length === 1 && savedB());
+  const s1 = () => app.model.scenarios.list.find((s) => s.id === 's1');
+  closed = dialogCase('delete', () => {
+    const s = app.model.scenarios.list.find((x) => x.id === 's1');
+    UI.dialogs.confirmBox('Excluir', '', 'Excluir', () => { app.pushUndo(); M.deleteScenario(app.model, s.id); app.changed(); });
+  });
+  ok('F3 delete the child of A, B dropped: the child of B stays', closed && isB() && s1() && s1().name === 'child of B');
+  closed = dialogCase('convert', () => UI.dialogs.modal({ title: 'Converter', body: '', actions: [{ label: 'Cancelar' }, { label: 'Aplicar', primary: true, onClick: () => app.setVal('p:1', 'length', { value: 800000, unit: 'mm' }) }] }));
+  ok('F3 a conversion of the length of A to mm, B dropped: B keeps 1600 m (was 800000 mm, 72.15653 L/s)', closed && isB() && app.model.pipes[0].length.unit === 'm' && savedB());
+  // control: a file refused leaves the box of A open, and A works
+  startA();
+  UI.dialogs.confirmBox('Excluir', '', 'Excluir', () => { app.pushUndo(); M.deleteScenario(app.model, 's1'); app.changed(); });
+  open('{ "pipes": [] }', 'broken.json').finish();
+  ok('F3 control: a refused file says why and leaves A open with its box', app.model.title === 'A' && !byId['#modal'].hidden && toasts.some((s) => /broken|abrir|modelo/i.test(s)), toasts.join(' | '));
+  primary().fire('click');
+  ok('F3 control: the box of A still does its work on A', app.model.title === 'A' && !s1() && byId['#modal'].hidden);
+
+  // item 9: A and B requested, their readings ending in either order; the latest request wins
+  startA();
+  const rA = open(study('A2', 800, 'child'), 'A2.json'), rB = open(B);
+  rB.finish(); rA.finish();
+  ok('F9 B read first, A2 last: B stays open, calculated and saved', isB() && savedB() && app.undoStack.length === 1);
+  startA();
+  const rA2 = open(study('A2', 800, 'child'), 'A2.json'), rB2 = open(B);
+  rA2.finish(); rB2.finish();
+  ok('F9 A2 read first, B last: B open and saved, A2 never applied', isB() && savedB() && app.undoStack.length === 1 && JSON.parse(app.undoStack[0]).title === 'A');
+  // an importer of another format follows the same rule
+  PX.importers = { fake: { read: (text) => ({ model: JSON.parse(text), notes: [], counts: {} }) } };
+  UI.importReport = { show() {}, pickScenario() {} };
+  startA();
+  const rI = open(study('imported', 800, 'child'), 'old.fake'), rB3 = open(B);
+  rB3.finish(); rI.finish();
+  ok('F9 an import requested before B and read after it is dropped', isB() && savedB());
+  // a model opened by the menu after a request: the reading of the request is dropped too
+  startA();
+  const rL = open(B);
+  app.replaceModel(M.newModel());
+  rL.finish();
+  ok('F9 File → New model while B is read: the new model stays', app.model.pipes.length === 0);
+
+  // review of the changes before the push: what an opening sets in a file reaches the message of File → Open
+  startA();
+  {
+    const m = JSON.parse(B);
+    m.scenarios.list[1].overrides['p:1|material.sch'] = '40';
+    open(JSON.stringify(m), 'old.json').finish();
+    const d1 = M.getObj(M.effective(app.model, 's1'), 'p:1').geometry.d.value;
+    ok('G1 a file of before opened by File → Open: one message with its name and the pipe set (was "Aberto: old.json" over the note)',
+      toasts.length === 1 && toasts[0].startsWith('Aberto: old.json · Seção ajustada') && toasts[0].includes('P1 (child of B)')
+      && d1 === M.catalogueBore({ kind: 'steel', nps: '8', sch: '40' }), toasts.join(' | '));
+  }
+  // a file whose paths go through the prototype of an object writes nothing there; a dormant section of the base, or a
+  // field of one that is not of the section, goes when it opens
+  startA();
+  {
+    const m = JSON.parse(B);
+    m.scenarios.list[1].overrides['p:1|__proto__.polluted'] = 'override';
+    m.scenarios.list[1].parked = { 'p:1': { 'geometry.d': q(150, 'mm'), 'geometry.__proto__.polluted2': 'dormant', length: q(5, 'm') } };
+    m.scenarios.list[0].parked = { 'p:1': { 'geometry.d': q(120, 'mm') } };
+    app.loadModel(m, { fit: false });
+    const kept = app.model.scenarios.list[1].parked;
+    ok('G2 on opening: the base keeps no dormant section, and the child keeps only the fields of its section',
+      !app.model.scenarios.list[0].parked && Object.keys(kept['p:1']).sort().join(',') === 'geometry.__proto__.polluted2,geometry.d', JSON.stringify(kept));
+    app.model.scenarios.current = 'base';
+    app.setVal('p:1', 'material.kind', 'user');
+    M.effective(app.model, 's1');
+    const clean = vm.runInContext('Object.prototype.polluted === undefined && Object.prototype.polluted2 === undefined', cx);
+    const dBase = M.getObj(M.effective(app.model, 'base'), 'p:1').geometry.d.value, dKid = M.getObj(M.effective(app.model, 's1'), 'p:1').geometry.d.value;
+    ok('G2 the base user-defined: the child has its 150 mm back, the base its 193.68 mm, and no object gains a field (was Object.prototype.polluted)',
+      clean && dKid === 150 && dBase === 193.68, `${clean} ${dKid} ${dBase}`);
+  }
+  // a file of 200 pipes and three scenarios: one effective model per scenario that holds a pipe of its own, and one per
+  // pipe set (was one per pipe and scenario, about 200 ms per scenario)
+  {
+    const m = M.newModel();
+    const mat = { kind: 'steel', nps: '8', sch: '80' };
+    m.junctions = [M.newJunction('reservoir', 1, 0, 0), M.newJunction('reservoir', 2, 100, 0)];
+    for (let i = 1; i <= 200; i++) {
+      const p = Object.assign(M.newPipe(i, 1, 2), { material: Object.assign({}, mat) });
+      p.geometry = Object.assign(p.geometry, { kind: 'circular', d: q(M.catalogueBore(mat), 'mm') });
+      m.pipes.push(p);
+    }
+    m.nextId = { j: 3, p: 201 };
+    const s1 = M.addScenario(m, 'base', 'one'), s2 = M.addScenario(m, s1.id, 'two'), s3 = M.addScenario(m, s2.id, 'three');
+    s2.overrides['p:7|material.sch'] = '40';
+    s3.overrides['p:9|geometry.d'] = q(150, 'mm');
+    let calls = 0;
+    const eff0 = M.effective;
+    M.effective = (...a) => { calls++; return eff0(...a); };
+    const set = M.fitCataloguePipesOnLoad(m);
+    M.effective = eff0;
+    ok('G3 200 pipes, three scenarios: P7 and P9 set with 4 effective models (was 602)', set.join(', ') === 'P7 (two), P9 (three)' && calls <= 4 && !!s3.parked, `${set.join(', ')}; ${calls}`);
+  }
+  delete Node.prototype.matches; delete Node.prototype.focus; delete Node.prototype.blur;
 }
 
 console.log(`\n${pass} checks passed, ${fail} failed`);

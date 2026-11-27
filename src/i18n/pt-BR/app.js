@@ -99,6 +99,7 @@ PumpIt.i18n.add('pt-BR', {
       duplicateIds: 'O arquivo não foi aberto: {list}',
       isProfile: 'Este arquivo é um perfil de colunas de resultados, e não um modelo. Ele entra por {path}.',
       converted: 'Tipos de junção convertidos: {notes}.',
+      pipesFitted: 'Seção ajustada ao catálogo do material que o cenário mostra: {pipes}.',
       opened: 'Aberto: {name}',
       cannotOpen: 'Não foi possível abrir: {message}',
       modelCopied: 'Modelo copiado para a área de transferência.',

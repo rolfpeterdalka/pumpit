@@ -121,8 +121,11 @@
       const ob = objectOf(eff, key);
       const x = { kind: ob.kind, id: ob.o.id, def: ob.def, end };
       if (Q.at === 'flow' && ob.kind === 'j') {
+        // the velocity of a two-port junction: that of the pipe at its inlet port, positive from the inlet to the outlet
+        // whichever way that pipe is drawn (-1 when it starts at the junction: review of e81e282, item 4)
         const pr = M.ports(eff, ob.o);
         x.inPipe = pr ? pr.in.id : null;
+        x.inSign = pr && pr.in.down !== ob.o.id ? -1 : 1;
       }
       return x;
     };
@@ -163,8 +166,9 @@
       }
       case 'flowMass': { const r = x.kind === 'p' ? sol.pipes[x.id] : sol.junctions[x.id]; return r ? r.m : NaN; }
       case 'velocity': {
-        const r = x.kind === 'p' ? sol.pipes[x.id] : x.inPipe !== null && x.inPipe !== undefined ? sol.pipes[x.inPipe] : null;
-        return r ? r.V : NaN;
+        if (x.kind === 'p') return sol.pipes[x.id] ? sol.pipes[x.id].V : NaN;
+        const r = x.inPipe !== null && x.inPipe !== undefined ? sol.pipes[x.inPipe] : null;
+        return r ? r.V * (x.inSign || 1) : NaN;
       }
       case 'pumpSpeed': return sol.pumps[x.id] ? sol.pumps[x.id].speed : NaN;
       case 'pumpFlow': return sol.pumps[x.id] ? sol.pumps[x.id].Q : NaN;

@@ -19,6 +19,9 @@
     selSet: new Set(),      // every selected key ('p:3', 'j:5')
     results: {},
     version: 0,
+    // the model open: one more each time another model takes the place of the one in the editor (files.js). A control
+    // or a dialog built for one model writes nothing into the next one
+    modelGen: 0,
     undoStack: [],
     redoStack: [],
     clipboard: null,

@@ -28,10 +28,9 @@
     for (const p of pipes) {
       const cur = (j.pipeK && j.pipeK[p.id]) || {};
       const path = 'pipeK.' + p.id;
-      // field by field, so that a scenario keeps inheriting the fields it does not change; a pipe without losses yet
-      // gets the whole entry
-      const write = (patch) => (j.pipeK && j.pipeK[p.id] ? app.setVals(key, Object.entries(patch).map(([f, v]) => [path + '.' + f, v]))
-        : app.setVal(key, path, Object.assign({ kOut: 0, kIn: 0 }, patch)));
+      // field by field, so that a scenario keeps inheriting the fields it does not change, also in a row it fills first
+      // (a field missing in a row is no loss, or the bottom)
+      const write = (patch) => app.setVals(key, Object.entries(patch).map(([f, v]) => [path + '.' + f, v]));
       const tr = el('tr');
       const td0 = el('td', {}, `<span class="num">P${p.id}</span>`);
       const mk = (field, aria) => {

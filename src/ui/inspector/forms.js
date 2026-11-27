@@ -10,6 +10,12 @@
   const { t } = PumpIt.i18n;
 
   const idOf = (objKey, path) => ('f-' + objKey + '-' + path).replace(/[^a-zA-Z0-9_-]/g, '_');
+  // what a field writes, into the model it was drawn for: a field left after another model came in (its change fires
+  // as it loses the focus) writes nothing into the new one (review of e81e282, item 2)
+  function writer() {
+    const gen = app.modelGen;
+    return (objKey, path, value) => { if (gen === app.modelGen) app.setVal(objKey, path, value); };
+  }
 
   // The fields built while describe() runs, by 'objKey|path': their label and what reads their value (the category of a
   // quantity, the options of a list, a check box, the suffix of a number, the axes of a curve). The table of the
@@ -64,7 +70,8 @@
     // bare: the section title already names the field; the label stays for screen readers (and the override dot)
     if (opts.bare) lab.classList.add('sr-label');
     if (opts.title) lab.title = opts.title;
-    if (objKey && app.isOv(objKey, path)) {
+    // derived: a value that follows from other fields (the section of a catalogue pipe), with no restore of its own
+    if (objKey && !opts.derived && app.isOv(objKey, path)) {
       f.classList.add('overridden');
       const dot = el('button', { class: 'ov-dot', type: 'button', title: t('inspector.fields.overridden'), 'aria-label': t('inspector.fields.restore') });
       dot.addEventListener('click', () => app.clearOv(objKey, path));
@@ -94,7 +101,7 @@
   function qty(objKey, path, label, cat, opts = {}) {
     remember(objKey, path, { cat });
     const v = app.getVal(objKey, path) || { value: NaN, unit: U.list(cat)[0] };
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
     inp.value = F.inputStr(v.value);
     // the input unit: changing it keeps the number (15 m becomes 15 mm), as its note says when it gets the focus
@@ -105,10 +112,10 @@
     inp.addEventListener('change', () => {
       if (badNumber(inp)) return;
       const n = F.parseNum(inp.value);
-      app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value });
+      set(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value });
     });
     // the number in the field, which a click on the selector may have just confirmed
-    us.addEventListener('change', () => { if (badNumber(inp)) { us.value = v.unit; return; } const n = F.parseNum(inp.value); app.setVal(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
+    us.addEventListener('change', () => { if (badNumber(inp)) { us.value = v.unit; return; } const n = F.parseNum(inp.value); set(objKey, path, { value: Number.isFinite(n) ? n : null, unit: us.value }); });
     return wrap(objKey, path, label, inp, Object.assign({}, opts, { after: unitCtl(objKey, path, label, cat, inp, us, opts.disabled) }));
   }
 
@@ -160,14 +167,14 @@
   function num(objKey, path, label, opts = {}) {
     remember(objKey, path, { suffix: opts.suffix });
     const v = app.getVal(objKey, path);
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const inp = el('input', { type: 'text', id, inputmode: 'decimal', autocomplete: 'off', disabled: opts.disabled });
     inp.value = F.inputStr(v);
     inp.addEventListener('change', () => {
       if (badNumber(inp)) return;
       let n = F.parseNum(inp.value);
       if (opts.int && Number.isFinite(n)) n = Math.round(n);
-      app.setVal(objKey, path, Number.isFinite(n) ? n : null);
+      set(objKey, path, Number.isFinite(n) ? n : null);
     });
     const after = opts.suffix ? el('span', { class: 'muted small', style: 'align-self:center;padding:0 2px' }, F.esc(opts.suffix)) : null;
     return wrap(objKey, path, label, inp, Object.assign({}, opts, { after }));
@@ -177,13 +184,13 @@
   function sel(objKey, path, label, options, opts = {}) {
     remember(objKey, path, { options });
     const v = app.getVal(objKey, path);
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const s = el('select', { id, disabled: opts.disabled },
       options.map(([val, lab]) => `<option value="${F.esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${F.esc(lab)}</option>`).join(''));
     s.addEventListener('change', () => {
       const raw = s.value;
       const opt = options.find(([val]) => String(val) === raw);
-      app.setVal(objKey, path, opt ? opt[0] : raw);
+      set(objKey, path, opt ? opt[0] : raw);
     });
     return wrap(objKey, path, label, s, opts);
   }
@@ -192,12 +199,12 @@
   function seg(objKey, path, label, options, opts = {}) {
     remember(objKey, path, { options });
     const v = app.getVal(objKey, path);
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const g = el('div', { class: 'seg', role: 'radiogroup', id, 'aria-label': label });
     for (const [val, lab] of options) {
       const on = String(val) === String(v);
       const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: on ? 'on' : null, 'data-v': val, id: (id + '-' + val).replace(/[^a-zA-Z0-9_-]/g, '_') }, F.esc(lab));
-      b.addEventListener('click', () => { if (!on) app.setVal(objKey, path, val); });
+      b.addEventListener('click', () => { if (!on) set(objKey, path, val); });
       g.appendChild(b);
     }
     return wrap(objKey, path, label, g, Object.assign({ wide: true }, opts));
@@ -206,19 +213,19 @@
   function chk(objKey, path, label, opts = {}) {
     remember(objKey, path, { check: true });
     const v = !!app.getVal(objKey, path);
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const c = el('input', { type: 'checkbox', id });
     c.checked = v;
-    c.addEventListener('change', () => app.setVal(objKey, path, c.checked));
+    c.addEventListener('change', () => set(objKey, path, c.checked));
     return wrap(objKey, path, label, c, Object.assign({ check: true }, opts));
   }
 
   function text(objKey, path, label, opts = {}) {
     const v = app.getVal(objKey, path) ?? '';
-    const id = idOf(objKey, path);
+    const id = idOf(objKey, path), set = writer();
     const inp = el('input', { type: 'text', id, class: 'txt', autocomplete: 'off', placeholder: opts.placeholder });
     inp.value = v;
-    inp.addEventListener('change', () => app.setVal(objKey, path, inp.value));
+    inp.addEventListener('change', () => set(objKey, path, inp.value));
     return wrap(objKey, path, label, inp, opts);
   }
 

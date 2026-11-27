@@ -29,7 +29,7 @@
         let model;
         try { model = JSON.parse(ta.value); } catch (e) { toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
         if (UI.files.profileRefused(model)) return false;
-        try { app.replaceModel(model); toast(t('app.pasteModel.opened')); } catch (e) { toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
+        try { app.replaceModel(model, { note: t('app.pasteModel.opened') }); } catch (e) { toast(t('app.pasteModel.cannotRead', { message: e.message })); return false; }
       } }] });
     },
     'export-xlsx': () => app.exportResultsXlsx(),
@@ -62,8 +62,7 @@
   function openExample(id) {
     const ex = PumpIt.examples.get(id);
     if (!ex) return;
-    app.replaceModel(ex.build());
-    toast(t('app.exampleLoaded', { name: ex.name }));
+    app.replaceModel(ex.build(), { note: t('app.exampleLoaded', { name: ex.name }) });
   }
 
   // the examples list of the File menu (names in the current language)
