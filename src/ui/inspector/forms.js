@@ -150,7 +150,9 @@
     const text = String(inp.value).trim();
     if (text === '' || Number.isFinite(F.parseNum(text))) { inp.removeAttribute('aria-invalid'); return false; }
     inp.setAttribute('aria-invalid', 'true');
-    app.toast(t('app.numberInvalid', { text, mark: t(F.decimalSep() === ',' ? 'app.menu.decimalComma' : 'app.menu.decimalPoint') }));
+    // a space, a tab or a line break inside: cells of a spreadsheet pasted together, and the field takes one value
+    if (/\s/.test(text)) { app.toast(t('app.numberOneValue', { text: text.replace(/\s+/g, ' ') })); return true; }
+    app.toast(t('app.numberInvalid',{ text, mark: t(F.decimalSep() === ',' ? 'app.menu.decimalComma' : 'app.menu.decimalPoint') }));
     return true;
   }
 

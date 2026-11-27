@@ -20,7 +20,10 @@
 
   const pos = (x) => x && Number.isFinite(x.value) && x.value > 0;
   const fin = (x) => x && Number.isFinite(x.value);
-  const curveOk = (c, min = 1) => c && c.x.length >= min && c.x.every(Number.isFinite) && c.y.every(Number.isFinite);
+  // a flow given twice in a curve (the first one repeated), or null: the editor refuses it, and an interpolation between
+  // the two divides by zero (review of e6b8f15). A model saved or imported with one is stopped here, not in the solver
+  const repeatedX = (c) => { const seen = new Set(); for (const x of c.x) { if (seen.has(x)) return x; seen.add(x); } return null; };
+  const curveOk = (c, min = 1) => c && c.x.length >= min && c.x.every(Number.isFinite) && c.y.every(Number.isFinite) && repeatedX(c) === null;
 
   function checkPipe(m, p) {
     const miss = unitMiss(p);
@@ -97,7 +100,7 @@
       if (Number.isFinite(pk.kOut) && pk.kOut < 0) miss.push(t('core.checklist.junction.pipeKOutNegative', { pipe: pid, value: pk.kOut }));
       if (Number.isFinite(pk.kIn) && pk.kIn < 0) miss.push(t('core.checklist.junction.pipeKInNegative', { pipe: pid, value: pk.kIn }));
     }
-    if (def.validate) def.validate(j, miss, { fin, pos, curveOk, pipeCount: n, gas: M.isCompressible(m), gasP: gasPressure(m, miss) });
+    if (def.validate) def.validate(j, miss, { fin, pos, curveOk, repeatedX, pipeCount: n, gas: M.isCompressible(m), gasP: gasPressure(m, miss) });
     if (timeOn(m)) checkTime(m, j, def, miss);
     if (surgeOn(m)) for (const k of PumpIt.surge.inputs.checkJunction(m, j)) miss.push(surgeText(k));
     return miss;

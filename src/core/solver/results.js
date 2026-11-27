@@ -136,10 +136,13 @@
         type: j.type, m, Q: m / rho, P0in, P0out, Pin: P0in - rho * Vin * Vin / 2, Pout: P0out - rho * Vout * Vout / 2,
         dP, K: Vup ? (m < 0 ? -dP : dP) / (rho * Vup * Vup / 2) : NaN, z, isolated: jn.in.isolated && jn.out.isolated,
       };
+      // a reverse flow beyond the rounding of a flow that is zero (10⁻⁹ of the flow at 0.01 m/s): a closed branch left
+      // −2·10⁻²⁸ kg/s and a false reverse flow (review of e6b8f15)
+      jr.reversed = m < -1e-9 * (el && el.mref > 0 ? el.mref : 0);
       jr.HGL = jr.Pin / rg + z;
       if (jr.isolated) Object.assign(jr, { P0in: NaN, P0out: NaN, Pin: NaN, Pout: NaN, dP: NaN, K: NaN, HGL: NaN });
       junctions[j.id] = jr;
-      if (m < 0 && def.reverseFlowCaution !== false && !jr.isolated) warn('caution', t('core.solver.reverseFlow', { id: j.id }), 'j:' + j.id);
+      if (jr.reversed && def.reverseFlowCaution !== false && !jr.isolated) warn('caution', t('core.solver.reverseFlow', { id: j.id }), 'j:' + j.id);
       if (def.elementResults) def.elementResults(j, jr, Object.assign({ el, m, P0in, P0out, dP }, shared));
     }
 

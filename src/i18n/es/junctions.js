@@ -120,6 +120,9 @@ PumpIt.i18n.add('es', {
         speed: 'velocidad',
         nPumps: 'número de bombas',
         npshrPoints: 'puntos del NPSH requerido: tantos caudales como alturas, cada uno cero o más',
+        curveTwice: 'curva de altura × caudal: el caudal {x} {unit} aparece dos veces',
+        effTwice: 'curva de eficiencia: el caudal {x} {unit} aparece dos veces',
+        npshrTwice: 'curva del NPSH requerido: el caudal {x} {unit} aparece dos veces',
       },
       error: { curve: 'Bomba J{id}: {message}' },
       warn: {
@@ -310,6 +313,7 @@ PumpIt.i18n.add('es', {
       label: 'Componente genérico',
       check: {
         curve: 'curva de pérdida (mín. 2 puntos)',
+        curveTwice: 'curva de pérdida: el caudal {x} {unit} aparece dos veces',
         fit: 'curva de pérdida: {message}',
         gain: 'curva de pérdida: el ajuste da una ganancia de presión de {from} a {to} {unit}; revise el ajuste (la interpolación lineal sigue los puntos)',
         falls: 'curva de pérdida: el ajuste baja en parte del rango de caudal hasta {to} {unit}, y el modo compresible necesita una pérdida que crezca con el caudal; revise el ajuste (la interpolación lineal sigue los puntos)',

@@ -97,7 +97,7 @@
       r.dPfit = fl2 + Kd > 0 ? loss * Kd / (fl2 + Kd) : 0;
       if (isolated) for (const k of NAN_KEYS) r[k] = NaN;
       pipes[p.id] = r;
-      pipeEnds.set(p.id, { a: ea, b: eb, m });
+      pipeEnds.set(p.id, { a: ea, b: eb, m, A });
       if (isolated || P.closed) continue;
       if (r.choked) warn('critical', t('core.gas.chokedPipe', { id: p.id, m: fmtSI(Math.abs(m)) }), 'p:' + p.id);
       const Mmax = Math.max(r.Min || 0, r.Mout || 0);
@@ -112,7 +112,7 @@
       if (!e) return null;
       const atB = p.down === jid;
       const into = atB ? e.m >= 0 : e.m < 0;
-      return { s: atB ? e.b : e.a, into, m: Math.abs(e.m) };
+      return { s: atB ? e.b : e.a, into, m: Math.abs(e.m), A: e.A };
     };
     // refuse(text): the solution is not valid (as in the incompressible results)
     const refused = [];
@@ -184,8 +184,12 @@
       };
       jr.HGL = NaN;
       if (jr.isolated) Object.assign(jr, { P0in: NaN, P0out: NaN, Pin: NaN, Pout: NaN, dP: NaN, K: NaN, Q: NaN });
+      // a reverse flow beyond the rounding of a flow that is zero (10⁻⁹ of the flow at 0.01 m/s in the pipe upstream), as
+      // in the incompressible mode (review of e6b8f15)
+      const Aref = (pinEnd && pinEnd.A) || (poutEnd && poutEnd.A) || 0;
+      jr.reversed = m < -1e-9 * (rhoIn > 0 ? rhoIn : 0) * Aref * 0.01;
       junctions[j.id] = jr;
-      if (m < 0 && def.reverseFlowCaution !== false && !jr.isolated) warn('caution', t('core.solver.reverseFlow', { id: j.id }), 'j:' + j.id);
+      if (jr.reversed && def.reverseFlowCaution !== false && !jr.isolated) warn('caution', t('core.solver.reverseFlow', { id: j.id }), 'j:' + j.id);
       // a choked valve, fitting or orifice: a warning (a restriction orifice chokes by design; a pipe that chokes is critical)
       if (jr.choked && !jr.isolated) warn('warning', t('core.gas.chokedJunction', { id: j.id, m: fmtSI(Math.abs(m)) }), 'j:' + j.id);
       if (def.gas && def.gas.results) def.gas.results(j, jr, Object.assign({ el, m, P0in: vi.P0, P0out: vo.P0, dP }, shared));

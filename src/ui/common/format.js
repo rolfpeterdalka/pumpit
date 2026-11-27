@@ -55,9 +55,11 @@
   // the thousands, in groups of three ("12.000" is 12000 with a decimal comma). Anywhere else ("1.5" with a decimal
   // comma) the text is not a number, and the field asks for a correction instead of guessing. The typographic minus
   // signs (of the sign and of the exponent) are read as minus signs.
+  // A space, a tab or a line break inside the text is not a number either: two cells of a spreadsheet pasted in one
+  // field ("300\t12") were read as 30012 (review of e6b8f15, item 20). The spaces around it are dropped.
   function parseNum(s) {
-    const t = String(s).trim().replace(/\s/g, '').replace(/−/g, '-');
-    if (t === '') return NaN;
+    const t = String(s).trim().replace(/−/g, '-');
+    if (t === '' || /\s/.test(t)) return NaN;
     const d = decimalSep(), g = groupSep();
     const m = /^([+-]?)([0-9.,]*)(?:[eE]([+-]?[0-9]+))?$/.exec(t);
     if (!m || !/[0-9]/.test(m[2])) return NaN;

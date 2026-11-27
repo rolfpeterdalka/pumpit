@@ -514,8 +514,9 @@ console.log('\nReview of 319654f, bugs 1 and 9: fitted curves that go below zero
   check('NPSHR: at 80 % speed with two pumps the curve is read at Q/(N·s) and scaled by s² (−5.88 m at 78.15 m³/h, invalid)',
     slow.r.ok && slow.r.pumps[2].npshrInvalid && Math.abs(slow.r.pumps[2].NPSHRfit - 0.64 * H.evalCurve(H.makeCurve([0, 200, 210].map((x) => x / 3600), [15, 16, 23], '2'), slow.r.pumps[2].Q / 1.6)) < 1e-9 && /-5\.88 m at 78\.15/.test(warns(slow)[0] || ''), warns(slow).join(' | '));
   const stuck = npsh({ x: [50, 50, 50], y: [3, 4, 5], fit: '2' });
-  check('NPSHR: a curve that cannot be fitted gives a warning and no NPSHR, and the pump still calculates (111.36 m³/h)',
-    stuck.v.ok && stuck.r.ok && Number.isNaN(stuck.r.pumps[2].NPSHR ?? NaN) && stuck.r.pumps[2].npshrInvalid && Math.abs(stuck.r.pumps[2].Q * 3600 - 111.364) < 1e-3 && warns(stuck).some((x) => /cannot be fitted/.test(x)), stuck.text);
+  // the checklist refuses a flow given twice (review of e6b8f15); the solver, given it anyway, still calculates
+  check('NPSHR: a curve that cannot be fitted is named by the checklist; solved anyway, a warning and no NPSHR, and the pump still calculates (111.36 m³/h)',
+    !stuck.v.ok && stuck.msgs.includes('NPSH required curve: the flow 50 m³/h is given twice') && stuck.r.ok && Number.isNaN(stuck.r.pumps[2].NPSHR ?? NaN) && stuck.r.pumps[2].npshrInvalid && Math.abs(stuck.r.pumps[2].Q * 3600 - 111.364) < 1e-3 && warns(stuck).some((x) => /cannot be fitted/.test(x)), stuck.text);
   for (const [what, c] of [['a negative head', { x: [0, 100], y: [-1, 3], fit: 'xy' }], ['a negative flow', { x: [-10, 100], y: [1, 3], fit: 'xy' }], ['a head that is not a number', { x: [0, 100], y: [1, null], fit: 'xy' }], ['fewer heads than flows', { x: [0, 100], y: [1], fit: 'xy' }]]) {
     const o = npsh(c);
     check(`NPSHR points: ${what} is refused by the checklist`, !o.v.ok && o.msgs.some((x) => /NPSH required points/.test(x)), o.text);
@@ -1112,6 +1113,97 @@ console.log('\nReview of a952425, items 10 and 11 and the static pressure: contr
         r.ok && rel(Q, Qof(V)) < 1e-9, r.ok ? `${Q.toFixed(4)} m³/h` : r.errors.join('; '));
     }
   }
+}
+
+console.log('\nReview of e6b8f15: a flow given twice in a curve');
+{
+  // the pump example with its head curve joined by linear interpolation (30.7724 L/s), and a fifth row equal to the first
+  const m = PumpIt.examples.get('pump').build();
+  const j = m.junctions.find((x) => x.type === 'pump');
+  j.curve.fit = 'xy';
+  const flow = (mm) => { const r = S.run(M.effective(mm, 'base')); return r.ok ? r.pipes[3].Q * 1000 : NaN; };
+  const Q0 = flow(m);
+  check('the interpolated curve: 30.7724 L/s in P3', Math.abs(Q0 - 30.7724) < 1e-4, Q0);
+  j.curve.x.push(j.curve.x[0]); j.curve.y.push(j.curve.y[0]);
+  const e = M.effective(m, 'base'), miss = M.checkJunction(e, M.getObj(e, 'j:' + j.id));
+  check('a fifth row equal to the first: the checklist names the flow given twice, before the solution',
+    !M.validate(e).ok && miss.includes('head × flow curve: the flow 0 m³/h is given twice'), JSON.stringify(miss));
+  j.curve.x.pop(); j.curve.y.pop();
+  check('… removing it gives 30.7724 L/s again', M.validate(M.effective(m, 'base')).ok && Math.abs(flow(m) - Q0) < 1e-12);
+  j.eff = { x: [0, 20, 20, 40], y: [0, 60, 65, 70], xUnit: 'm³/h', fit: '2' };
+  j.npshr = { x: [10, 10], y: [2, 3], xUnit: 'm³/h', yUnit: 'm', fit: '1' };
+  const e2 = M.effective(m, 'base'), miss2 = M.checkJunction(e2, M.getObj(e2, 'j:' + j.id));
+  check('the efficiency and NPSH required curves too',
+    miss2.includes('efficiency curve: the flow 20 m³/h is given twice') && miss2.includes('NPSH required curve: the flow 10 m³/h is given twice'), JSON.stringify(miss2));
+  const g = Object.assign(M.newJunction('generic', 9, 0, 0),
+    { genModel: 'curve', curve: { x: [0, 10, 10, 30], y: [0, 0.05, 0.2, 0.45], xUnit: 'm³/h', yUnit: 'kgf/cm²', fit: '2' } });
+  const e3 = M.effective(m, 'base');
+  e3.junctions.push(g);
+  const missG = M.checkJunction(e3, g);
+  check('… and the loss curve of a generic component', missG.includes('loss curve: the flow 10 m³/h is given twice'), JSON.stringify(missG));
+  const c = H.makeCurve([0, 1, 1, 2], [5, 4, 3, 2], 'xy');
+  check('an interpolation over a flow given twice stays finite', [0.5, 1, 1.5, 3].every((x) => Number.isFinite(H.evalCurve(c, x))));
+}
+
+console.log('\nReview of e6b8f15, items 19 and 22 and the closed discharge: a controlled speed, an exit valve against the flow, a flow of zero');
+{
+  // 19: a flow control at the pump's own operating point (curve 0/40/80/120 m³/h, 200/120/56/8 m, quadratic fit)
+  const m = PumpIt.examples.get('pump').build();
+  const j = m.junctions.find((x) => x.type === 'pump');
+  j.curve = Object.assign({}, j.curve, { x: [0, 40, 80, 120], y: [200, 120, 56, 8], xUnit: 'm³/h', yUnit: 'm', fit: '2' });
+  const free = S.run(M.effective(m, 'base')), pf = free.pumps[j.id];
+  Object.assign(j, { mode: 'controlFlow', setQ: q(pf.Q * 3600, 'm³/h') });
+  const ctl = S.run(M.effective(m, 'base')), pc = ctl.pumps[j.id];
+  check('19 on its curve: 97.4305 m³/h, 33.116 m at 100 %, NPSHR 3.8982 m, 11.2015 kW', free.ok && Math.abs(pf.Q * 3600 - 97.4305) < 1e-3 && Math.abs(pf.NPSHR - 3.8982) < 1e-4 && Math.abs(pf.Pshaft - 11201.5) < 0.1);
+  check('19 the flow control at that flow finds 100 % (not 1 %), the same NPSHR and shaft power, no warning of speed nor of the curve',
+    ctl.ok && pc.control === 'ok' && Math.abs(pc.speed - 100) < 0.01 && Math.abs(pc.NPSHR - pf.NPSHR) < 1e-6 && rel(pc.Pshaft, pf.Pshaft) < 1e-6
+      && !ctl.warnings.some((w) => /speed|curve/i.test(w.text)), `${pc.speed} % ${pc.NPSHR} m ${pc.Pshaft} W ${ctl.warnings.map((w) => w.text).join(' | ')}`);
+  Object.assign(j, { setQ: q(60, 'm³/h') });
+  const c60 = S.run(M.effective(m, 'base')).pumps[j.id];
+  const H60 = (c60.speed / 100) ** 2 * H.evalCurve(H.makeCurve([0, 40, 80, 120].map((x) => x / 3600), [200, 120, 56, 8], '2'), c60.Q / (c60.speed / 100));
+  check('19 … and at 60 m³/h a speed whose curve gives the head of the network', c60.control === 'ok' && c60.speed < 100 && Math.abs(H60 - c60.dH) < 1e-6 * c60.dH, `${c60.speed} % ${H60} ${c60.dH}`);
+
+  // 22: an exit valve with K 15 at the end of P2 from a reservoir, the outside at −0.5 and then +0.5 bar(g)
+  const TE = PumpIt.time.events;
+  const exit = (pout) => {
+    const mm = PumpIt.examples.get('exit').build();
+    const res = mm.junctions.find((x) => x.type === 'reservoir'), ev = mm.junctions.find((x) => x.type === 'exitvalve');
+    const p2 = mm.pipes.find((p) => p.down === ev.id);
+    p2.up = res.id; mm.pipes = [p2]; mm.junctions = [res, ev];
+    Object.assign(res, { elevation: q(0, 'm'), liquidElev: q(0, 'm'), surfP: q(0, 'bar(g)'), pipeK: {} });
+    Object.assign(ev, { elevation: q(0, 'm'), lossModel: 'K', K: 15, Pout: q(pout, 'bar(g)'), pipeK: {} });
+    const e = M.effective(mm, 'base'), r = S.run(e), v = r.valves[ev.id];
+    const pcv = TE.prepare({ q: 'cv', obj: 'j:' + ev.id, op: '>', value: q(70, '') }, e, { patm: 101325, rho: 1000 });
+    const cond = TE.truth(pcv, { t: 0, ta: 0, sol: r, model: e, si: () => NaN, tank: () => null });
+    return { r, v, cond, inflow: r.warnings.some((w) => w.text === PumpIt.i18n.t('junctions.exitvalve.warn.inflow', { id: ev.id })) };
+  };
+  const out = exit(-0.5), inn = exit(0.5);
+  check('22 out at −0.5 bar(g): 5.60109 L/s, 10.3235 kPa, K 15, Cv 72.5243, "Cv > 70" true, no inflow warning',
+    out.r.ok && Math.abs(out.v.Q * 1000 - 5.60109) < 1e-5 && Math.abs(out.v.dP / 1000 - 10.3235) < 1e-4 && Math.abs(out.v.K - 15) < 1e-9 && Math.abs(out.v.Cv - 72.5243) < 1e-4 && out.cond === true && !out.inflow,
+    `${out.v.Q * 1000} ${out.v.K} ${out.v.Cv} ${out.cond}`);
+  check('22 in at +0.5 bar(g): the flow and the drop keep their signs, the same K and Cv, "Cv > 70" true, with the inflow warning',
+    inn.r.ok && Math.abs(inn.v.Q * 1000 + 5.60109) < 1e-5 && Math.abs(inn.v.dP / 1000 + 10.3235) < 1e-4 && Math.abs(inn.v.K - 15) < 1e-9 && Math.abs(inn.v.Cv - out.v.Cv) < 1e-9 && inn.cond === true && inn.inflow,
+    `${inn.v.Q * 1000} ${inn.v.K} ${inn.v.Cv} ${inn.cond}`);
+
+  // a closed discharge: the pump runs without flow, a residue of either sign; a real reverse flow still warns
+  const closed = (L) => {
+    const mm = PumpIt.examples.get('pump').build();
+    mm.pipes.find((p) => p.id === 3).closed = true;
+    mm.pipes.find((p) => p.id === 1).length = q(L, 'm');
+    return S.run(M.effective(mm, 'base'));
+  };
+  const reverse = (r) => r.warnings.filter((w) => /[Rr]everse flow/.test(w.text)).map((w) => w.text);
+  const c15 = closed(15), c30 = closed(30);
+  check('closed P3, P1 of 15 m and of 30 m: 48 m and no warning of a reverse flow (a residue of −2·10⁻²⁸ kg/s before)',
+    c15.ok && c30.ok && Math.abs(c15.pumps[2].dH - 48) < 1e-9 && Math.abs(c30.pumps[2].dH - 48) < 1e-9 && !reverse(c15).length && !reverse(c30).length,
+    `${c15.pumps[2].m} ${c30.pumps[2].m} ${reverse(c30).join(' | ')}`);
+  const back = PumpIt.examples.get('pump').build();
+  const pb = back.junctions.find((x) => x.type === 'pump');
+  pb.speed = 30; // too slow to lift to the upper tank: the flow goes back through the pump
+  const rb = S.run(M.effective(back, 'base'));
+  check('… a pump at 30 % that the flow goes back through still warns of it (critical), and the valve after it of its K',
+    rb.ok && rb.pumps[pb.id].m < -1 && rb.warnings.some((w) => w.level === 'critical' && w.text === 'Reverse flow in pump J2: the head cannot be predicted by the curve.')
+      && rb.warnings.some((w) => w.level === 'caution' && /junction J3/.test(w.text)), reverse(rb).join(' | '));
 }
 
 console.log('\nScenarios that change a reservoir connection');

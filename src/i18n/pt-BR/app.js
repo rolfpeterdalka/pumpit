@@ -6,6 +6,7 @@ PumpIt.i18n.add('pt-BR', {
     welcome: 'Exemplo carregado: bombeamento entre tanques. O cálculo é refeito a cada alteração.',
     exampleLoaded: 'Exemplo carregado: {name}.',
     numberInvalid: 'Não é um número: "{text}". Separador decimal em uso: {mark}; o outro sinal só separa os milhares (menu Opções). O valor anterior foi mantido.',
+    numberOneValue: 'Apenas um valor: "{text}" tem mais de um (células coladas juntas?). O valor anterior foi mantido.',
     tabLock: {
       busyTitle: 'O Pump It já está aberto em outra aba',
       busyText: 'Só uma aba edita o estudo por vez, para que uma aba nunca apague o trabalho da outra. Esta aba fica bloqueada e não salva nada.',

@@ -46,10 +46,11 @@ function openTab(name, stored) {
   const byId = { 'tab-lock': lock, 'tab-lock-title': parts.title, 'tab-lock-text': parts.text, 'tab-lock-hint': parts.hint, 'tab-lock-use': parts.use };
   const win = { name, open: true, listeners: {},
     addEventListener(t, f) { (this.listeners[t] = this.listeners[t] || []).push(f); },
-    fire(t, extra = {}) { let stop = false; const e = Object.assign({ type: t, preventDefault() {}, stopImmediatePropagation() { stop = true; } }, extra); (this.listeners[t] || []).forEach((f) => { if (!stop) f(e); }); return stop; } };
+    fire(t, extra = {}) { let stop = false; const e = Object.assign({ type: t, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { stop = true; } }, extra); (this.listeners[t] || []).forEach((f) => { if (!stop) f(e); }); this.lastPrevented = !!e.prevented; return stop; } };
   const saved = [];
   const app = {
     model: stored ? JSON.parse(stored) : { pipes: [] },
+    undoStack: [], redoStack: [], menusHidden: 0, hideMenus() { app.menusHidden++; },
     save() { data.set('pumpit.model', JSON.stringify(app.model)); saved.push(JSON.stringify(app.model)); },
     savePrefs() {},
     storedModel: () => (data.has('pumpit.model') ? JSON.parse(data.get('pumpit.model')) : null),
@@ -61,10 +62,11 @@ function openTab(name, stored) {
     document: { body, get activeElement() { return body; } },
   });
   Object.assign(ctx, { window: ctx, addEventListener: win.addEventListener.bind(win) });
-  ctx.PumpIt = { app, ui: { dom: { $: (s) => byId[s.slice(1)] }, tips: null }, i18n: { t: (k) => k } };
+  const dialogs = { open: false, isModalOpen: () => dialogs.open, closeModal() { dialogs.open = false; } };
+  ctx.PumpIt = { app, ui: { dom: { $: (s) => byId[s.slice(1)] }, tips: null, dialogs }, i18n: { t: (k) => k } };
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/ui/app/single-tab.js'), 'utf8'), ctx, { filename: 'single-tab.js' });
   tabs.add(win);
-  const tab = { name, win, app, lock, offer, use: parts.use, title: parts.title, saved,
+  const tab = { name, win, app, lock, offer, use: parts.use, title: parts.title, saved, dialogs,
     single: ctx.PumpIt.ui.singleTab,
     edit(len) { app.model = Object.assign({}, app.model, { len }); app.save(); },
     close() { win.fire('pagehide'); win.open = false; tabs.delete(win); },
@@ -89,13 +91,19 @@ function openTab(name, stored) {
   ok('… everything else on its page is inert, up to the body (a card of the tour outside the app too)', B.offer.inert && !B.lock.inert);
   B.edit(30);
   ok('… an edit in the locked tab is not saved', JSON.parse(data.get('pumpit.model')).len === 1200 && !B.saved.length);
-  ok('… and it takes no key', B.win.fire('keydown', { target: {} }) === true);
+  ok('… and it takes no key', B.win.fire('keydown', { target: {} }) === true && B.win.lastPrevented);
+  ok('… a key on its button (Delete) reaches no shortcut of the app, and Enter keeps pressing the button', B.win.fire('keydown', { key: 'Delete', target: B.use }) === true && !B.win.lastPrevented);
   ok('the owner still edits', A.app.tabActive() && A.single.state() === null);
 
+  // review of e6b8f15, items 17 and 18: B had a history and a window open before, and A has a conversion open
+  B.app.undoStack = ['{"len":300}']; B.app.redoStack = ['{"len":5}']; B.dialogs.open = true;
+  A.dialogs.open = true; const menusA = A.app.menusHidden;
   B.use.click();
+  ok('"Use here" drops the undo and redo of the revision left behind, and closes what was open', !B.app.undoStack.length && !B.app.redoStack.length && !B.dialogs.open);
   ok('"Use here" opens the study as last saved (1200) and takes over', B.app.tabActive() && B.app.model.len === 1200 && data.get('pumpit.owner') === B.single.id() && B.lock.hidden);
   await wait(50);
   ok('… the other tab is told and locks itself', !A.app.tabActive() && A.single.state() === 'lost' && A.title.textContent === 'app.tabLock.lostTitle');
+  ok('… and its conversion and menus open are closed: nothing applies a value read before', !A.dialogs.open && A.app.menusHidden > menusA);
   B.app.model = Object.assign({}, B.app.model, { p1: 30 }); B.app.save();
   A.edit(300);
   const st = JSON.parse(data.get('pumpit.model'));

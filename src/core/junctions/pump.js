@@ -77,6 +77,38 @@
     };
   }
 
+  // The speed s of a control whose curve gives the head Hs at the flow Qn of one pump: s²·H1(Qn/s) = Hs, within 1 to
+  // 300 %. status 'high' (not even at 300 %: no speed), 'low' (no root down to 1 %: 1 %) or 'ok'. The equation may have
+  // more than one root: at a low speed Qn/s lies far beyond the curve, where its extrapolation can rise again (a quadratic
+  // fit opening upwards), and a bisection over the whole range stopped there (1 % at the pump's own operating point:
+  // review of e6b8f15, item 19). The root is looked for first within the speeds where Qn/s lies on the given curve, from
+  // the highest speed down, then over the whole range, and its residual is checked.
+  function speedFor(curve, Qn, Hs) {
+    const LO = 0.01, HI = 3;
+    const f = (sp) => sp * sp * H.evalCurve(curve, Qn / sp) - Hs;
+    if (f(HI) < 0) return { s: NaN, status: 'high' };
+    const root = (a, b) => {
+      if (!(b > a)) return NaN;
+      const n = 200;
+      let x1 = b;
+      if (!(f(b) >= 0)) return NaN;
+      for (let k = 1; k <= n; k++) {
+        const x0 = b - (b - a) * k / n;
+        if (f(x0) <= 0) {
+          let lo = x0, hi = x1;
+          for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
+          const sp = (lo + hi) / 2;
+          return Math.abs(f(sp)) <= 1e-6 * Math.max(Math.abs(Hs), 1e-3) ? sp : NaN;
+        }
+        x1 = x0;
+      }
+      return NaN;
+    };
+    let sp = Qn > 0 && curve.xmax > 0 ? root(Math.max(LO, Qn / curve.xmax), Math.min(HI, curve.xmin > 0 ? Qn / curve.xmin : HI)) : NaN;
+    if (!Number.isFinite(sp)) sp = root(LO, HI);
+    return Number.isFinite(sp) ? { s: sp, status: 'ok' } : { s: LO, status: 'low' };
+  }
+
   function pumpResult(env, el, j, jr, warn, st) {
     const { rho, g, pv } = env;
     const m = jr.m, Q = m / rho;
@@ -91,22 +123,17 @@
       r.speed = NaN; r.eta = NaN; r.etaAssumed = true;
       r.Pideal = Q * dP; r.Pshaft = NaN;
       if (dP < 0) warn('warning', t('junctions.pump.warn.fixedNegative', { id: j.id, dp: fmtSI(dP / KGF) }), 'j:' + j.id);
-      if (m < 0) warn('critical', t('junctions.pump.warn.fixedReverse', { id: j.id }), 'j:' + j.id);
+      if (jr.reversed) warn('critical', t('junctions.pump.warn.fixedReverse', { id: j.id }), 'j:' + j.id);
       return r;
     }
     let s = el.s;
     if (el.controlled && el.curve) {
       // speed that delivers the required head: s²·H1(Q/(N·s)) = ΔH
       const target = dH;
-      const f = (sp) => sp * sp * H.evalCurve(el.curve, Q / (el.N * sp)) - target;
-      let lo = 0.01, hi = 3;
-      r.control = 'ok';
-      if (f(hi) < 0) { s = NaN; r.control = 'high'; warn('warning', t('junctions.pump.warn.speedTooHigh', { id: j.id }), 'j:' + j.id); }
-      else if (f(lo) > 0) { s = lo; r.control = 'low'; warn('warning', t('junctions.pump.warn.speedTooLow', { id: j.id }), 'j:' + j.id); }
-      else {
-        for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
-        s = (lo + hi) / 2;
-      }
+      const c = speedFor(el.curve, Q / el.N, target);
+      s = c.s; r.control = c.status;
+      if (c.status === 'high') warn('warning', t('junctions.pump.warn.speedTooHigh', { id: j.id }), 'j:' + j.id);
+      if (c.status === 'low') warn('warning', t('junctions.pump.warn.speedTooLow', { id: j.id }), 'j:' + j.id);
       r.speed = s * 100;
     }
     const Qs = Number.isFinite(s) ? Q / (el.N * s) : NaN; // equivalent flow per pump on the 100% curve
@@ -134,7 +161,7 @@
         warn('warning', t('junctions.pump.warn.npshrRange', { id: j.id, required: v.toFixed(2), flow: (Q * 3600).toFixed(2) }), 'j:' + j.id);
       }
     }
-    if (m < 0) warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
+    if (jr.reversed) warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
     if (el.curve && Number.isFinite(Qs) && Qs > el.curve.xmax * 1.0001) warn('warning', t('junctions.pump.warn.beyondCurve', { id: j.id }), 'j:' + j.id);
     if (Number.isFinite(r.NPSHR) && r.NPSHA < r.NPSHR) warn('warning', t('junctions.pump.warn.npsh', { id: j.id, available: r.NPSHA.toFixed(2), required: r.NPSHR.toFixed(2) }), 'j:' + j.id);
     if (!el.effCurve) r.etaAssumed = true;
@@ -173,15 +200,22 @@
       ratio: 2, etaGas: 75, // compressible mode: pressure ratio and polytropic efficiency (%) of a compressor
     }),
 
-    validate(j, miss, { fin, pos, curveOk, gas, gasP }) {
+    validate(j, miss, { fin, pos, curveOk, repeatedX, gas, gasP }) {
       if (j.state !== 'on') return;
       const need = (k) => miss.push(t('junctions.pump.check.' + k));
+      // a flow given twice in one of its curves, named with its unit
+      const twice = (c, k) => {
+        const x = c && Array.isArray(c.x) ? repeatedX(c) : null;
+        if (x !== null) miss.push(t('junctions.pump.check.' + k, { x: String(x), unit: U.label(c.xUnit) }));
+        return x !== null;
+      };
       // a fixed pressure ratio is a compressor of the compressible mode
       if (j.mode === 'ratio') { if (!gas) need('ratioGasOnly'); else if (!(j.ratio > 0)) need('ratio'); }
       if (gas && j.etaGas !== undefined && !(j.etaGas > 0 && j.etaGas <= 100)) need('etaGas');
       // the points of the efficiency curve (read by a compressor in every mode, by a pump of a liquid on its curve)
       if ((gas || j.mode !== 'fixedFlow') && j.eff && Array.isArray(j.eff.y) && j.eff.y.length && !effPointsOk(j.eff)) need('effRange');
-      if (['curve', 'controlFlow', 'controlDischarge', 'controlSuction'].includes(j.mode) && !curveOk(j.curve)) need('curve');
+      if ((gas || j.mode !== 'fixedFlow') && j.eff && Array.isArray(j.eff.y) && j.eff.y.length) twice(j.eff, 'effTwice');
+      if (['curve', 'controlFlow', 'controlDischarge', 'controlSuction'].includes(j.mode) && !curveOk(j.curve) && !twice(j.curve, 'curveTwice')) need('curve');
       if (j.mode === 'fixedFlow' && !(fin(j.fixedFlow) && j.fixedFlow.value >= 0)) need('fixedFlow');
       if (j.mode === 'controlFlow' && !pos(j.setQ)) need('setQ');
       if ((j.mode === 'controlDischarge' || j.mode === 'controlSuction') && !fin(j.setP)) need('setP');
@@ -191,6 +225,7 @@
       // the points of the NPSH required (optional, read by a pump of a liquid on its curve): as many flows as heads, each
       // a number of zero or more
       if (!gas && j.mode !== 'fixedFlow' && j.npshr && Array.isArray(j.npshr.x) && j.npshr.x.length && !npshrPointsOk(j.npshr)) need('npshrPoints');
+      if (!gas && j.mode !== 'fixedFlow' && j.npshr && Array.isArray(j.npshr.x) && j.npshr.x.length) twice(j.npshr, 'npshrTwice');
     },
 
     buildElement,
@@ -289,14 +324,7 @@
     lk.headOf = (r, T0) => cx.ZR * T0 * k / (k - 1) * (Math.pow(Math.max(r, 1e-9), (k - 1) / k) - 1) / g;
     // a control: the speed whose curve gives the head H at the suction flow Q, s²·H1(Q/(N·s)) = H. status 'high' (not
     // even at 300 %: no speed), 'low' (below 1 %: 1 %) or 'ok'
-    lk.controlSpeed = (Q, Hs) => {
-      const f = (sp) => sp * sp * H.evalCurve(lk.curve, Q / (N * sp)) - Hs;
-      let lo = 0.01, hi = 3;
-      if (f(hi) < 0) return { s: NaN, status: 'high' };
-      if (f(lo) > 0) return { s: lo, status: 'low' };
-      for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
-      return { s: (lo + hi) / 2, status: 'ok' };
-    };
+    lk.controlSpeed = (Q, Hs) => speedFor(lk.curve, Q / N, Hs);
     // the speed the machine runs at for a suction flow Q and a pressure ratio r: that of its control, or the typed one
     lk.speedAt = (Q, r, T0) => (lk.controlled && lk.curve ? lk.controlSpeed(Q, lk.headOf(r, T0)).s : s);
     const suction = (m, na, sol) => { const P0 = p0(na, Pin, lk.a, sol), T0 = T0of(na); return { P0, T0, Q: m * cx.ZR * T0 / P0 }; };
@@ -305,7 +333,9 @@
       const f = net.flowExt(qt, 1, j) || { m: 0 };
       if (f.m !== undefined) { lk.mode = 'fixedFlow'; lk.value = f.m; return; }
       lk.mode = 'fixedFlow'; lk.value = f.Q * net.env.rhoN; lk.conScale = 'M'; lk.localVolume = true; // value: a scale only
-      lk.con = (m, na) => m - f.Q * Fw().rhoOf(cx, na.P, Fw().tempOf(cx, na));
+      // the volume flow at the suction, at its stagnation state as on the curve (suction): the results and the converter
+      // of the field read the same density (review of e6b8f15, item 21)
+      lk.con = (m, na, nb, sol) => { const su = suction(m, na, sol); return m - f.Q * su.P0 / (cx.ZR * su.T0); };
     };
     if (j.mode === 'ratio') {
       lk.mode = 'ratio'; lk.joins = true; lk.conScale = 'P'; lk.initRatio = j.ratio;
@@ -349,6 +379,10 @@
     const na = S.gasNode(el.pk, rc.res, el.a);
     const su = el.suction(m, na, rc.res);
     r.Q = su.Q; r.T0in = su.T0;
+    // the volume flow of the junction and its density are those of the suction at rest, as the fixed flow and the curve
+    // read them (the static state at the inlet gave 1.516 m³/s for 1.5 kg/s, which converted back gave 1.7034 kg/s:
+    // review of e6b8f15, item 21)
+    jr.rho = su.P0 / (cx.ZR * su.T0); jr.Q = m / jr.rho;
     r.dHs = el.headOf(r.ratio, su.T0); // isentropic head
     // the speed: of the control, the one whose curve gives the head the network asks for; the efficiency is read at it
     let sp = el.s;
@@ -369,7 +403,7 @@
     if (el.effCurve && !Number.isFinite(r.eta)) rc.warn('warning', t('junctions.pump.warn.effNoSpeed', { id: j.id }), 'j:' + j.id);
     else if (r.etaInvalid) rc.warn('warning', t('junctions.pump.warn.effRangeGas', { id: j.id, eta: (r.eta * 100).toFixed(2) }), 'j:' + j.id);
     bestEfficiency(r, el, sp, su.Q);
-    if (m < 0) rc.warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
+    if (jr.reversed) rc.warn('critical', t('junctions.pump.warn.reverse', { id: j.id }), 'j:' + j.id);
     if (el.curve && j.mode === 'curve' && su.Q / (el.N * el.s) > el.curve.xmax * 1.0001) rc.warn('warning', t('junctions.pump.warn.beyondCurve', { id: j.id }), 'j:' + j.id);
     if (r.ratio < 1 && m > 0) rc.warn('warning', t('core.gas.compressorBelowOne', { id: j.id, r: r.ratio.toFixed(3) }), 'j:' + j.id);
     rc.pumps[j.id] = r;

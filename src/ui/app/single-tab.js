@@ -44,6 +44,7 @@
     const box = $('#tab-lock');
     if (!box) return;
     if (PumpIt.ui.tips) PumpIt.ui.tips.hide();
+    closeOpen();
     $('#tab-lock-title').textContent = t(why === 'busy' ? 'app.tabLock.busyTitle' : 'app.tabLock.lostTitle');
     $('#tab-lock-text').textContent = t(why === 'busy' ? 'app.tabLock.busyText' : 'app.tabLock.lostText');
     $('#tab-lock-hint').textContent = t('app.tabLock.useHint');
@@ -70,11 +71,26 @@
     active = true;
     unlock();
   }
-  // "Use here": the study as the other tab last saved it
+  // A window or a menu open in this tab belongs to the study as it was here: a conversion would apply a value read
+  // before (review of e6b8f15, item 18). Locking closes them, and so does taking the study over.
+  function closeOpen() {
+    const D = PumpIt.ui.dialogs;
+    if (D && D.isModalOpen && D.isModalOpen()) D.closeModal();
+    if (app.hideMenus) app.hideMenus();
+  }
+  // "Use here": the study as the other tab last saved it. Its history stays in the other tab: the undo and redo of this
+  // tab hold copies of a revision left behind, so they are dropped (review of e6b8f15, item 17)
   function useHere() {
     const m = app.storedModel();
+    closeOpen();
     claim();
-    if (m) { try { app.loadModel(m); } catch (e) { /* the model of this tab stays */ } }
+    if (m) {
+      try {
+        app.loadModel(m);
+        app.undoStack = [];
+        app.redoStack = [];
+      } catch (e) { /* the model of this tab stays, with its history */ }
+    }
   }
 
   window.addEventListener('storage', (e) => {
@@ -89,13 +105,14 @@
     }
   });
 
-  // a locked tab takes no keys (undo, delete, shortcuts) and no dropped or pasted files: only its own button works
+  // a locked tab takes no keys (undo, delete, shortcuts) and no dropped or pasted files: only its own button works. A
+  // key on that button still reaches no shortcut of the app (Delete there removed the selection: review of e6b8f15), but
+  // keeps what the browser does with it (Enter and Space press the button, Tab moves the focus)
   for (const type of ['keydown', 'drop', 'dragover', 'paste']) {
     window.addEventListener(type, (e) => {
       if (state === null) return;
       const box = $('#tab-lock');
-      if (type === 'keydown' && box && box.contains(e.target)) return;
-      e.preventDefault();
+      if (!(type === 'keydown' && box && box.contains(e.target))) e.preventDefault();
       e.stopImmediatePropagation();
     }, true);
   }

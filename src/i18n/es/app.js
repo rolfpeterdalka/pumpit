@@ -6,6 +6,7 @@ PumpIt.i18n.add('es', {
     welcome: 'Ejemplo cargado: bombeo entre tanques. El cálculo se rehace con cada cambio.',
     exampleLoaded: 'Ejemplo cargado: {name}.',
     numberInvalid: 'No es un número: "{text}". Separador decimal en uso: {mark}; el otro signo solo separa los miles (menú Opciones). Se mantuvo el valor anterior.',
+    numberOneValue: 'Solo un valor: "{text}" tiene más de uno (¿celdas pegadas juntas?). Se mantuvo el valor anterior.',
     tabLock: {
       busyTitle: 'Pump It ya está abierto en otra pestaña',
       busyText: 'Solo una pestaña edita el estudio a la vez, para que una pestaña nunca borre el trabajo de la otra. Esta pestaña queda bloqueada y no guarda nada.',

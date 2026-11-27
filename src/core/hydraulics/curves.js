@@ -49,7 +49,8 @@
     if (n === 1) return ys[0];
     let i = 1;
     while (i < n - 1 && x > xs[i]) i++;
-    const w = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+    const dx = xs[i] - xs[i - 1];
+    const w = dx ? (x - xs[i - 1]) / dx : 0; // a flow given twice (the checklist refuses it) divides by nothing
     return ys[i - 1] + w * (ys[i] - ys[i - 1]);
   }
 

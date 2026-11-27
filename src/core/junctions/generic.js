@@ -38,10 +38,14 @@
       curve: { x: [0, 10, 20, 30], y: [0, 0.05, 0.2, 0.45], xUnit: 'm³/h', yUnit: 'kgf/cm²', fit: '2' },
     }),
 
-    validate(j, miss, { curveOk, gas }) {
+    validate(j, miss, { curveOk, repeatedX, gas }) {
       if (j.genModel === 'K' && !(j.K >= 0)) miss.push('K');
       if (j.genModel !== 'curve') return;
-      if (!curveOk(j.curve, 2)) { miss.push(t('junctions.generic.check.curve')); return; }
+      if (!curveOk(j.curve, 2)) {
+        const x = j.curve && Array.isArray(j.curve.x) ? repeatedX(j.curve) : null;
+        miss.push(x !== null ? t('junctions.generic.check.curveTwice', { x: String(x), unit: U.label(j.curve.xUnit) }) : t('junctions.generic.check.curve'));
+        return;
+      }
       let issue = null;
       try { issue = curveIssue(j.curve, gas); } catch (e) { return; } // a unit the checklist reports
       if (issue) miss.push(t('junctions.generic.check.' + issue.key, issue));

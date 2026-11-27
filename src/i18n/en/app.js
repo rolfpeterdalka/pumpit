@@ -7,6 +7,7 @@ PumpIt.i18n.add('en', {
     exampleLoaded: 'Example loaded: {name}.',
     // a model the browser could not keep (src/ui/topbar/header.js)
     numberInvalid: 'Not a number: "{text}". Decimal mark in use: {mark}; the other mark only groups the thousands (Options menu). The value was kept.',
+    numberOneValue: 'One value only: "{text}" holds more than one (cells pasted together?). The value was kept.',
     tabLock: {
       busyTitle: 'Pump It is already open in another tab',
       busyText: 'Only one tab edits the study at a time, so that one tab never overwrites the work of the other. This tab is locked and saves nothing.',

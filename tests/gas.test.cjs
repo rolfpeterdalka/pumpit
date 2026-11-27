@@ -584,8 +584,10 @@ if (PumpIt) {
     return { r, p: r.pumps[2] };
   };
   const a = pump('isothermal', 'controlFlow', 100).p, b = pump('isothermal', 'controlFlow', 70).p;
-  ok('6c4f0fa-3 isothermal, flow control after 100 % and after 70 %: 90.8229 %, 79.121 % and 11.147 W in both',
-    [a, b].every((p) => near(p.speed, 90.8229, 1e-6) && near(p.eta * 100, 79.121, 1e-5) && near(p.Pgas, 11.147, 1e-4)), `${a.eta * 100} ${b.eta * 100} ${a.Pgas} ${b.Pgas}`);
+  // the set volume flow is that of the suction at rest, as on the curve (review of e6b8f15, item 21; 90.8229 % before,
+  // when the set flow read the pressure of the node): the compressor shows the 80 m³/h set
+  ok('6c4f0fa-3 isothermal, flow control after 100 % and after 70 %: 90.8232 %, 79.121 % and 11.147 W in both, 80 m³/h at the suction',
+    [a, b].every((p) => near(p.Q * 3600, 80, 1e-8) && near(p.speed, 90.82324, 1e-6) && near(p.eta * 100, 79.121, 1e-5) && near(p.Pgas, 11.147, 1e-4)), `${a.eta * 100} ${b.eta * 100} ${a.Pgas} ${b.Pgas}`);
   const fx = pump('isothermal', 'curve', a.speed).p;
   ok('6c4f0fa-3 isothermal: the same as the machine at that fixed speed', near(fx.eta, a.eta, 1e-6) && near(fx.Pgas, a.Pgas, 1e-6), `${fx.eta * 100} ${fx.Pgas}`);
   const c = pump('adiabatic', 'controlFlow', 100), d = pump('adiabatic', 'controlFlow', 70);
@@ -922,13 +924,13 @@ if (PumpIt) {
   });
   ok('a952425-2 a closed gas exit valve, and one without flow: no K nor Cv, in both drawings', closed.every(none) && still.every(none),
     JSON.stringify(closed.concat(still).map((s) => s.ok && [s.valves[3].m, s.valves[3].K, s.valves[3].Cv])));
-  // an inflow (a residual pressure of 6 bar(g), above the network): the same end in both drawings, K about −5 as for a
-  // liquid, no Cv, and the warning
+  // an inflow (a residual pressure of 6 bar(g), above the network): the same end in both drawings, K about 5 and its Cv
+  // by the loss along the flow, as for a liquid (review of e6b8f15, item 22), and the warning
   const inflow = [false, true].map((flip) => steady(exitAt(flip, 140, { Pout: q(6, 'bar(g)') })));
   const [ia, ib] = inflow.map((s) => s.ok && s.valves[3]);
-  ok('a952425-2 an inflow through a gas exit valve: the same K (about −5) in both drawings, no Cv, and its warning',
-    !!ia && !!ib && ia.m < 0 && Math.abs(ia.K + 5) < 0.05 && Math.abs(ib.K - ia.K) < 1e-9 && Number.isNaN(ia.Cv) && Number.isNaN(ib.Cv)
-      && inflow.every((s) => s.warnings.some((w) => w.text === t('junctions.exitvalve.warn.inflow', { id: 3 }))), `${ia && ia.K} ${ib && ib.K}`);
+  ok('a952425-2 an inflow through a gas exit valve: the same K (about 5) and Cv in both drawings, and its warning',
+    !!ia && !!ib && ia.m < 0 && Math.abs(ia.K - 5) < 0.05 && Math.abs(ib.K - ia.K) < 1e-9 && ia.Cv > 0 && Math.abs(ib.Cv - ia.Cv) < 1e-9 * ia.Cv
+      && inflow.every((s) => s.warnings.some((w) => w.text === t('junctions.exitvalve.warn.inflow', { id: 3 }))), `${ia && ia.K} ${ib && ib.K} ${ia && ia.Cv}`);
 
   // item 8: a PDCV between pipe P1 and a new pipe to J2 in the air example (as the valve of 319654f)
   const pdcv = (setDP, kOpen, special = 'none') => {
@@ -1140,6 +1142,36 @@ if (PumpIt) {
         tr.ok ? series.map((x) => x.toFixed(5)).join(', ') + ' / ' + steady.map((x) => x.toFixed(5)).join(', ') : tr.errors.join('; '));
     }
   }
+}
+
+console.log('\nReview of e6b8f15, item 21: the fixed volume flow of an adiabatic compressor, converted there and back');
+if (PumpIt) {
+  const M = PumpIt.model, q = M.q, U = PumpIt.units;
+  // the compressed air plant cut to J1, the compressor J2 and a reservoir at 1 bar(g) at the end of P2, pipes of 1 m
+  const build = (flow) => {
+    const m = PumpIt.examples.get('airPlant').build();
+    const j1 = m.junctions.find((j) => j.id === 1), j2 = m.junctions.find((j) => j.id === 2), old = m.junctions.find((j) => j.id === 3);
+    const j3 = Object.assign(M.clone(j1), { id: 3, x: old.x, y: old.y, pipeK: {}, surfP: q(1, 'bar(g)') });
+    j1.pipeK = {};
+    m.junctions = [j1, j2, j3];
+    m.pipes = m.pipes.filter((p) => p.id === 1 || p.id === 2);
+    m.pipes.forEach((p) => { p.length = q(1, 'm'); });
+    m.system.gasMode = 'adiabatic';
+    Object.assign(j2, { mode: 'fixedFlow', fixedFlow: flow });
+    return m;
+  };
+  const run = (m) => { const e = M.effective(m, 'base'); return { v: M.validate(e), s: PumpIt.solver.run(e) }; };
+  // the conversion of the field, with the density its converter reads (the result of the junction)
+  const conv = (v, from, to, jr) => U.fromSI(U.toSI(v, from, 'flow', { rho: jr.rho }), to, 'flow', { rho: jr.rho });
+  const a = run(build(q(1.5, 'kg/s'))), ja = a.s.junctions[2], pa = a.s.pumps[2];
+  const Q = conv(1.5, 'kg/s', 'm³/s', ja);
+  const b = run(JSON.parse(JSON.stringify(build(q(Q, 'm³/s'))))), jb = b.s.junctions[2];
+  const back = conv(Q, 'm³/s', 'kg/s', jb);
+  const c = run(build(q(back, 'kg/s'))), jc = c.s.junctions[2];
+  ok('e6b8f15-21 1.5 kg/s: the volume flow of the junction and of the compressor is the mass flow over the density of the suction at rest',
+    a.v.ok && a.s.ok && near(ja.m, 1.5, 1e-9) && near(ja.Q * ja.rho, ja.m, 1e-12) && near(pa.Q, ja.Q, 1e-12), `${ja.m} ${ja.rho} ${ja.Q} ${pa.Q}`);
+  ok('e6b8f15-21 … converted to m³/s (and saved and opened again) it is still 1.5 kg/s, and converted back 1.5 kg/s again',
+    b.v.ok && b.s.ok && near(jb.m, 1.5, 1e-9) && near(back, 1.5, 1e-9) && c.s.ok && near(jc.m, 1.5, 1e-9), `${Q} m³/s → ${jb.m} kg/s → ${back}`);
 }
 
 console.log(fails ? `\n${fails} failed` : '\nAll tests passed.');

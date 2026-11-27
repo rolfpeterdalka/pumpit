@@ -97,6 +97,12 @@ lang('pt-BR');
   ok('C2 without a choice, English has the point', F.decimalSep() === '.' && F.parseNum('1.5') === 1.5 && Number.isNaN(F.parseNum('1,5')));
   lang('es');
   ok('C2 and Spanish the comma', F.decimalSep() === ',' && F.parseNum('1,5') === 1.5);
+  // review of e6b8f15, item 20: two cells of a spreadsheet pasted in one field are not one number
+  ok('C2 a tab, a line break or a space inside is not a number (300 and 12 were read as 30012)',
+    ['300\t12', '300\n12', '300 12', '1 200'].every((x) => Number.isNaN(F.parseNum(x))) && F.parseNum(' 1200\n') === 1200);
+  ok('C2 … a cell refuses it too, and a paste in a table still splits its columns', r('300\t12') === '{"error":"invalid"}'
+    && JSON.stringify(PT.parsePaste('300\t12\n400 5\t13', 2)) === '{"error":{"line":2,"col":0,"kind":"invalid","text":"400 5"}}'
+    && JSON.stringify(PT.parsePaste('300\t12\n400\t13', 2).cols) === '[[300,400],[12,13]]');
   lang('pt-BR');
   ok('C2 a zero typed is a number', NC.read('0').value === 0 && NC.read('0,0').value === 0);
   ok('C3 an empty cell that stands for a value (the bottom of a reservoir)', NC.read('', { empty: null }).value === null);

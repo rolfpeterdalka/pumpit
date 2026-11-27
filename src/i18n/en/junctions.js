@@ -120,6 +120,9 @@ PumpIt.i18n.add('en', {
         speed: 'speed',
         nPumps: 'number of pumps',
         npshrPoints: 'NPSH required points: as many flows as heads, each of zero or more',
+        curveTwice: 'head × flow curve: the flow {x} {unit} is given twice',
+        effTwice: 'efficiency curve: the flow {x} {unit} is given twice',
+        npshrTwice: 'NPSH required curve: the flow {x} {unit} is given twice',
       },
       error: { curve: 'Pump J{id}: {message}' },
       warn: {
@@ -310,6 +313,7 @@ PumpIt.i18n.add('en', {
       label: 'Generic component',
       check: {
         curve: 'loss curve (min. 2 points)',
+        curveTwice: 'loss curve: the flow {x} {unit} is given twice',
         fit: 'loss curve: {message}',
         gain: 'loss curve: the fit gives a pressure gain from {from} to {to} {unit}; review the fit (linear interpolation follows the points)',
         falls: 'loss curve: the fit falls over part of the flow range up to {to} {unit}, and the compressible mode needs a loss that grows with the flow; review the fit (linear interpolation follows the points)',

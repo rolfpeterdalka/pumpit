@@ -42,8 +42,11 @@
       const { rho } = rc.env;
       const pc = rc.con[0], pr = pc && rc.pipeOf(pc.id);
       const vr = { type: j.type, m: jr.m, Q: jr.Q, dP: jr.dP, Pin: jr.Pin, P0in: rc.P0, Pout: jr.Pext, state: t('junctions.states.discharging') };
-      vr.K = pr && pr.V ? jr.dP / (rho * pr.V * pr.V / 2) : NaN;
-      vr.Cv = JS.equivalentCv(jr.m, jr.dP, rho);
+      // K and Cv by the loss along the flow, as an in-line valve: an inflow (from the outside pressure) through the same
+      // valve has the same K and Cv; the flow and the drop keep their signs (review of e6b8f15, item 22)
+      const loss = jr.m < 0 ? -jr.dP : jr.dP;
+      vr.K = pr && pr.V ? loss / (rho * pr.V * pr.V / 2) : NaN;
+      vr.Cv = JS.flowCv(jr.m, jr.dP, rho);
       if (j.closed || JS.shutByOpening(j)) vr.state = t('junctions.states.closed');
       if (j.lossModel === 'opening') vr.open = j.closed ? 0 : j.open;
       if (jr.m < 0) rc.warn('warning', t('junctions.exitvalve.warn.inflow', { id: j.id }), 'j:' + j.id);
@@ -75,14 +78,15 @@
       },
       // K and Cv: the drop referred to the density and the velocity of the end of the pipe at the valve (its "out" end when
       // the pipe is drawn towards the valve, its "in" end when drawn from it), so the drawing does not change them
-      // (G-40); an inflow, which warns, takes the same end
+      // (G-40); an inflow, which warns, takes the same end, and its K and Cv are those of the loss along the flow, as
+      // for a liquid (review of e6b8f15, item 22)
       results(j, jr, rc) {
         JS.gasDischargeResults(j, jr, rc);
         if (rc.nd.isolated) return;
         const pc = rc.con[0], pr = pc && rc.pipeOf(pc.id);
         const vr = { type: j.type, m: jr.m, Q: jr.Q, QN: jr.QN, dP: jr.dP, Pin: jr.Pin, P0in: jr.P0in, Pout: jr.Pext, state: t('junctions.states.discharging'), choked: jr.choked };
         const atOut = pc && pc.down === j.id, rhoE = pr ? (atOut ? pr.rhoOut : pr.rhoIn) : NaN, VE = pr ? (atOut ? pr.Vout : pr.Vin) : NaN;
-        vr.K = VE && rhoE > 0 ? jr.dP / (rhoE * VE * VE / 2) : NaN;
+        vr.K = VE && rhoE > 0 ? (jr.m < 0 ? -jr.dP : jr.dP) / (rhoE * VE * VE / 2) : NaN;
         vr.Cv = pr ? JS.gasEquivalentCv(vr.K, pr.A * pr.N) : NaN;
         if (j.closed || JS.shutByOpening(j)) vr.state = t('junctions.states.closed');
         if (j.lossModel === 'opening') vr.open = j.closed ? 0 : j.open;

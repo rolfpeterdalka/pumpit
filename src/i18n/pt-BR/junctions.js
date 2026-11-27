@@ -121,6 +121,9 @@ PumpIt.i18n.add('pt-BR', {
         speed: 'rotação',
         nPumps: 'número de bombas',
         npshrPoints: 'pontos do NPSH requerido: tantas vazões quanto alturas, cada uma zero ou mais',
+        curveTwice: 'curva de altura × vazão: a vazão {x} {unit} aparece duas vezes',
+        effTwice: 'curva de eficiência: a vazão {x} {unit} aparece duas vezes',
+        npshrTwice: 'curva do NPSH requerido: a vazão {x} {unit} aparece duas vezes',
       },
       error: { curve: 'Bomba J{id}: {message}' },
       warn: {
@@ -311,6 +314,7 @@ PumpIt.i18n.add('pt-BR', {
       label: 'Componente genérico',
       check: {
         curve: 'curva de perda (mín. 2 pontos)',
+        curveTwice: 'curva de perda: a vazão {x} {unit} aparece duas vezes',
         fit: 'curva de perda: {message}',
         gain: 'curva de perda: o ajuste dá ganho de pressão de {from} a {to} {unit}; revise o ajuste (a interpolação linear segue os pontos)',
         falls: 'curva de perda: o ajuste cai em parte da faixa de vazão até {to} {unit}, e o modo compressível precisa de uma perda que cresça com a vazão; revise o ajuste (a interpolação linear segue os pontos)',
