@@ -97,6 +97,10 @@ PumpIt.i18n.add('en', {
         junction: 'Junction J{id} appears more than once: each junction needs an id of its own.',
         scenario: 'Scenario "{id}" appears more than once: each scenario needs an id of its own.',
       },
+      scenarioTree: {
+        parent: 'Scenario "{id}" comes from scenario "{parent}", which is not in the file.',
+        cycle: 'Scenario "{id}" comes, through its parents, from itself: each scenario must come from the base.',
+      },
     },
     checklist: {
       unknownUnit: 'unknown unit: {units}',

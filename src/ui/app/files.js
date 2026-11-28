@@ -14,11 +14,16 @@
     // an id given to two objects of one collection: the file is refused, naming them (the study open stays as it is)
     const dup = M.duplicateIds(m);
     if (dup.length) throw new Error(t('app.files.duplicateIds', { list: dup.map(M.duplicateText).join(' ') }));
+    // a scenario whose parent is not in the file, or that comes from itself through its parents, is refused the same way
+    const tree = M.scenarioTreeIssues(m);
+    if (tree.length) throw new Error(t('app.files.duplicateIds', { list: tree.map(M.scenarioTreeText).join(' ') }));
     const base = M.newModel();
     m.system = Object.assign(base.system, m.system || {});
     m.solution = Object.assign(base.solution, m.solution || {});
     if (!m.scenarios || !m.scenarios.list || !m.scenarios.list.length) m.scenarios = base.scenarios;
     if (!m.scenarios.list.some((s) => s.id === m.scenarios.current)) m.scenarios.current = m.scenarios.list[0].id;
+    // a scenario saved without its overrides has none
+    for (const s of m.scenarios.list) if (!s.overrides || typeof s.overrides !== 'object' || Array.isArray(s.overrides)) s.overrides = {};
     m.nextId = m.nextId || {};
     m.nextId.p = Math.max(m.nextId.p || 1, 1 + Math.max(0, ...m.pipes.map((p) => p.id)));
     m.nextId.j = Math.max(m.nextId.j || 1, 1 + Math.max(0, ...m.junctions.map((j) => j.id)));

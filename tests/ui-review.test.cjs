@@ -2092,6 +2092,23 @@ console.log('\nReview of e81e282: another model in place of the one open');
   inp.value = '1700'; inp.fire('change');
   ok('F2 control: a field drawn for B still writes into B', app.model.title === 'B' && len() === 1700);
 
+  // a file whose scenarios come from themselves through their parents, or from a scenario not in it (a file edited by
+  // hand): refused with a message, the study open kept (was a page that hung, looking for the parents forever)
+  const withScenarios = (...extra) => { const m = JSON.parse(B); m.scenarios.list.push(...extra); return JSON.stringify(m); };
+  startA();
+  open(withScenarios({ id: 'x1', name: 'a', parent: 'x2', overrides: {} }, { id: 'x2', name: 'b', parent: 'x1', overrides: {} })).finish();
+  ok('SC scenarios in a loop: refused, naming both, A open as it was',
+    app.model.title === 'A' && len() === 800 && /O cenário "x1" vem, por meio dos seus pais, dele mesmo/.test(toasts[0]) && /"x2"/.test(toasts[0]) && !app.undoStack.length, toasts[0]);
+  startA();
+  open(withScenarios({ id: 'x3', name: 'c', parent: 'x3', overrides: {} })).finish();
+  ok('SC a scenario that is its own parent: refused', app.model.title === 'A' && /O cenário "x3" vem, por meio dos seus pais, dele mesmo/.test(toasts[0]), toasts[0]);
+  startA();
+  open(withScenarios({ id: 'x4', name: 'd', parent: 'gone', overrides: {} })).finish();
+  ok('SC a scenario whose parent is not in the file: refused, naming both', app.model.title === 'A' && /O cenário "x4" vem do cenário "gone", que não está no arquivo/.test(toasts[0]), toasts[0]);
+  startA();
+  open(withScenarios({ id: 'x5', name: 'e', parent: 'base' })).finish();
+  ok('SC a scenario saved without its overrides opens, with none', isB() && M.deepEqual(app.model.scenarios.list.find((s) => s.id === 'x5').overrides, {}), toasts[0]);
+
   // item 3: a dialog of A confirmed after B was dropped over it
   const primary = () => byId['#modal-actions'].children.find((b) => b.className.includes('primary'));
   const dialogCase = (name, show) => {

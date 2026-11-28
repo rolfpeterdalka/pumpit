@@ -131,5 +131,24 @@
   // the message of a repeated id
   const duplicateText = (d) => PumpIt.i18n.t('core.model.duplicate.' + d.what, { id: d.id });
 
-  Object.assign(M, { PIPE_ENDS, otherEnd, LOOSE_GAP, isLoose, junctionOf, endPoint, spotNear, loosenEnd, connectEnd, swapEnds, normalizeEnds, idsWellFormed, duplicateIds, duplicateText });
+  // The scenarios of a loaded model form a tree under the base: the parent of each one is a scenario of the file, and no
+  // chain of parents comes back to where it started (only a file edited by hand can have that; the effective model of a
+  // scenario in a loop would never be found, and the page would hang). → [{ what: 'parent' | 'cycle', id, parent }]
+  function scenarioTreeIssues(m) {
+    const list = m.scenarios && Array.isArray(m.scenarios.list) ? m.scenarios.list.filter(Boolean) : [];
+    const byId = new Map(list.map((s) => [s.id, s]));
+    const out = [];
+    for (const s of list) {
+      if (s.parent != null && !byId.has(s.parent)) { out.push({ what: 'parent', id: s.id, parent: s.parent }); continue; }
+      const seen = new Set([s.id]);
+      for (let x = s; x && x.parent != null; x = byId.get(x.parent)) {
+        if (seen.has(x.parent)) { if (x.parent === s.id) out.push({ what: 'cycle', id: s.id }); break; }
+        seen.add(x.parent);
+      }
+    }
+    return out;
+  }
+  const scenarioTreeText = (d) => PumpIt.i18n.t('core.model.scenarioTree.' + d.what, { id: d.id, parent: d.parent });
+
+  Object.assign(M, { PIPE_ENDS, otherEnd, LOOSE_GAP, isLoose, junctionOf, endPoint, spotNear, loosenEnd, connectEnd, swapEnds, normalizeEnds, idsWellFormed, duplicateIds, duplicateText, scenarioTreeIssues, scenarioTreeText });
 })(typeof window !== 'undefined' ? window : globalThis);

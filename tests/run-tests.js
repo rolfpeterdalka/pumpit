@@ -608,6 +608,13 @@ console.log('\nReview of 319654f, bugs 2 and 4: vapor pressure below vacuum, rep
   const dupS = M.newModel(); M.addScenario(dupS, 'base', 'a'); dupS.scenarios.list.push(M.clone(dupS.scenarios.list[1]));
   const ds = M.duplicateIds(dupS);
   check('ids: two scenarios with one id are found, each repeated id once', ds.length === 1 && ds[0].what === 'scenario' && /Scenario "[\w-]+" appears more than once/.test(M.duplicateText(ds[0])), JSON.stringify(ds));
+  // scenarios that come from themselves, or from one that is not there: found once each (a scenario that only leads into
+  // the loop is not named)
+  const loop = M.newModel();
+  loop.scenarios.list.push({ id: 'x1', parent: 'x2', overrides: {} }, { id: 'x2', parent: 'x1', overrides: {} }, { id: 'x3', parent: 'x1', overrides: {} }, { id: 'x4', parent: 'no', overrides: {} });
+  const ti = M.scenarioTreeIssues(loop);
+  check('ids: scenarios in a loop and a missing parent are found', ti.map((x) => x.what + ':' + x.id).join(',') === 'cycle:x1,cycle:x2,parent:x4' && M.scenarioTreeIssues(M.newModel()).length === 0
+    && /Scenario "x4" comes from scenario "no", which is not in the file/.test(M.scenarioTreeText(ti[2])), JSON.stringify(ti));
   // the gas regime and the time simulation refuse them too
   const air = PumpIt.examples.get('air').build(); air.pipes.push(M.clone(air.pipes[0]));
   const ra = S.run(M.effective(air, 'base'));

@@ -95,6 +95,10 @@ PumpIt.i18n.add('es', {
         junction: 'La unión J{id} aparece más de una vez: cada unión necesita un número propio.',
         scenario: 'El escenario "{id}" aparece más de una vez: cada escenario necesita una identificación propia.',
       },
+      scenarioTree: {
+        parent: 'El escenario "{id}" viene del escenario "{parent}", que no está en el archivo.',
+        cycle: 'El escenario "{id}" viene, a través de sus padres, de sí mismo: cada escenario debe venir de la base.',
+      },
     },
     checklist: {
       unknownUnit: 'unidad desconocida: {units}',

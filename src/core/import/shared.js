@@ -471,18 +471,20 @@
   // on the grid of the drawing; without usable coordinates, the junctions go on a grid (F-30). A junction the import
   // created goes beside the pump it serves, on its side
   function place(js, raw, note, created = []) {
-    const GRID = 20, SPACING = 160, MARGIN = 100;
+    const GRID = 20, SPACING = 160, MARGIN = 100, FAR = 1e9;
     const own = js.filter((j) => !created.some((c) => c.j === j));
     const pts = own.map((j) => raw.get(j.id) || [NaN, NaN]);
     const okPts = pts.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
     const spread = okPts && new Set(pts.map((p) => p.join(','))).size > 1;
     const used = new Set();
     if (!own.length) return;
-    if (!spread) {
+    const grid = () => {
       const cols = Math.ceil(Math.sqrt(own.length));
       own.forEach((j, i) => { j.x = MARGIN + (i % cols) * SPACING; j.y = MARGIN + Math.floor(i / cols) * SPACING; used.add(j.x + ',' + j.y); });
       if (own.length > 1) note('assumed', 'layout', null);
-    } else {
+    };
+    if (!spread) grid();
+    else {
       // median distance to the nearest distinct neighbour (a sample of the junctions in large models)
       const sample = pts.length > 400 ? pts.filter((_, i) => i % Math.ceil(pts.length / 400) === 0) : pts;
       const near = sample.map((a) => Math.min(...pts.map((b) => Math.hypot(a[0] - b[0], a[1] - b[1])).filter((x) => x > 0)));
@@ -490,8 +492,12 @@
       const d = near[Math.floor(near.length / 2)];
       const s = d > 0 && Number.isFinite(d) ? SPACING / d : 1;
       const x0 = Math.min(...pts.map((p) => p[0])), y0 = Math.min(...pts.map((p) => p[1]));
-      own.forEach((j, i) => {
-        let x = MARGIN + Math.round(((pts[i][0] - x0) * s) / GRID) * GRID, y = MARGIN + Math.round(((pts[i][1] - y0) * s) / GRID) * GRID;
+      // a junction far from all the others (a stray coordinate in the file) would sit where a step of the grid no longer
+      // changes its place, and the search for a free spot would not end: then the junctions go on a grid
+      const at = pts.map(([px, py]) => [MARGIN + Math.round(((px - x0) * s) / GRID) * GRID, MARGIN + Math.round(((py - y0) * s) / GRID) * GRID]);
+      if (!at.every(([x, y]) => x < FAR && y < FAR)) grid();
+      else own.forEach((j, i) => {
+        let [x, y] = at[i];
         while (used.has(x + ',' + y)) x += GRID; // two junctions on the same spot of the grid
         used.add(x + ',' + y);
         j.x = x; j.y = y;

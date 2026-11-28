@@ -955,5 +955,16 @@ console.log('\nThe validation script (tests/validate-fth.js) on a synthetic file
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+console.log('\nThe drawing of junctions with a stray coordinate');
+{
+  // three junctions close together and two on the same spot far away (1e30): a step of the grid no longer moves them there
+  const js = [1, 2, 3, 4, 5].map((id) => ({ id }));
+  const raw = new Map([[1, [0, 0]], [2, [1, 0]], [3, [2, 0]], [4, [1e30, 0]], [5, [1e30, 0]]]);
+  const notes = [];
+  PumpIt.importShared.place(js, raw, (level, key) => notes.push(key));
+  ok('the junctions go on a grid, each on its own spot, and the import says so (was a tab that hung)',
+    new Set(js.map((j) => j.x + ',' + j.y)).size === 5 && js.every((j) => j.x < 1000 && j.y < 1000) && notes.includes('layout'), js.map((j) => j.x + ',' + j.y).join(' '));
+}
+
 console.log(`\n${passed} checks passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
