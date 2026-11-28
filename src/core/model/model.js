@@ -53,14 +53,19 @@
     };
   }
 
-  // Data of a pipe the user draws (R-13 of the 3D views): length, material, section and friction copied from the
-  // reference pipe, never taken from the drawing. Without a reference (or with an invalid length) the length is
-  // 100 m, and the rest comes from newPipe.
+  // Data of a pipe the user draws (R-13 of the 3D views): length, material, section, friction and the reduction of the
+  // inner diameter copied from the reference pipe, never taken from the drawing (the reduction is part of the section:
+  // review of c3b3ec4, item A; the number of parallel pipes is not copied). Without a reference (or with an invalid
+  // length) the length is 100 m, and the rest comes from newPipe; an invalid reduction gives 0 %.
   function pipeDefaults(prev) {
     const base = newPipe(0, 0, 0);
     const pick = (k) => clone(prev && prev[k] ? prev[k] : base[k]);
     const L = prev && prev.length ? Number(prev.length.value) : NaN;
-    return { length: L > 0 ? pick('length') : q(100, 'm'), material: pick('material'), geometry: pick('geometry'), friction: pick('friction') };
+    const r = prev ? Number(prev.idReduction) : NaN;
+    return {
+      length: L > 0 ? pick('length') : q(100, 'm'), material: pick('material'), geometry: pick('geometry'), friction: pick('friction'),
+      idReduction: r >= 0 && r < 100 ? r : 0,
+    };
   }
 
   // the gas of the compressible mode (R-10): a library gas by its id, or 'custom' with its own MW, k and μ; Z is always

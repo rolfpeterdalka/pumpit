@@ -73,21 +73,22 @@
   }
 
   // the points of a series for the screen: all of them, or the largest and the smallest of each of MAX_POINTS / 2
-  // stretches, in the order of time
+  // stretches, in the order of time. A stretch with samples without a value keeps the first of them, so that the
+  // chart breaks its line there as it does with all the points (review of c3b3ec4, item B)
   function thin(xs, ys) {
     const n = xs.length;
     if (n <= MAX_POINTS) return xs.map((x, i) => [x, ys[i]]);
     const out = [], parts = MAX_POINTS / 2;
     for (let b = 0; b < parts; b++) {
       const i0 = Math.floor((b * n) / parts), i1 = Math.floor(((b + 1) * n) / parts);
-      let lo = -1, hi = -1;
+      let lo = -1, hi = -1, gap = -1;
       for (let i = i0; i < i1; i++) {
-        if (!Number.isFinite(ys[i])) continue;
+        if (!Number.isFinite(ys[i])) { if (gap < 0) gap = i; continue; }
         if (lo < 0 || ys[i] < ys[lo]) lo = i;
         if (hi < 0 || ys[i] > ys[hi]) hi = i;
       }
-      if (lo < 0) continue;
-      for (const i of lo === hi ? [lo] : lo < hi ? [lo, hi] : [hi, lo]) out.push([xs[i], ys[i]]);
+      const keep = [...new Set([lo, hi, gap].filter((i) => i >= 0))].sort((u, w) => u - w);
+      for (const i of keep) out.push([xs[i], i === gap ? NaN : ys[i]]);
     }
     return out;
   }

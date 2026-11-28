@@ -21,7 +21,11 @@ function storageFor(win) {
   const write = (k, v) => {
     const old = data.has(k) ? data.get(k) : null;
     if (v === null) data.delete(k); else data.set(k, String(v));
-    for (const w of tabs) if (w !== win && w.open) setTimeout(() => w.fire('storage', { key: k, oldValue: old, newValue: v === null ? null : String(v) }), 0);
+    // a page kept by the browser (frozen) gets its events when it is shown again, after its pageshow
+    for (const w of tabs) if (w !== win && w.open) {
+      const e = { key: k, oldValue: old, newValue: v === null ? null : String(v) };
+      if (w.frozen) w.queue.push(e); else setTimeout(() => w.fire('storage', e), 0);
+    }
   };
   return {
     getItem: (k) => (data.has(k) ? data.get(k) : null),
@@ -44,24 +48,26 @@ function openTab(name, stored) {
   appBox.children = [lock]; lock.parentElement = appBox;
   body.children = [appBox, offer]; appBox.parentElement = body; offer.parentElement = body;
   const byId = { 'tab-lock': lock, 'tab-lock-title': parts.title, 'tab-lock-text': parts.text, 'tab-lock-hint': parts.hint, 'tab-lock-use': parts.use };
-  const win = { name, open: true, listeners: {},
+  const win = { name, open: true, frozen: false, queue: [], listeners: {},
     addEventListener(t, f) { (this.listeners[t] = this.listeners[t] || []).push(f); },
     fire(t, extra = {}) { let stop = false; const e = Object.assign({ type: t, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { stop = true; } }, extra); (this.listeners[t] || []).forEach((f) => { if (!stop) f(e); }); this.lastPrevented = !!e.prevented; return stop; } };
   const saved = [];
+  const field = { typed: null };
   const dialogs = { open: false, isModalOpen: () => dialogs.open, closeModal() { dialogs.open = false; } };
   const app = {
     model: stored ? JSON.parse(stored) : { pipes: [] },
     undoStack: [], redoStack: [], menusHidden: 0, hideMenus() { app.menusHidden++; },
-    save() { data.set('pumpit.model', JSON.stringify(app.model)); saved.push(JSON.stringify(app.model)); },
+    save() { storageFor(win).setItem('pumpit.model', JSON.stringify(app.model)); saved.push(JSON.stringify(app.model)); },
     savePrefs() {},
     storedModel: () => (data.has('pumpit.model') ? JSON.parse(data.get('pumpit.model')) : null),
-    loadModel(m) { app.model = m; },
+    loadModel(m, o) { app.model = m; app.loadNote = o && o.note; },
     // as in src/ui/app/files.js
     closeTransient() { if (dialogs.isModalOpen()) dialogs.closeModal(); app.hideMenus(); },
-    commitPending() {},
+    // a field of the inspector being edited writes its value when it loses the focus (as app.commitPending, files.js)
+    commitPending() { if (field.typed !== null) { const v = field.typed; field.typed = null; app.model = Object.assign({}, app.model, { len: v }); app.save(); } },
   };
   const ctx = vm.createContext({
-    console, setTimeout, Math, Date, JSON,
+    console, setTimeout, clearTimeout, Math, Date, JSON,
     localStorage: storageFor(win),
     document: { body, get activeElement() { return body; } },
   });
@@ -72,6 +78,11 @@ function openTab(name, stored) {
   const tab = { name, win, app, lock, offer, use: parts.use, title: parts.title, saved, dialogs,
     single: ctx.PumpIt.ui.singleTab,
     edit(len) { app.model = Object.assign({}, app.model, { len }); app.save(); },
+    type(len) { field.typed = len; },
+    // the page goes to another address of the site and the browser keeps it; shown again, pageshow comes before the
+    // events of while it was kept
+    keep() { win.fire('pagehide'); win.frozen = true; },
+    showAgain() { win.frozen = false; win.fire('pageshow', { persisted: true }); const q = win.queue.splice(0); setTimeout(() => q.forEach((e) => win.fire('storage', e)), 0); },
     close() { win.fire('pagehide'); win.open = false; tabs.delete(win); },
     crash() { win.open = false; tabs.delete(win); } };
   tab.single.start();
@@ -102,9 +113,9 @@ function openTab(name, stored) {
   B.app.undoStack = ['{"len":300}']; B.app.redoStack = ['{"len":5}']; B.dialogs.open = true;
   A.dialogs.open = true; const menusA = A.app.menusHidden;
   B.use.click();
+  await wait(50);
   ok('"Use here" drops the undo and redo of the revision left behind, and closes what was open', !B.app.undoStack.length && !B.app.redoStack.length && !B.dialogs.open);
   ok('"Use here" opens the study as last saved (1200) and takes over', B.app.tabActive() && B.app.model.len === 1200 && data.get('pumpit.owner') === B.single.id() && B.lock.hidden);
-  await wait(50);
   ok('… the other tab is told and locks itself', !A.app.tabActive() && A.single.state() === 'lost' && A.title.textContent === 'app.tabLock.lostTitle');
   ok('… and its conversion and menus open are closed: nothing applies a value read before', !A.dialogs.open && A.app.menusHidden > menusA);
   B.app.model = Object.assign({}, B.app.model, { p1: 30 }); B.app.save();
@@ -119,7 +130,8 @@ function openTab(name, stored) {
   ok('an owner whose id was replaced stops saving at its next save and locks', B.saved.length === n && B.single.state() === 'lost' && JSON.parse(data.get('pumpit.model')).len === 1200);
 
   // the owner closes: the next tab edits at once
-  B.use.click();
+  data.set('pumpit.owner', B.single.id()); B.use.click();
+  ok('"Use here" with this tab stored as the owner takes over at once', B.app.tabActive() && B.single.state() === null);
   B.close();
   ok('closing the owner gives the study back', !data.has('pumpit.owner'));
   const C = openTab('C', data.get('pumpit.model'));
@@ -148,6 +160,67 @@ function openTab(name, stored) {
   const E = openTab('E'), F = openTab('F');
   await wait(900);
   ok('two tabs opened together: one edits and the other is locked', [E, F].filter((x) => x.app.tabActive()).length === 1 && [E, F].some((x) => x.single.state() !== null && !x.lock.hidden));
+
+  // review of c3b3ec4, item 1: 1600 typed in A (the cursor still in the field), then "Use here" in B
+  console.log('\n"Use here" asks the owner for the study (review of c3b3ec4, item 1)');
+  E.close(); F.close();
+  data.clear(); data.set('pumpit.model', JSON.stringify({ len: 800 }));
+  const A3 = openTab('A3', data.get('pumpit.model'));
+  const B3 = openTab('B3', data.get('pumpit.model'));
+  await wait(900);
+  A3.type(1600);
+  B3.use.click();
+  B3.use.click();
+  ok('B asks and waits: still locked, nothing opened yet', !B3.app.tabActive() && B3.app.model.len === 800);
+  await wait(50);
+  ok('A writes the field and saves before it hands over: B opens 1600 (was 800)',
+    B3.app.tabActive() && B3.app.model.len === 1600 && JSON.parse(data.get('pumpit.model')).len === 1600 && data.get('pumpit.owner') === B3.single.id(), String(B3.app.model.len));
+  ok('… A is locked, and a second click in B asked nothing more', !A3.app.tabActive() && A3.single.state() === 'lost' && B3.single.state() === null);
+  A3.use.click();
+  await wait(50);
+  ok('back to A with "Use here": 1600 there too (was 800)', A3.app.tabActive() && A3.app.model.len === 1600 && !B3.app.tabActive());
+  const reopened = openTab('R3', data.get('pumpit.model'));
+  ok('… and in a page opened afterwards', reopened.app.model.len === 1600);
+  await wait(900);
+  reopened.close();
+  // a request for another owner, or an old one, is not answered
+  const stale = (extra) => { data.set('pumpit.handover', JSON.stringify(Object.assign({ from: 'x', to: A3.single.id(), n: 1, at: Date.now() }, extra))); A3.win.fire('storage', { key: 'pumpit.handover', newValue: data.get('pumpit.handover') }); };
+  stale({ to: 'someone' }); stale({ at: Date.now() - 60000 });
+  ok('a request for another tab, or an old one, is not answered', A3.app.tabActive() && data.get('pumpit.owner') === A3.single.id());
+  // the owner does not answer (a crash): the asking tab takes over after the wait
+  const B4 = openTab('B4', data.get('pumpit.model'));
+  await wait(900);
+  A3.crash();
+  B4.use.click();
+  await wait(100);
+  ok('an owner that does not answer: the asking tab still locked during the wait', !B4.app.tabActive());
+  await wait(800);
+  ok('… and takes over after it', B4.app.tabActive() && data.get('pumpit.owner') === B4.single.id() && B4.app.model.len === 1600);
+  B4.close();
+
+  // review of c3b3ec4, TODO b: A leaves for another page of the site, B opens, saves 1600 and closes, A comes back
+  console.log('\nA page shown again from the cache of the browser (review of c3b3ec4, TODO b)');
+  data.clear(); data.set('pumpit.model', JSON.stringify({ len: 800 }));
+  const A5 = openTab('A5', data.get('pumpit.model'));
+  A5.keep();
+  const B5 = openTab('B5', data.get('pumpit.model'));
+  ok('B opens at once while A is kept by the browser', B5.app.tabActive());
+  B5.edit(1600);
+  B5.close();
+  A5.showAgain();
+  await wait(30);
+  ok('A comes back as the owner and is not locked by the events of while it was kept (was locked)',
+    A5.app.tabActive() && A5.single.state() === null && data.get('pumpit.owner') === A5.single.id() && A5.lock.hidden, String(A5.single.state()));
+  ok('… with the study as B saved it (1600; was 800), without the history, and says so',
+    A5.app.model.len === 1600 && !A5.app.undoStack.length && A5.app.loadNote === 'app.tabLock.reloaded', String(A5.app.model.len));
+  A5.edit(1700);
+  ok('… and it saves', JSON.parse(data.get('pumpit.model')).len === 1700);
+  // nothing changed while it was kept: the page stays as it is
+  A5.app.undoStack = ['{"len":1}']; A5.app.loadNote = null;
+  A5.keep(); A5.showAgain();
+  await wait(30);
+  ok('a page shown again when nobody saved meanwhile keeps its model and history', A5.app.model.len === 1700 && A5.app.undoStack.length === 1 && !A5.app.loadNote);
+  A5.close();
 
   console.log(`\n${pass} checks passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

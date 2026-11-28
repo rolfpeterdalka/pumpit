@@ -122,10 +122,13 @@
       const x = { kind: ob.kind, id: ob.o.id, def: ob.def, end };
       if (Q.at === 'flow' && ob.kind === 'j') {
         // the velocity of a two-port junction: that of the pipe at its inlet port, positive from the inlet to the outlet
-        // whichever way that pipe is drawn (-1 when it starts at the junction: review of e81e282, item 4)
+        // whichever way that pipe is drawn (-1 when it starts at the junction: review of e81e282, item 4), read at the
+        // end of that pipe that touches the junction (a gas pipe has its own velocity at each end: review of c3b3ec4,
+        // item C)
         const pr = M.ports(eff, ob.o);
         x.inPipe = pr ? pr.in.id : null;
         x.inSign = pr && pr.in.down !== ob.o.id ? -1 : 1;
+        x.inEnd = x.inSign < 0 ? 'in' : 'out';
       }
       return x;
     };
@@ -168,7 +171,9 @@
       case 'velocity': {
         if (x.kind === 'p') return sol.pipes[x.id] ? sol.pipes[x.id].V : NaN;
         const r = x.inPipe !== null && x.inPipe !== undefined ? sol.pipes[x.inPipe] : null;
-        return r ? r.V * (x.inSign || 1) : NaN;
+        if (!r) return NaN;
+        const atEnd = x.inEnd === 'in' ? r.Vin : x.inEnd === 'out' ? r.Vout : undefined;
+        return (Number.isFinite(atEnd) ? atEnd : r.V) * (x.inSign || 1);
       }
       case 'pumpSpeed': return sol.pumps[x.id] ? sol.pumps[x.id].speed : NaN;
       case 'pumpFlow': return sol.pumps[x.id] ? sol.pumps[x.id].Q : NaN;

@@ -1558,5 +1558,54 @@ console.log('\nThe velocity of a valve has the sign of the valve, whichever way 
     near(lps(pAhead, 3), 6.81772, 1e-3) && near(lps(pBack, 3), 36.18509, 1e-3), row(pAhead) + ' · ' + row(pBack));
 }
 
+console.log('\nVelocity of a gas junction at the end of its inlet pipe (review of c3b3ec4, item C)');
+{
+  // airPlant with the downstream part 500 m lower and P1 of 300 mm: the gas speeds along P1, 3.22923 m/s where it
+  // leaves J1 and 3.05542 m/s where it reaches the compressor J2. The condition reads the end at J2
+  const gasPlant = (threshold) => {
+    const m = PumpIt.examples.get('airPlant').build();
+    for (const j of m.junctions) if (j.id !== 1) j.elevation = q(-500, 'm');
+    const p1 = m.pipes.find((p) => p.id === 1);
+    p1.material = { kind: 'user' }; Object.assign(p1.geometry, { kind: 'circular', d: q(300, 'mm') }); p1.length = q(500, 'm');
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 's'), stop: q(3, 's'), step: q(1, 's') });
+    const j5 = m.junctions.find((j) => j.id === 5);
+    j5.time = timeData('Q', 'single', [{ q: 'velocity', obj: 'j:2', op: '>', value: q(threshold, 'm/s') }],
+      [table([0, 3], [300, 300], 's', 'Nm³/h')], { interp: 'step' });
+    return m;
+  };
+  const st = PumpIt.solver.run(M.effective(gasPlant(3.1), 'base')).pipes[1];
+  check('P1: 3.22923 m/s at J1 and 3.05542 m/s at J2', near(st.Vin, 3.22923, 1e-5) && near(st.Vout, 3.05542, 1e-5), f6(st.Vin) + ' / ' + f6(st.Vout));
+  const j5 = (r) => Array.from(r.series.junctions[5].m);
+  const r31 = simulate(gasPlant(3.1)), r30 = simulate(gasPlant(3.0));
+  check('threshold 3.1 m/s: no start, J5 at 0.143585 kg/s in all four samples (was 0.107688 from 0 s)',
+    j5(r31).length === 4 && j5(r31).every((x) => near(x, 0.143585, 1e-6)), j5(r31).map(f6).join(', '));
+  check('threshold 3.0 m/s: the table starts', j5(r30).slice(1).every((x) => near(x, 0.107688, 1e-6)), j5(r30).map(f6).join(', '));
+  // a valve on a descending line, drawn both ways: 1.85920 m/s at the far end, 1.75658 m/s at the valve
+  const valveLine = (threshold, reversed) => {
+    const m = PumpIt.examples.get('airPlant').build();
+    m.junctions = m.junctions.filter((j) => j.id <= 3);
+    m.pipes = m.pipes.filter((p) => p.id <= 2);
+    m.junctions[0].surfP = q(6, 'bar(g)');
+    const keep = (j, type) => {
+      const k = { id: j.id, x: j.x, y: j.y, name: j.name };
+      for (const x of Object.keys(j)) delete j[x];
+      return Object.assign(j, M.newJunction(type, k.id, k.x, k.y), { name: k.name, elevation: q(-500, 'm') });
+    };
+    keep(m.junctions[1], 'valve');
+    const j3 = Object.assign(keep(m.junctions[2], 'flow'), { Q: q(3000, 'Nm³/h'), dir: 'out' });
+    const p1 = m.pipes[0];
+    p1.material = { kind: 'user' }; Object.assign(p1.geometry, { kind: 'circular', d: q(300, 'mm') }); p1.length = q(500, 'm');
+    if (reversed) M.swapEnds(p1);
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 's'), stop: q(3, 's'), step: q(1, 's') });
+    j3.time = timeData('Q', 'single', [{ q: 'velocity', obj: 'j:2', op: '>', value: q(threshold, 'm/s') }],
+      [table([0, 3], [2000, 2000], 's', 'Nm³/h')], { interp: 'step' });
+    return m;
+  };
+  for (const rev of [false, true]) {
+    const fired = (thr) => { const m3 = simulate(valveLine(thr, rev)).series.junctions[3].m; return Math.abs(m3[3] - m3[0]) > 1e-6; };
+    check(`valve, P1 drawn ${rev ? 'from J2 to J1' : 'from J1 to J2'}: 1.80 m/s does not start the table, 1.70 m/s does`, !fired(1.8) && fired(1.7));
+  }
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

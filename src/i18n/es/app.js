@@ -14,6 +14,7 @@ PumpIt.i18n.add('es', {
       lostText: 'La otra pestaña pasó a editar el estudio. Esta pestaña queda bloqueada y ya no guarda nada; lo que se guardó aquí sigue en el estudio.',
       use: 'Usar aquí',
       useHint: 'Esta pestaña abre el estudio como se guardó por última vez y pasa a editarlo; la otra pestaña queda bloqueada.',
+      reloaded: 'Otra pestaña cambió el estudio mientras esta página estaba fuera: se abre como se guardó por última vez.',
     },
     saving: { short: 'No se pudo guardar', failed: 'No se pudo guardar. Los cambios están solo en esta pestaña.', download: 'Descargar una copia', again: 'El modelo vuelve a guardarse en el navegador.' },
     page: {
@@ -156,6 +157,8 @@ PumpIt.i18n.add('es', {
       copied: 'Copiado: {junctions} unión(es) y {pipes} tubería(s). Ctrl+V pega.',
       empty: 'Nada copiado todavía.',
       pasted: 'Pegado: {junctions} unión(es) y {pipes} tubería(s).',
+      eventsAdded: 'Eventos con nombre añadidos con la copia: {list}.',
+      eventsRenamed: 'Eventos con nombre de la copia cuyo nombre el modelo ya daba a otro evento, añadidos con un nombre nuevo: {list}.',
     },
     shortcuts: {
       title: 'Atajos de teclado',

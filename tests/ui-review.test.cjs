@@ -2200,5 +2200,205 @@ console.log('\nReview of e81e282: another model in place of the one open');
   delete Node.prototype.matches; delete Node.prototype.focus; delete Node.prototype.blur;
 }
 
+// ------------------------------------------------------------ review of c3b3ec4
+console.log('\nA pipe drawn from a pipe with a reduction of its inner diameter (review of c3b3ec4, item A)');
+{
+  const c2 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P2 = c2.PumpIt, UI = P2.ui, M = P2.model, q = M.q;
+  UI.dialogs = { toast() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {}, ensureVisible() {}, elevationM: () => 0 };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c2, { filename: f });
+  run('src/ui/app/state.js');
+  const app = P2.app;
+  run('src/ui/app/editing.js');
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, savePrefs() {}, recalc() {} });
+  const m = M.newModel();
+  const r1 = Object.assign(M.newJunction('reservoir', 1, 0, 0), { liquidElev: q(30, 'm') });
+  const r2 = Object.assign(M.newJunction('reservoir', 2, 100, 0), { liquidElev: q(10, 'm') });
+  const p1 = M.newPipe(1, 1, 2);
+  p1.length = q(800, 'm'); p1.material = { kind: 'user' }; p1.geometry.kind = 'circular'; p1.geometry.d = q(100, 'mm'); p1.friction.eps = q(0.046, 'mm');
+  m.junctions.push(r1, r2); m.pipes.push(p1); m.nextId = { p: 2, j: 3 };
+  app.model = m; app.undoStack = []; app.redoStack = [];
+  const drawn = () => { const k = app.addPipe(1, 2); return app.model.pipes.find((p) => p.id === k); };
+  const flow = (id) => P2.solver.run(M.effective(app.model, app.model.scenarios.current)).pipes[id].Q * 1000;
+  app.setVal('p:1', 'idReduction', 30);
+  app.sel = { kind: 'pipe', id: 1 }; app.selSet = new Set(['p:1']);
+  const id = app.addPipe(1, 2);
+  const p2 = app.model.pipes.find((p) => p.id === id);
+  const f1 = flow(1), f2 = flow(id);
+  ok('A1 the pipe drawn from P1 at 30 % gets 30 %, 70 mm inside, the same flow (4.89097 L/s; was 12.60423)',
+    p2.idReduction === 30 && Math.abs(f1 - f2) <= 1e-3 && Math.abs(f2 - 4.89097) <= 1e-3, `${f1.toFixed(5)} / ${f2.toFixed(5)}`);
+  app.sel = null; app.selSet = new Set();
+  app.model.pipes.length = 0;
+  const p3 = drawn();
+  ok('A1 without a reference pipe, 0 %', p3.idReduction === 0 && p3.nParallel === 1);
+  // the value seen in the current scenario: a child that sets 30 % on a pipe of 0 %
+  app.model.pipes.length = 0;
+  const p4 = drawn();
+  const s1 = M.addScenario(app.model, 'base', 'reduced');
+  s1.overrides[`p:${p4.id}|idReduction`] = 30;
+  app.model.scenarios.current = s1.id;
+  app.sel = { kind: 'pipe', id: p4.id }; app.selSet = new Set([`p:${p4.id}`]);
+  const p5 = drawn();
+  ok('A1 the reference is read in the current scenario (30 % of the child scenario)', p5.idReduction === 30, String(p5.idReduction));
+}
+
+console.log('\nA chart breaks its line where a sample has no value, and its axes reach negative values (review of c3b3ec4, item B, TODO a)');
+{
+  const c2 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js', 'src/ui/charts/line-chart.js']);
+  const P2 = c2.PumpIt, UI = P2.ui, M = P2.model, q = M.q, LC = UI.lineChart;
+  // a valve whose Cv table closes it from 1 s to 3 s: P2 has no pressure at 1 and 2 s
+  const valveRun = (closes) => {
+    const m = M.newModel();
+    const j1 = Object.assign(M.newJunction('reservoir', 1, 0, 0), { liquidElev: q(10, 'm') });
+    const j2 = Object.assign(M.newJunction('valve', 2, 100, 0), { lossModel: 'Cv', Cv: 100 });
+    const j3 = Object.assign(M.newJunction('flow', 3, 200, 0), { Q: q(0, 'm³/h') });
+    m.junctions.push(j1, j2, j3);
+    m.pipes.push(M.newPipe(1, 1, 2), M.newPipe(2, 2, 3));
+    m.nextId = { p: 3, j: 4 };
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 's'), stop: q(4, 's'), step: q(1, 's') });
+    j2.time = { use: true, what: 'Cv', basis: 'absolute', start: 'time', when: [], tables: [{ t: [0, 1, 3], v: [100, closes ? 0 : 100, 100], tUnit: 's', vUnit: '' }], repeat: false, interp: 'step' };
+    const run = P2.time.run(M.effective(m, 'base'));
+    const xs = Array.from(run.times);
+    return LC.lineChart({ title: 't', xLabel: 'x', yLabel: 'y', series: [{ name: 'P2', pts: xs.map((x, i) => [x, run.series.pipes[2].Pout[i] / 1000]), color: 'red', width: 2 }] });
+  };
+  const paths = (svg) => [...svg.matchAll(/<path d="([^"]+)"/g)].map((x) => x[1]);
+  const dots = (svg) => [...svg.matchAll(/<circle class="lone" cx="([^"]+)"/g)].map((x) => Number(x[1]));
+  const shut = valveRun(true), open = valveRun(false);
+  // the x axis from 0 to 4 s: 0 s at 70, 3 s at 659.5 and 4 s at 856
+  ok('B1 closed from 1 s to 3 s: one dot at 0 s and one segment from 3 s to 4 s, nothing between (was one line from 0 s)',
+    paths(shut).length === 1 && paths(shut)[0] === 'M659.5 187.5L856.0 187.5' && dots(shut).length === 1 && Math.abs(dots(shut)[0] - 70) < 0.1, paths(shut).join(' | ') + ' · ' + dots(shut));
+  ok('B1 the valve always open: one line through the five samples, no dot', paths(open).length === 1 && (paths(open)[0].match(/[ML]/g) || []).length === 5 && /^M70\.0/.test(paths(open)[0]) && dots(open).length === 0, paths(open).join(' | '));
+  const two = LC.lineChart({ series: [{ name: 's', pts: [[0, 1], [1, 2], [2, NaN], [3, 1], [4, 2]], color: 'red' }] });
+  ok('B1 two runs are two pieces of one path', paths(two).length === 1 && (paths(two)[0].match(/M/g) || []).length === 2 && dots(two).length === 0);
+  const marked = LC.lineChart({ series: [{ name: 's', pts: [[0, 1], [1, NaN], [2, 2]], color: 'red', marker: true }] });
+  ok('B1 a series with markers keeps its markers and draws no line between them', paths(marked).length === 0 && (marked.match(/<circle cx="(?!15")[^"]+" cy="[^"]+" r="3\.2"/g) || []).length === 2);
+  ok('B1 the step of an axis of no range is 1 (was NaN for a negative range)', LC.niceStep(-24.4) === 1 && LC.niceStep(0) === 1 && LC.niceStep(NaN) === 1 && LC.niceStep(30) === 5);
+  // the surge charts thin long series: a stretch without values keeps a gap
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c2, { filename: f });
+  UI.charts = UI.charts || { register() {} };
+  run('src/ui/surge/charts.js');
+  const xs = Array.from({ length: 10000 }, (_, i) => i), ys = xs.map((x) => (x >= 4000 && x < 6000 ? NaN : Math.sin(x / 100)));
+  const th = UI.surgeCharts.thin(xs, ys);
+  const holes = th.filter((p) => !Number.isFinite(p[1]));
+  ok('B2 a long surge series keeps the gap of its samples without a value', holes.length > 0 && holes[0][0] === 4000 && th.length <= 4000 + 2 &&
+    th.every((p, i) => i === 0 || p[0] > th[i - 1][0]), `${th.length} points, ${holes.length} gaps`);
+
+  // the pump chart of a pump in fixed flow lifting from a reservoir above the discharge one: the heads are negative
+  UI.dialogs = { toast() {} };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {}, ensureVisible() {} };
+  run('src/ui/app/state.js');
+  const app = P2.app;
+  let m = null, res = null;
+  Object.assign(app, {
+    version: 1, prefs: {}, outUnit: (k, cat) => (cat === 'volFlow' ? 'm³/h' : 'm'), validation: () => M.validate(M.effective(m, 'base')),
+    timeRun: () => null, currentResults: () => res, scenario: () => ({ id: 'base', name: 'Base' }), eff: () => M.effective(m, 'base'),
+  });
+  run('src/ui/charts/pump-chart.js');
+  const chartAt = (level) => {
+    m = P2.examples.get('pump').build();
+    const pump = m.junctions.find((j) => j.id === 2);
+    pump.mode = 'fixedFlow'; pump.fixedFlow = q(10, 'm³/h');
+    m.junctions.find((j) => j.id === 1).liquidElev = q(level, 'm');
+    app.version++;
+    res = P2.solver.run(M.effective(m, 'base'));
+    const box = new Node('div');
+    UI.pumpChart.render(box, new Node('div'), new Node('p'));
+    return { html: box.html || '', dH: res.pumps[2].dH };
+  };
+  const low = chartAt(3), high = chartAt(50);
+  const point = (h) => { const x = /<circle cx="([^"]+)" cy="([^"]+)" r="6"/.exec(h); return x ? [Number(x[1]), Number(x[2])] : null; };
+  const ticks = (h) => [...h.matchAll(/text-anchor="end">([^<]+)</g)].map((x) => x[1]);
+  const finite = (h) => !/NaN/.test(h);
+  ok('TODO a level 3 m: +22.15973 m, drawn from 0 up as before', Math.abs(low.dH - 22.15973) < 1e-4 && finite(low.html) && !!point(low.html) && ticks(low.html)[0] === '0', ticks(low.html).join(' '));
+  const hp = point(high.html), yAxis = ticks(high.html);
+  // y of −24.84027 m on an axis from −30 to 0 (y from 332 down to 18)
+  const yOf = (v) => 18 + (1 - (v + 30) / 30) * (400 - 18 - 52);
+  ok('TODO a level 50 m: the point drawn at −24.84027 m on an axis from −30 to 0 (was NaN everywhere)',
+    Math.abs(high.dH + 24.84027) < 1e-4 && finite(high.html) && !!hp && Math.abs(hp[1] - yOf(-24.84027)) < 0.1 && yAxis[0] === '−30' && yAxis[yAxis.length - 1] === '0', yAxis.join(' ') + ' · ' + hp);
+}
+
+console.log('\nA paste brings the named events of the copied junctions (review of c3b3ec4, item 2)');
+{
+  const c2 = loadContext(['src/ui/namespace.js', 'src/ui/common/format.js', 'src/ui/common/dom.js', 'src/ui/common/num-cell.js']);
+  const P2 = c2.PumpIt, UI = P2.ui, M = P2.model, q = M.q;
+  const toasts = [];
+  UI.dialogs = { toast: (s) => toasts.push(s) };
+  UI.canvas = { dropDraft() {} };
+  UI.scene3d = { carryView() {}, ensureVisible() {}, elevationM: () => 0 };
+  c2.navigator = { clipboard: { writeText: (s) => { c2.lastClip = s; return { catch() {} }; } } };
+  const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), c2, { filename: f });
+  run('src/ui/app/state.js');
+  const app = P2.app;
+  run('src/ui/app/editing.js');
+  run('src/ui/app/clipboard.js');
+  Object.assign(app, { changed: () => { app.version++; }, pruneSelection() {}, renderAll() {}, save() {}, savePrefs() {}, recalc() {}, hitOf: (k) => ({ key: k }) });
+  P2.i18n.setLanguage('en');
+  // a reservoir and a demand of 1 L/s whose table (3 L/s) starts with the event "Start", at 2 s in A and 20 s in B
+  const project = (eventAt, table, events) => {
+    const m = M.newModel();
+    const j1 = Object.assign(M.newJunction('reservoir', 1, 0, 0), { liquidElev: q(20, 'm') });
+    const j2 = Object.assign(M.newJunction('flow', 2, 100, 0), { Q: q(1, 'L/s') });
+    m.junctions.push(j1, j2); m.pipes.push(M.newPipe(1, 1, 2)); m.nextId = { p: 2, j: 3 };
+    m.solution.time = Object.assign(M.newTimeControl(), { on: true, start: q(0, 's'), stop: q(5, 's'), step: q(1, 's') });
+    m.events = events || [{ name: 'Start', cond: { q: 'time', op: '>=', value: q(eventAt, 's') } }];
+    if (table) j2.time = { use: true, what: 'Q', basis: 'absolute', start: 'combined', combined: table, when: [], tables: [{ t: [0, 5], v: [3, 3], tUnit: 's', vUnit: 'L/s' }], repeat: false, interp: 'step' };
+    return m;
+  };
+  const series = (m, pid) => { const r = P2.time.run(M.effective(m, 'base')); return r.ok ? Array.from(r.series.pipes[pid].Q, (x) => +(x * 1000).toFixed(4)).join(',') : 'failed'; };
+  const copyFrom = (m, keys) => { app.model = m; app.undoStack = []; app.selSet = new Set(keys); app.copySelection(); };
+  const pasteInto = (m) => { app.model = m; app.undoStack = []; toasts.length = 0; app.paste(); return app.model.pipes[app.model.pipes.length - 1]; };
+  const valid = (m) => M.validate(M.effective(m, 'base')).ok;
+
+  const A = project(2, 'Start');
+  const sA = series(A, 1);
+  copyFrom(A, ['j:1', 'j:2', 'p:1']);
+  ok('P2-1 the system clipboard carries the events too', JSON.parse(c2.lastClip).events.length === 1);
+  const B = project(20, null);
+  const pB = pasteInto(B);
+  const jB = B.junctions[B.junctions.length - 1];
+  ok('P2-1 pasted into B (its "Start" at 20 s): the copy gives the series of A, 1,1,1,3,3,3 L/s (was 1 L/s throughout)',
+    sA === '1,1,1,3,3,3' && series(B, pB.id) === sA && valid(B), series(B, pB.id));
+  ok('P2-1 B keeps its "Start" at 20 s, and the copy starts with "Start (2)"',
+    B.events.length === 2 && B.events[0].cond.value.value === 20 && jB.time.combined === 'Start (2)' && B.events[1].name === 'Start (2)');
+  ok('P2-1 the paste says so', toasts[0].includes('"Start" → "Start (2)"'), toasts[0]);
+  const pB2 = pasteInto(B);
+  ok('P2-1 a second paste into B uses "Start (2)" again', B.events.length === 2 && B.junctions[B.junctions.length - 1].time.combined === 'Start (2)' && series(B, pB2.id) === sA);
+  const C = project(2, null);
+  const pC = pasteInto(C);
+  ok('P2-1 a target with the same "Start": no new event, no note', C.events.length === 1 && series(C, pC.id) === sA && !toasts[0].includes('"'), toasts[0]);
+  const D = project(2, null, []);
+  const pD = pasteInto(D);
+  ok('P2-1 a target without the event gets it, and the copy is complete (was an incomplete junction)',
+    D.events.length === 1 && D.events[0].name === 'Start' && valid(D) && series(D, pD.id) === sA && toasts[0].includes('Named events added with the copy: "Start"'), toasts[0]);
+
+  // a combined event that leads to another, on the pipe copied with it
+  const evs = [
+    { name: 'Late', cond: { q: 'time', op: '>=', value: q(2, 's') } },
+    { name: 'Flowing', cond: { q: 'flowVol', obj: 'p:1', op: '>', value: q(0.5, 'L/s') } },
+    { name: 'Both', op: 'and', of: ['Late', 'Flowing'] },
+    { name: 'Unused', cond: { q: 'time', op: '>=', value: q(9, 's') } },
+  ];
+  const E = project(0, 'Both', evs);
+  copyFrom(E, ['j:1', 'j:2', 'p:1']);
+  ok('P2-2 the copy holds the combined event and the events it leads to, not the others', app.clipboard.events.map((e) => e.name).join(',') === 'Late,Flowing,Both');
+  const F = project(0, null, [{ name: 'Late', cond: { q: 'time', op: '>=', value: q(4, 's') } }]);
+  const pF = pasteInto(F);
+  const both = F.events.find((e) => e.name === 'Both');
+  ok('P2-2 in a model whose "Late" is at 4 s: "Late (2)" added, "Both" leads to it, "Flowing" watches the pasted pipe',
+    !!both && both.of.join(',') === 'Late (2),Flowing' && F.events.find((e) => e.name === 'Flowing').cond.obj === 'p:' + pF.id && valid(F) && series(F, pF.id) === sA,
+    F.events.map((e) => e.name + (e.of ? '=' + e.of.join('+') : '')).join(' · '));
+  // in the same model the watched pipe is copied too: the copy watches its own pipe, under "(2)" names
+  const pE = pasteInto(E);
+  const both2 = E.events.find((e) => e.name === 'Both (2)'), fl2 = E.events.find((e) => e.name === 'Flowing (2)');
+  ok('P2-2 pasted in the same model: "Late" is used as it is, "Flowing (2)" watches the pasted pipe, "Both (2)" joins them',
+    !E.events.some((e) => e.name === 'Late (2)') && !!fl2 && fl2.cond.obj === 'p:' + pE.id && !!both2 && both2.of.join(',') === 'Late,Flowing (2)' &&
+    E.junctions[E.junctions.length - 1].time.combined === 'Both (2)' && E.junctions[1].time.combined === 'Both' && valid(E));
+  app.undo();
+  ok('P2-2 undo takes the events of the paste away too', app.model.events.length === 4 && app.model.events.map((e) => e.name).join(',') === 'Late,Flowing,Both,Unused');
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

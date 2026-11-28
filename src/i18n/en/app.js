@@ -15,6 +15,7 @@ PumpIt.i18n.add('en', {
       lostText: 'The other tab now edits the study. This tab is locked and saves nothing more; what was saved here stays in the study.',
       use: 'Use here',
       useHint: 'This tab opens the study as last saved and edits it; the other tab is locked.',
+      reloaded: 'Another tab changed the study while this page was away: it opens as last saved.',
     },
     saving: { short: 'Saving failed', failed: 'Saving failed. The changes are only in this tab.', download: 'Download a copy', again: 'The model is saved in the browser again.' },
     page: {
@@ -157,6 +158,8 @@ PumpIt.i18n.add('en', {
       copied: 'Copied: {junctions} junction(s) and {pipes} pipe(s). Ctrl+V pastes.',
       empty: 'Nothing copied yet.',
       pasted: 'Pasted: {junctions} junction(s) and {pipes} pipe(s).',
+      eventsAdded: 'Named events added with the copy: {list}.',
+      eventsRenamed: 'Named events of the copy whose name the model already gave to another event, added under a new name: {list}.',
     },
     shortcuts: {
       title: 'Keyboard shortcuts',

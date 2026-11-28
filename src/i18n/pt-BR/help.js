@@ -311,7 +311,7 @@ PumpIt.i18n.add('pt-BR', {
 <li><b>Dados</b>: selecione o objeto e edite no painel [[show:inspector|Propriedades]].</li>
 <li><b>Trocar o tipo de uma junção</b>: no painel, mude [[t:inspector.junction.type]]. Nome, cota, posição e os dados compatíveis — como as perdas por tubo e o modelo de perda das válvulas — são mantidos.</li>
 <li><b>Inverter o sentido de um tubo</b>: o botão [[t:inspector.pipe.reverse]] no painel, o menu [[t:app.menu.edit]] → [[t:app.menu.reverse]] ou o clique direito no tubo.</li>
-<li><b>Copiar e colar</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copia as junções selecionadas, as pontas dos tubos selecionados e os tubos entre elas, com os valores do cenário atual; <kbd>Ctrl</kbd>+<kbd>V</kbd> cola uma cópia deslocada, e cada nova colagem desloca um pouco mais.</li>
+<li><b>Copiar e colar</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copia as junções selecionadas, as pontas dos tubos selecionados e os tubos entre elas, com os valores do cenário atual; <kbd>Ctrl</kbd>+<kbd>V</kbd> cola uma cópia deslocada, e cada nova colagem desloca um pouco mais. Os eventos nomeados com que as junções copiadas começam vão junto, vigiando os objetos copiados; um nome que o modelo já dá a outro evento vira "Nome (2)", e a colagem avisa.</li>
 <li><b>Excluir</b>: <kbd>Del</kbd>. Excluir uma junção exclui também os tubos ligados a ela. Para mantê-los, use antes [[t:network.menu.disconnectPipes]] (veja [[go:draw.connect|Desconectar e reconectar tubos]]). A exclusão muda a rede de todos os cenários; para tirar um tubo de um só cenário, use [[t:network.menu.closePipe]] no menu do botão direito.</li>
 <li><b>Desfazer e refazer</b>: <kbd>Ctrl</kbd>+<kbd>Z</kbd> e <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
 </ul>

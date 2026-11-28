@@ -311,7 +311,7 @@ PumpIt.i18n.add('en', {
 <li><b>Data</b>: select the object and edit it in the [[show:inspector|Properties]] panel.</li>
 <li><b>Change the type of a junction</b>: in the panel, change [[t:inspector.junction.type]]. Name, elevation, position and the compatible data — such as the per-pipe losses and the loss model of valves — are kept.</li>
 <li><b>Reverse a pipe</b>: the [[t:inspector.pipe.reverse]] button in the panel, the [[t:app.menu.edit]] → [[t:app.menu.reverse]] menu or a right click on the pipe.</li>
-<li><b>Copy and paste</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copies the selected junctions, the ends of the selected pipes and the pipes between them, with the values of the current scenario; <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes a shifted copy, and each new paste shifts a little further.</li>
+<li><b>Copy and paste</b>: <kbd>Ctrl</kbd>+<kbd>C</kbd> copies the selected junctions, the ends of the selected pipes and the pipes between them, with the values of the current scenario; <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes a shifted copy, and each new paste shifts a little further. The named events that the copied junctions start with go along, watching the copied objects; a name the model already gives to another event becomes "Name (2)", and the paste says so.</li>
 <li><b>Delete</b>: <kbd>Del</kbd>. Deleting a junction also deletes the pipes connected to it. To keep them, use [[t:network.menu.disconnectPipes]] first (see [[go:draw.connect|Disconnecting and reconnecting pipes]]). Deleting changes the network of every scenario; to take a pipe out of one scenario only, use [[t:network.menu.closePipe]] in its right-click menu.</li>
 <li><b>Undo and redo</b>: <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
 </ul>

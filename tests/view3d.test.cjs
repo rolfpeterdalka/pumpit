@@ -276,6 +276,11 @@ ok('T20 new pipe copies the reference pipe (roughness 0 included)', d1.length.va
 d1.geometry.d.value = 1;
 ok('T20 the copy shares no object with the reference', ref.geometry.d.value === 200);
 ok('T20 reference without a valid length: 100 m', M.pipeDefaults(Object.assign(M.newPipe(9, 1, 2), { length: q(null, 'm') })).length.value === 100);
+ok('T20 new pipe without a reference: no reduction of the inner diameter', d0.idReduction === 0);
+ok('T20 new pipe copies the reduction of the inner diameter, not the parallel pipes (review of c3b3ec4)',
+  M.pipeDefaults(Object.assign(M.newPipe(9, 1, 2), { idReduction: 30, nParallel: 3 })).idReduction === 30 &&
+  !('nParallel' in M.pipeDefaults(Object.assign(M.newPipe(9, 1, 2), { nParallel: 3 }))));
+ok('T20 an invalid reduction gives 0 %', [100, -5, 'x', null, NaN].every((r) => M.pipeDefaults(Object.assign(M.newPipe(9, 1, 2), { idReduction: r })).idReduction === 0));
 
 console.log('\nLoaded models (§7.5)');
 // T21 validation of the drawing fields of a loaded model

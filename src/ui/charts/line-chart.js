@@ -4,7 +4,9 @@
   const F = PumpIt.ui.format;
   const { t } = PumpIt.i18n;
 
+  // a range that is not a positive number (all values equal, or a minimum above the maximum) gets a step of 1
   function niceStep(range, n = 6) {
+    if (!(range > 0) || !Number.isFinite(range)) return 1;
     const raw = range / n;
     const p = 10 ** Math.floor(Math.log10(raw));
     const m = raw / p;
@@ -43,13 +45,18 @@
   }
 
   // generic line chart: o = { title, xLabel, yLabel, xMin, yMin, series: [{ name, pts, color, dash, width, marker }], points,
-  // xTick (optional: the text of a tick of the x axis, from its value) }
+  // xTick (optional: the text of a tick of the x axis, from its value) }. xMin and yMin are values the axes always
+  // include (the zero of the pump chart), not a floor: values below them extend the axis (review of c3b3ec4, TODO a).
+  // A point without a value (NaN, a closed valve) breaks the line there, and a point with a value between two without
+  // one is drawn as a dot (review of c3b3ec4, item B)
   function lineChart(o) {
     const W = 880, Hh = 400, L = 70, R = 24, T = 18, B = 52;
     const all = o.series.flatMap((s) => s.pts).concat((o.points || []).map((p) => [p.x, p.y])).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
     if (!all.length) return `<div class="empty">${t('charts.noData')}</div>`;
-    let x0 = o.xMin ?? Math.min(...all.map((p) => p[0])), x1 = Math.max(...all.map((p) => p[0]));
-    let y0 = o.yMin ?? Math.min(...all.map((p) => p[1])), y1 = Math.max(...all.map((p) => p[1]));
+    const xv = all.map((p) => p[0]).concat(Number.isFinite(o.xMin) ? [o.xMin] : []);
+    const yv = all.map((p) => p[1]).concat(Number.isFinite(o.yMin) ? [o.yMin] : []);
+    let x0 = Math.min(...xv), x1 = Math.max(...xv);
+    let y0 = Math.min(...yv), y1 = Math.max(...yv);
     if (x1 === x0) x1 = x0 + 1;
     if (y1 === y0) { y1 += 1; y0 -= 1; }
     const xs = niceStep(x1 - x0), ys = niceStep(y1 - y0);
@@ -65,11 +72,20 @@
     g += `<text class="axis-label" x="${(L + W - R) / 2}" y="${Hh - 10}" text-anchor="middle">${F.esc(o.xLabel)}</text>`;
     g += `<text class="axis-label" transform="translate(16 ${(T + Hh - B) / 2}) rotate(-90)" text-anchor="middle">${F.esc(o.yLabel)}</text>`;
     for (const s of o.series) {
-      const pts = s.pts.filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+      const ok = (p) => Number.isFinite(p[0]) && Number.isFinite(p[1]);
+      const pts = s.pts.filter(ok);
       if (!pts.length) continue;
-      const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join('');
-      g += `<path d="${d}" fill="none" style="stroke:${s.color}" stroke-width="${s.width || 2.4}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} stroke-linejoin="round"/>`;
+      // the runs of points with a value, split where a point has none
+      const runs = [[]];
+      for (const p of s.pts) {
+        if (ok(p)) runs[runs.length - 1].push(p);
+        else if (runs[runs.length - 1].length) runs.push([]);
+      }
+      const lines = runs.filter((r) => r.length > 1);
+      const d = lines.map((r) => r.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join('')).join('');
+      if (d) g += `<path d="${d}" fill="none" style="stroke:${s.color}" stroke-width="${s.width || 2.4}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} stroke-linejoin="round"/>`;
       if (s.marker) g += pts.map((p) => `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3.2" style="fill:${s.color}"/>`).join('');
+      else g += runs.filter((r) => r.length === 1).map(([p]) => `<circle class="lone" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="${Math.max(2.4, (s.width || 2.4) * 1.1)}" style="fill:${s.color}"/>`).join('');
     }
     for (const p of o.points || []) {
       if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;

@@ -14,6 +14,7 @@ PumpIt.i18n.add('pt-BR', {
       lostText: 'A outra aba passou a editar o estudo. Esta aba fica bloqueada e não salva mais nada; o que foi salvo aqui continua no estudo.',
       use: 'Usar aqui',
       useHint: 'Esta aba abre o estudo como foi salvo por último e passa a editá-lo; a outra aba fica bloqueada.',
+      reloaded: 'Outra aba alterou o estudo enquanto esta página estava fora: ele abre como foi salvo por último.',
     },
     saving: { short: 'Falha ao salvar', failed: 'Falha ao salvar. As alterações estão só nesta aba.', download: 'Baixar cópia', again: 'O modelo voltou a ser salvo no navegador.' },
     page: {
@@ -156,6 +157,8 @@ PumpIt.i18n.add('pt-BR', {
       copied: 'Copiado: {junctions} junção(ões) e {pipes} tubo(s). Ctrl+V cola.',
       empty: 'Nada copiado ainda.',
       pasted: 'Colado: {junctions} junção(ões) e {pipes} tubo(s).',
+      eventsAdded: 'Eventos nomeados acrescentados com a cópia: {list}.',
+      eventsRenamed: 'Eventos nomeados da cópia cujo nome o modelo já dava a outro evento, acrescentados com um novo nome: {list}.',
     },
     shortcuts: {
       title: 'Atalhos de teclado',
